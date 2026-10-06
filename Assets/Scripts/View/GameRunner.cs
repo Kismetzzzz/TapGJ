@@ -367,6 +367,7 @@ namespace TapGJ.View
                 case GameEventType.Message: return e.Text;
                 case GameEventType.Move: return $"    {ElementDefs.Name(e.Element)}{e.To} 移动";
                 case GameEventType.Bump: return $"    {ElementDefs.Name(e.Element)}{e.From} 同元素相遇 → 禁止移动";
+                case GameEventType.Transform: return $"    {e.From} {e.Text}";
                 case GameEventType.Vanish: return $"    {e.Text}";
                 case GameEventType.Spawn: return $"    {e.To} {e.Text}";
                 case GameEventType.SpawnBlocked: return $"    {e.From} {e.Text}";

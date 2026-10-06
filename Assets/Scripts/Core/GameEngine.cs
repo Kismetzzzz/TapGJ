@@ -81,6 +81,8 @@ namespace TapGJ.Core
         readonly List<GameEvent> _log = new List<GameEvent>();
         readonly Dictionary<Element, int> _removed = new Dictionary<Element, int>();
         readonly Dictionary<Element, int> _spawned = new Dictionary<Element, int>();
+        /// <summary>键是「变之前」的元素：金变水记在金的账上。</summary>
+        readonly Dictionary<Element, int> _converted = new Dictionary<Element, int>();
 
         int _nextUid = 1;
         int _nextCardId = 1;
@@ -130,11 +132,18 @@ namespace TapGJ.Core
         public int CreepCount => Board.CreepCount();
         public bool AwaitingStepPlayback => _steps.Count > 0;
 
-        /// <summary>本局累计各元素被反应消耗 / 生成的数量，用于观察平衡性。</summary>
+        /// <summary>本局累计各元素被相克消耗 / 出牌相生生成 / 相生转换掉的数量，用于观察平衡性。</summary>
         public IReadOnlyDictionary<Element, int> RemovedCounts => _removed;
         public IReadOnlyDictionary<Element, int> SpawnedCounts => _spawned;
+
+        /// <summary>有多少只该元素**被相生变成了别的元素**（键是变之前的元素）。</summary>
+        public IReadOnlyDictionary<Element, int> ConvertedCounts => _converted;
+
         public int TotalRemoved { get; private set; }
         public int TotalSpawned { get; private set; }
+
+        /// <summary>本局累计发生的相生转换次数。</summary>
+        public int TotalTransformed { get; private set; }
 
         /// <summary>出生失败的次数（反应本该生成新元素但四周无空格）。</summary>
         public int SpawnBlockedCount { get; private set; }
@@ -164,6 +173,7 @@ namespace TapGJ.Core
             _log.Clear();
             _removed.Clear();
             _spawned.Clear();
+            _converted.Clear();
             _nextUid = 1;
             _nextCardId = 1;
             _movedThisRound.Clear();
@@ -178,6 +188,7 @@ namespace TapGJ.Core
             DiscardPhaseEnded = false;
             TotalRemoved = 0;
             TotalSpawned = 0;
+            TotalTransformed = 0;
             SpawnBlockedCount = 0;
 
             // 均匀生成：把 64 格洗牌，前 20 格按「每种元素 4 个」铺开。
@@ -388,13 +399,19 @@ namespace TapGJ.Core
                     }
                     else
                     {
-                        // 不同元素相遇：发生反应（撞上去的一方可能被消耗掉，那就不再往下走）
-                        ResolveEncounter(creep, other, next, record);
+                        // 不同元素相遇：发生反应。相克可能会把拦路的那只清掉，
+                        // 于是主动方可以顺势占住那一格并接着把剩余步数走完。
+                        bool mayContinue = ResolveEncounter(creep, other, next, record);
+
                         if (!creep.Alive)
                         {
                             record.To = record.Path.Count > 0 ? record.Path[record.Path.Count - 1] : creep.Pos;
                             break;
                         }
+
+                        if (!mayContinue) break; // 相生：格子还被占着，走不动了
+                        cursor = creep.Pos;      // 相克且主动方赢：已经站到新格子上，继续
+                        continue;
                     }
                     break;
                 }
@@ -439,13 +456,14 @@ namespace TapGJ.Core
 
         /// <summary>
         /// 触发方(trigger) 撞上 目标(target)。按图2 的表结算（详见 ReactionTable 的注释）：
-        ///   def.Spawn 就是这一对的赢家 —— 它留下并「+1」（在相邻空格生成一个新的自己），
-        ///   另一方（输家）从棋盘上消失。输家可能是主动撞上去的，也可能是被撞上的，
-        ///   由表决定，不能写死。
-        /// 当前 10 对跨元素组合都有明确赢家，所以走不到 BothVanish 分支；
-        /// 保留它是为了以后能配出「湮灭」型规则。
+        ///   相生（原表「X元素+1」句式）→ 输的一方**就地变成**赢家元素，格子占用不变；
+        ///   相克（原表「该X元素消失」句式）→ 输的一方**直接消失**，格子空出来。
+        /// 谁输由表决定（def.Winner 是赢家，另一方就是输家），不能写死成「主动方一定输」。
         /// </summary>
-        void ResolveEncounter(Creep trigger, Creep target, Pos meetingPoint, StepRecord record)
+        /// <returns>
+        /// true = 主动方赢了相克、已经占住让出来的那一格，调用方可以让它接着走完剩余步数。
+        /// </returns>
+        bool ResolveEncounter(Creep trigger, Creep target, Pos meetingPoint, StepRecord record)
         {
             var def = Reactions.Get(trigger.Element, target.Element);
 
@@ -460,12 +478,15 @@ namespace TapGJ.Core
                     Uid = trigger.Uid,
                     Text = $"同种{ElementDefs.Name(trigger.Element)}相遇，禁止移动",
                 });
-                return;
+                return false;
             }
+
+            var winnerIsTrigger = def.Winner == trigger.Element;
+            var loser = winnerIsTrigger ? target : trigger;
 
             if (def.Rule == ReactionRule.BothVanish)
             {
-                // 可选规则：双方都消失，没有任何赢家，也不生成新元素
+                // 可选规则：双方都消失，没有任何赢家，也不发生相生转换
                 RemoveCreep(trigger, record, meetingPoint);
                 RemoveCreep(target, record, meetingPoint);
                 record.Events.Add(new GameEvent
@@ -476,13 +497,32 @@ namespace TapGJ.Core
                     Uid = trigger.Uid,
                     Text = $"{ElementDefs.Name(trigger.Element)} × {ElementDefs.Name(target.Element)} → 双方都消失",
                 });
-                return;
+                return false;
             }
 
-            // 赢家是 trigger 还是 target，由表决定
-            var winnerIsTrigger = def.Spawn == trigger.Element;
-            var loser = winnerIsTrigger ? target : trigger;
+            if (def.Rule == ReactionRule.Transform)
+            {
+                // 相生：输家变成赢家元素。uid / 位置 / 存活状态全都不变，只换元素。
+                var before = loser.Element;
+                loser.Element = def.Winner;
 
+                TotalTransformed++;
+                _converted[before] = ConvertedCounts.TryGetValue(before, out var n) ? n + 1 : 1;
+
+                record.Events.Add(new GameEvent
+                {
+                    Type = GameEventType.Transform,
+                    From = loser.Pos,
+                    To = loser.Pos,
+                    Element = before,
+                    Uid = loser.Uid,
+                    Text = $"{ElementDefs.Name(trigger.Element)} × {ElementDefs.Name(target.Element)} → "
+                           + $"{ElementDefs.Name(before)}变为{ElementDefs.Name(def.Winner)}（相生）",
+                });
+                return false; // 格子没空出来，主动方走不动
+            }
+
+            // 相克：输家直接消失
             RemoveCreep(loser, record, meetingPoint);
             record.Events.Add(new GameEvent
             {
@@ -491,7 +531,7 @@ namespace TapGJ.Core
                 Element = loser.Element,
                 Uid = loser.Uid,
                 Text = $"{ElementDefs.Name(trigger.Element)} × {ElementDefs.Name(target.Element)} → "
-                      + $"{ElementDefs.Name(loser.Element)}消失，{ElementDefs.Name(def.Spawn)}+1",
+                       + $"{ElementDefs.Name(loser.Element)}消失（{ElementDefs.Name(def.Winner)}克之）",
             });
 
             // 赢家是撞上去的那一方时，它顺势占住让出来的那一格（等于往前走了一步）
@@ -502,9 +542,10 @@ namespace TapGJ.Core
                 Board.Put(trigger);
                 record.Path.Add(meetingPoint);
                 record.To = meetingPoint;
+                return true;
             }
 
-            SpawnCreep(def.Spawn, SpawnCellFor(meetingPoint), record, meetingPoint);
+            return false;
         }
 
         /// <summary>
@@ -637,7 +678,7 @@ namespace TapGJ.Core
                 Element = card.Element,
                 From = Pos.None,
                 To = target,
-                CreepWentAway = true,
+                CreepWentAway = plan.Value.TargetVanishes,
             };
 
             _hand.Remove(card);
@@ -649,18 +690,28 @@ namespace TapGJ.Core
             return record;
         }
 
+        /// <summary>一次出牌的结算计划（由 PlanCardEffect 算出，具体生效在 ApplyCardEffect）。</summary>
         struct CardPlan
         {
-            public Creep Loser;
+            /// <summary>目标最终的元素（相生时会被改掉）。</summary>
+            public Element TargetBecomes;
+            /// <summary>目标是否直接消失（相克且牌面元素赢）。</summary>
+            public bool TargetVanishes;
+            /// <summary>是否额外生成一只、以及生成什么元素（相生的「+1」）。</summary>
             public Element? Spawn;
         }
 
         /// <summary>
-        /// 算出这次出牌会让谁消失、生成什么；返回 null 表示这次出牌不合法。
-        /// 牌 = 一个「虚拟元素」，主动撞上目标格上的元素，因此按图2 的表：
-        ///   目标元素的「遇到 牌面元素」那一行决定结果 —— 目标消失。
-        ///   SpawnOne(winner) 时，若 winner 就是牌面元素，则「牌+1」= 生成一个新的牌面元素；
-        ///   若 winner 是目标元素，则这次出牌只是把它清掉（没有额外生成），牌被消耗。
+        /// 算出这次出牌的结果；返回 null 表示这次出牌不合法（打出去场上什么都不会变）。
+        ///
+        /// 牌 = 一个「虚拟元素」主动撞上目标格上的元素，按图2 同一张表结算：
+        ///   · 相克（「该X元素消失」）—— **只有牌面元素克制目标**时才有意义：
+        ///       目标直接消失，不生成任何东西。
+        ///       反过来（目标克制牌）时牌打出去场上毫无变化，所以判定为不合法。
+        ///   · 相生（「X元素+1」）—— 输的一方变成赢家元素，并且赢家元素在目标旁边**+1**：
+        ///       牌面元素赢 → 目标就地变成牌面元素，旁边再生成一个牌面元素；
+        ///       目标赢     → 目标不变，牌自己变成目标元素落到旁边（即生成 1 个目标元素）。
+        ///     两种情况都会在目标周围多出一只，这正是原表写的「+1」。
         /// </summary>
         CardPlan? PlanCardEffect(Creep victim, Card card)
         {
@@ -668,11 +719,11 @@ namespace TapGJ.Core
             {
                 case CardEffectMode.SameElementOnly:
                     if (victim.Element != card.Element) return null;
-                    return new CardPlan { Loser = victim, Spawn = null };
+                    return new CardPlan { TargetBecomes = victim.Element, TargetVanishes = true, Spawn = null };
 
                 case CardEffectMode.SameElementSpawnOne:
                     if (victim.Element != card.Element) return null;
-                    return new CardPlan { Loser = victim, Spawn = victim.Element };
+                    return new CardPlan { TargetBecomes = victim.Element, TargetVanishes = true, Spawn = victim.Element };
 
                 default: // CardAsVirtualElement
                 {
@@ -681,48 +732,101 @@ namespace TapGJ.Core
                     var def = Reactions.Get(victim.Element, card.Element);
                     if (def.Rule == ReactionRule.NoReaction) return null;
 
-                    // 牌面元素主动撞上目标：目标消失；若赢家就是牌面元素，就在旁边生成一个新的牌面元素。
-                    // （10 对跨元素组合里牌面元素永远是赢家，所以正常都会生成；这里仍按表判断，
-                    //   以后把某对改成「双方都消失」时不用动这段。）
-                    var spawn = def.CreatesCreep && def.Spawn == card.Element ? card.Element : (Element?)null;
-                    return new CardPlan { Loser = victim, Spawn = spawn };
+                    if (def.Rule == ReactionRule.BothVanish)
+                        return new CardPlan { TargetBecomes = victim.Element, TargetVanishes = true, Spawn = null };
+
+                    var cardWins = def.Winner == card.Element;
+
+                    if (def.Rule == ReactionRule.Annihilate)
+                    {
+                        // 相克：牌面元素赢 → 目标消失；牌面元素输 → 这张牌不该能打出去
+                        if (!cardWins) return null;
+                        return new CardPlan { TargetBecomes = victim.Element, TargetVanishes = true, Spawn = null };
+                    }
+
+                    // 相生：输的一方变成赢家元素，且赢家元素在旁边 +1
+                    return cardWins
+                        ? new CardPlan { TargetBecomes = card.Element, TargetVanishes = false, Spawn = card.Element }
+                        : new CardPlan { TargetBecomes = victim.Element, TargetVanishes = false, Spawn = victim.Element };
                 }
             }
         }
 
         void ApplyCardEffect(CardPlan plan, Creep victim, Card card, Pos target, StepRecord record)
         {
-            RemoveCreep(plan.Loser, record, target);
-            record.Events.Add(new GameEvent
-            {
-                Type = GameEventType.Vanish,
-                From = target,
-                Element = plan.Loser.Element,
-                Uid = plan.Loser.Uid,
-                Text = $"打出{ElementDefs.Name(card.Element)}牌 → {ElementDefs.Name(plan.Loser.Element)}元素消失",
-            });
+            var victimElement = victim.Element;
 
+            if (plan.TargetVanishes)
+            {
+                RemoveCreep(victim, record, target);
+                record.Events.Add(new GameEvent
+                {
+                    Type = GameEventType.Vanish,
+                    From = target,
+                    Element = victimElement,
+                    Uid = victim.Uid,
+                    Text = $"打出{ElementDefs.Name(card.Element)}牌 → {ElementDefs.Name(victimElement)}元素消失（相克）",
+                });
+            }
+            else if (plan.TargetBecomes != victimElement)
+            {
+                // 相生：目标就地变成牌面元素，uid / 位置不变（表现层只需要换颜色和字）
+                victim.Element = plan.TargetBecomes;
+
+                TotalTransformed++;
+                _converted[victimElement] = ConvertedCounts.TryGetValue(victimElement, out var n) ? n + 1 : 1;
+
+                record.Events.Add(new GameEvent
+                {
+                    Type = GameEventType.Transform,
+                    From = target,
+                    To = target,
+                    Element = victimElement,
+                    Uid = victim.Uid,
+                    Text = $"打出{ElementDefs.Name(card.Element)}牌 → "
+                           + $"{ElementDefs.Name(victimElement)}变为{ElementDefs.Name(plan.TargetBecomes)}（相生）",
+                });
+            }
+
+            // 相生的「+1」：在目标旁边多出一只赢家元素
             if (plan.Spawn == null) return;
 
-            var spawnCell = SpawnCellFor(target);
-            SpawnCreep(plan.Spawn.Value, spawnCell, record, target);
+            SpawnCreep(plan.Spawn.Value, SpawnCellFor(target), record, target);
         }
 
-        /// <summary>这次出牌不合法时，给玩家一句能看懂的提示（含这张目标格可用的牌）。</summary>
+        /// <summary>这次出牌不合法时，给玩家一句能看懂的提示（列出这张目标格真正能用的牌）。</summary>
         string BuildFailReason(Creep victim, Card card)
         {
             if (Rules.CardEffect != CardEffectMode.CardAsVirtualElement)
                 return $"{ElementDefs.Name(card.Element)}牌只能作用于{ElementDefs.Name(card.Element)}元素，目标格是{ElementDefs.Name(victim.Element)}";
 
-            // 反推：哪些牌能打在这个目标上
+            // 反推：哪些牌打在这个目标上真的会发生事情
             var valid = new List<string>();
             foreach (var e in ElementDefs.All)
             {
                 if (e == victim.Element) continue; // 同元素之间不发生反应，不能出牌
+
                 var d = Reactions.Get(victim.Element, e);
                 if (d.Rule == ReactionRule.NoReaction) continue;
-                valid.Add($"{ElementDefs.Name(e)}牌 → {ElementDefs.Name(victim.Element)}消失并生成 1 个{ElementDefs.Name(d.Spawn)}");
+
+                var cardWins = d.Winner == e;
+                if (d.Rule == ReactionRule.Annihilate && !cardWins) continue; // 相克里牌面元素输 → 打出去没变化
+
+                string effect;
+                if (d.Rule == ReactionRule.Annihilate)
+                    effect = $"{ElementDefs.Name(victim.Element)}直接消失";
+                else if (d.Rule == ReactionRule.BothVanish)
+                    effect = "双方都消失";
+                else if (cardWins)
+                    effect = $"{ElementDefs.Name(victim.Element)}变为{ElementDefs.Name(e)}，并生成 1 个{ElementDefs.Name(e)}";
+                else
+                    effect = $"目标不变，生成 1 个{ElementDefs.Name(victim.Element)}";
+
+                valid.Add($"{ElementDefs.Name(e)}牌 → {effect}");
             }
+
+            if (valid.Count == 0)
+                return $"没有能作用于{ElementDefs.Name(victim.Element)}的牌";
 
             return $"这张牌打在该目标上不构成反应；可用的牌（{ElementDefs.Name(victim.Element)}目标）：{string.Join("、", valid)}";
         }

@@ -95,68 +95,112 @@ namespace TapGJ.Tests
                     var mirror = table.Get(b, a);
                     Assert.AreEqual(def.Rule, mirror.Rule,
                         $"{ElementDefs.Name(a)}×{ElementDefs.Name(b)} 与 {ElementDefs.Name(b)}×{ElementDefs.Name(a)} 规则不一致");
-                    if (def.CreatesCreep)
-                        Assert.AreEqual(def.Spawn, mirror.Spawn,
-                            $"{ElementDefs.Name(a)}×{ElementDefs.Name(b)} 两个方向生成/消失的元素不一致");
+                    Assert.AreEqual(def.Winner, mirror.Winner,
+                        $"{ElementDefs.Name(a)}×{ElementDefs.Name(b)} 两个方向的赢家必须一致");
                 }
             }
 
             // 抽查图2 里写明的几条（括号里是原文）
-            Assert.AreEqual(ReactionRule.SpawnOne, table.Get(Element.Water, Element.Wood).Rule, "水：与木牌相遇木元素+1");
-            Assert.AreEqual(Element.Wood, table.Get(Element.Water, Element.Wood).Spawn);
+            Assert.AreEqual(ReactionRule.Transform, table.Get(Element.Water, Element.Wood).Rule, "木行「与水牌相遇木元素+1」→ 相生");
+            Assert.AreEqual(Element.Wood, table.Get(Element.Water, Element.Wood).Winner);
 
-            Assert.AreEqual(ReactionRule.SpawnOne, table.Get(Element.Fire, Element.Wood).Rule, "火：与木牌相遇火元素+1");
-            Assert.AreEqual(Element.Fire, table.Get(Element.Fire, Element.Wood).Spawn);
+            Assert.AreEqual(ReactionRule.Annihilate, table.Get(Element.Water, Element.Earth).Rule, "水行「与土元素相遇，该水元素消失」→ 相克");
+            Assert.AreEqual(Element.Earth, table.Get(Element.Water, Element.Earth).Winner);
 
-            Assert.AreEqual(ReactionRule.SpawnOne, table.Get(Element.Water, Element.Earth).Rule, "水：与土元素相遇，该水元素消失");
-            Assert.AreEqual(Element.Earth, table.Get(Element.Water, Element.Earth).Spawn);
+            Assert.AreEqual(ReactionRule.Annihilate, table.Get(Element.Metal, Element.Wood).Rule, "金行「与木元素相遇，该木元素消失」→ 相克");
+            Assert.AreEqual(Element.Metal, table.Get(Element.Metal, Element.Wood).Winner);
+        }
 
-            Assert.AreEqual(ReactionRule.SpawnOne, table.Get(Element.Metal, Element.Wood).Rule, "金：与木元素相遇，该木元素消失");
-            Assert.AreEqual(Element.Metal, table.Get(Element.Metal, Element.Wood).Spawn);
-
-            Assert.AreEqual(ReactionRule.SpawnOne, table.Get(Element.Earth, Element.Metal).Rule, "土：与金牌相遇金元素+1 → 金赢、土输");
-            Assert.AreEqual(Element.Metal, table.Get(Element.Earth, Element.Metal).Spawn);
-            Assert.AreEqual(ReactionRule.SpawnOne, table.Get(Element.Fire, Element.Metal).Rule, "火：与金元素相遇，该金元素消失（点名金 → 火输、金赢）");
-            Assert.AreEqual(Element.Metal, table.Get(Element.Fire, Element.Metal).Spawn);
-
-            // 原表两种句式看起来打架，但按「被点名的元素是输家」读就全部自洽。
-            // 下面 10 对逐对钉住赢家，防止以后改表改歪。
-            var allPairs = new (Element a, Element b, Element winner, string why)[]
+        [Test]
+        public void 反应表_相生五对_输家变成赢家()
+        {
+            // 原表「与X相遇 X元素+1」句式 = 相生：输的那个就地变成 X。
+            var table = new ReactionTable();
+            var pairs = new (Element loser, Element winner, string why)[]
             {
-                (Element.Metal, Element.Wood, Element.Metal, "金：与木元素相遇，该木元素消失"),
-                (Element.Metal, Element.Water, Element.Water, "金：与水牌相遇水元素+1 → 金消失变成水"),
-                (Element.Metal, Element.Earth, Element.Metal, "金：与土牌相遇金元素+1 → 土输"),
-                (Element.Fire, Element.Metal, Element.Metal, "火：与金元素相遇，该金元素消失 → 火输"),
-                (Element.Water, Element.Wood, Element.Wood, "水：与木牌相遇木元素+1 → 水输"),
-                (Element.Wood, Element.Fire, Element.Fire, "木：与火牌相遇火元素+1 → 木输"),
-                (Element.Wood, Element.Earth, Element.Wood, "木：与土元素相遇，该土元素消失"),
-                (Element.Water, Element.Fire, Element.Water, "水：与火元素相遇，该火元素消失"),
-                (Element.Water, Element.Earth, Element.Earth, "水：与土元素相遇，该水元素消失"),
-                (Element.Fire, Element.Earth, Element.Earth, "火：与土牌相遇土元素+1 → 火输"),
+                (Element.Metal, Element.Water, "金行「与水牌相遇水元素+1」→ 金变水"),
+                (Element.Water, Element.Wood,  "木行「与水牌相遇木元素+1」→ 水变木"),
+                (Element.Wood,  Element.Fire,  "木行「与火牌相遇火元素+1」→ 木变火"),
+                (Element.Fire,  Element.Earth, "火行「与土牌相遇土元素+1」→ 火变土"),
+                (Element.Earth, Element.Metal, "金行「与土牌相遇金元素+1」→ 土变金"),
             };
 
-            Assert.AreEqual(10, allPairs.Length, "跨元素组合一共 10 对");
-            foreach (var (a, b, winner, why) in allPairs)
+            Assert.AreEqual(5, pairs.Length, "相生一共 5 对（五行相生链）");
+            foreach (var (loser, winner, why) in pairs)
             {
-                var d = table.Get(a, b);
-                Assert.AreEqual(ReactionRule.SpawnOne, d.Rule, $"{ElementDefs.Name(a)}×{ElementDefs.Name(b)} 必须有明确赢家");
-                Assert.AreEqual(winner, d.Spawn,
-                    $"{ElementDefs.Name(a)}×{ElementDefs.Name(b)} 的赢家应该是{ElementDefs.Name(winner)}（{why}）");
+                var d = table.Get(loser, winner);
+                Assert.AreEqual(ReactionRule.Transform, d.Rule, why);
+                Assert.AreEqual(winner, d.Winner, why);
 
-                // 反向必须给出同一个赢家
-                Assert.AreEqual(d.Rule, table.Get(b, a).Rule, "反向规则必须一致");
-                Assert.AreEqual(winner, table.Get(b, a).Spawn, "反向赢家必须一致");
+                // 反向必须一致
+                Assert.AreEqual(ReactionRule.Transform, table.Get(winner, loser).Rule, why);
+                Assert.AreEqual(winner, table.Get(winner, loser).Winner, why);
             }
+        }
 
-            // 再确认一遍：25 格里没有一格是「没有明确赢家」的跨元素组合
-            foreach (var a in ElementDefs.All)
+        [Test]
+        public void 反应表_相克五对_输家直接消失()
+        {
+            // 原表「与X相遇，该Y元素消失」句式 = 相克：Y 直接消失。
+            var table = new ReactionTable();
+            var pairs = new (Element loser, Element winner, string why)[]
             {
+                (Element.Wood,  Element.Metal, "金行「与木元素相遇，该木元素消失」→ 金克木"),
+                (Element.Metal, Element.Fire,  "金行「与火元素/火牌相遇，该金元素消失」→ 火克金"),
+                (Element.Earth, Element.Wood,  "木行「与土元素相遇，该土元素消失」→ 木克土"),
+                (Element.Fire,  Element.Water, "水行「与火元素相遇，该火元素消失」→ 水克火"),
+                (Element.Water, Element.Earth, "水行「与土元素相遇，该水元素消失」→ 土克水"),
+            };
+
+            Assert.AreEqual(5, pairs.Length, "相克一共 5 对（五行相克链）");
+            foreach (var (loser, winner, why) in pairs)
+            {
+                var d = table.Get(loser, winner);
+                Assert.AreEqual(ReactionRule.Annihilate, d.Rule, why);
+                Assert.AreEqual(winner, d.Winner, why);
+
+                Assert.AreEqual(ReactionRule.Annihilate, table.Get(winner, loser).Rule, why);
+                Assert.AreEqual(winner, table.Get(winner, loser).Winner, why);
+            }
+        }
+
+        [Test]
+        public void 反应表_十对全部落在相生相克上_且每个元素都是两胜两负()
+        {
+            // 这条是防「某个元素一家独大」的回归测试：
+            // 之前金×火被写反，导致金 3 胜 1 负、火 1 胜 3 负，五行就不平衡了。
+            var table = new ReactionTable();
+
+            int transform = 0, annihilate = 0;
+            foreach (var a in ElementDefs.All)
                 foreach (var b in ElementDefs.All)
                 {
                     if (a == b) continue;
-                    Assert.AreNotEqual(ReactionRule.BothVanish, table.Get(a, b).Rule,
-                        $"{ElementDefs.Name(a)}×{ElementDefs.Name(b)} 不该是湮灭型规则 —— 10 对都应该有赢家");
+
+                    var d = table.Get(a, b);
+                    Assert.IsTrue(d.IsGenerating || d.IsDestroying,
+                        $"{ElementDefs.Name(a)}×{ElementDefs.Name(b)} 必须是相生或相克");
+                    Assert.AreNotEqual(ReactionRule.BothVanish, d.Rule, "当前这张表里没有湮灭型规则");
+
+                    if (d.IsGenerating) transform++;
+                    else annihilate++;
                 }
+
+            Assert.AreEqual(10, transform, "相生共 5 对（双向各算一次）");
+            Assert.AreEqual(10, annihilate, "相克共 5 对（双向各算一次）");
+
+            foreach (var e in ElementDefs.All)
+            {
+                int wins = 0, losses = 0;
+                foreach (var other in ElementDefs.All)
+                {
+                    if (other == e) continue;
+                    if (table.Get(e, other).Winner == e) wins++;
+                    else losses++;
+                }
+
+                Assert.AreEqual(2, wins, $"{ElementDefs.Name(e)} 应该只赢 2 种元素（生 1 + 克 1）");
+                Assert.AreEqual(2, losses, $"{ElementDefs.Name(e)} 应该只输 2 种元素（被 1 种生 + 被 1 种克）");
             }
         }
 
@@ -218,10 +262,9 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 不同元素相遇_水木相遇_水消失而木加一()
+        public void 相生_水撞木_水就地变成木_元素总数不变()
         {
-            // 水行「与木牌相遇木元素+1」→ 木赢：撞上去的水消失，木+1。
-            // 注意被撞上的木同时会消失，所以净效果是「原来的木消失 + 新生一个木」。
+            // 木行「与水牌相遇木元素+1」= 相生：输的水变成木（水+1 就是"金木水火土"里水那一格换了身份）。
             var engine = Rig(BaseRules(),
                 (Element.Water, new Pos(0, 0)),
                 (Element.Wood, new Pos(2, 0)));
@@ -229,61 +272,87 @@ namespace TapGJ.Tests
             var step = StepOnce(engine, 3, 1);
 
             Assert.IsNotNull(step);
-            Assert.AreEqual(0, engine.Board.CountOf(Element.Water), "水消失");
-            Assert.AreEqual(2, engine.Board.CountOf(Element.Wood), "木+1：原来的木被撞掉，另生成一个新的木");
-            Assert.AreEqual(2, engine.CreepCount);
-            Assert.IsTrue(step.CreepWentAway, "消失的是主动撞上去的水");
+            Assert.AreEqual(0, engine.Board.CountOf(Element.Water), "水没了（变成了木）");
+            Assert.AreEqual(2, engine.Board.CountOf(Element.Wood), "原来的木 + 变成木的那只 = 2");
+            Assert.AreEqual(2, engine.CreepCount, "相生不改变元素总数");
+            Assert.AreEqual(1, engine.TotalTransformed, "记一次相生转换");
+            Assert.AreEqual(0, engine.TotalRemoved, "相生不算「消失」，所以不计瓶子");
+            Assert.AreEqual(0, engine.TotalSpawned, "棋盘上的相生不会凭空生成新小怪");
+            Assert.AreEqual(1, engine.ConvertedOf(Element.Water), "水被转换掉 1 只");
 
-            bool hasSpawn = false;
-            Pos spawnAt = Pos.None;
-            foreach (var e in step.Events)
-                if (e.Type == GameEventType.Spawn) { hasSpawn = true; spawnAt = e.To; }
-            Assert.IsTrue(hasSpawn, "应该记录一次生成事件");
-            Assert.AreNotEqual(new Pos(2, 0), spawnAt, "新元素不能盖在原有的木上");
-            Assert.IsTrue(Board.Manhattan(new Pos(2, 0), spawnAt) == 1, "新元素应该紧贴反应发生点");
+            // 相生不空出格子 → 主动方只能停在相邻格，不能占住对方的格子
+            Assert.AreEqual(new Pos(1, 0), step.To, "相生后主动方停在相邻格");
+            Assert.AreEqual(Element.Wood, engine.Board.At(new Pos(1, 0)).Element, "(1,0) 上的水已经变成木");
+            Assert.AreEqual(Element.Wood, engine.Board.At(new Pos(2, 0)).Element, "被撞的木留在原地");
+            Assert.IsFalse(step.CreepWentAway, "相生没有任何小怪离场");
+            Assert.AreEqual(0, engine.Bottle.Count(Element.Water), "相生不给瓶子加计数");
+
+            bool hasTransform = false;
+            foreach (var e in step.Events) if (e.Type == GameEventType.Transform) hasTransform = true;
+            Assert.IsTrue(hasTransform, "应该记录一次相生转换事件");
         }
 
         [Test]
-        public void 不同元素相遇_水撞火_火消失而水加一()
+        public void 相克_水撞火_火消失_主动方占住那一格并继续走完剩余步数()
         {
-            // 水行「与火元素相遇，该火元素消失」→ 水赢、火输。
-            // 按「被点名的元素是输家」读：「该火元素消失」点名的是火，所以火消失。
+            // 水行「与火元素相遇，该火元素消失」= 相克：火直接消失，格子空出来。
+            // 预算刚好用完：停在让出来的那一格。
             var engine = Rig(BaseRules(),
                 (Element.Water, new Pos(0, 0)),
                 (Element.Fire, new Pos(2, 0)));
 
-            var step = StepOnce(engine, 3, 1);
+            var step = StepOnce(engine, 2, 1);
 
             Assert.IsNotNull(step);
-            Assert.AreEqual(0, engine.Board.CountOf(Element.Fire), "被点名的火消失");
-            Assert.AreEqual(2, engine.Board.CountOf(Element.Water), "水赢 → 水+1（撞上去的那只 + 新生成的一只）");
-            Assert.AreEqual(2, engine.CreepCount);
-            Assert.IsFalse(step.CreepWentAway, "消失的是被撞上的火，不是主动撞上去的水");
+            Assert.AreEqual(0, engine.Board.CountOf(Element.Fire), "相克：火直接消失");
+            Assert.AreEqual(1, engine.Board.CountOf(Element.Water), "水赢，场上只有它自己（没有生成复制）");
+            Assert.AreEqual(1, engine.CreepCount, "相克让元素总数 −1");
+            Assert.AreEqual(1, engine.TotalRemoved, "记一次消失（瓶子会 +1）");
+            Assert.AreEqual(0, engine.TotalSpawned, "相克不生成任何东西");
+            Assert.AreEqual(0, engine.TotalTransformed);
+            Assert.AreEqual(Element.Water, engine.Board.At(new Pos(2, 0)).Element, "主动方占住让出来的那一格");
+            Assert.IsFalse(step.CreepWentAway, "消失的是被撞上的火");
+
+            // 预算还有剩：吃完火之后继续把剩下的步数走完
+            var engine2 = Rig(BaseRules(),
+                (Element.Water, new Pos(0, 0)),
+                (Element.Fire, new Pos(2, 0)));
+
+            var step2 = StepOnce(engine2, 3, 1);
+
+            Assert.IsNotNull(step2);
+            Assert.AreEqual(new Pos(3, 0), step2.To, "相克后主动方继续前进");
+            Assert.IsNull(engine2.Board.At(new Pos(2, 0)), "已经走到 (3,0)");
+            Assert.AreEqual(Element.Water, engine2.Board.At(new Pos(3, 0)).Element);
         }
 
         [Test]
-        public void 不同元素相遇_火撞金_火消失而金加一()
+        public void 相克_火撞金_火克金_金消失()
         {
-            // 火行「与金元素相遇，该金元素消失」；土行也写「与金牌相遇金元素+1」——
-            // 两处都让金赢，所以火 × 金的结果是火消失、金 +1。
+            // 金行「与火元素/火牌相遇，该金元素消失」→ 火赢、金输。
+            // ⚠ 这一对以前被写反成「金赢」，让金变成 3 胜 1 负的一家独大；这里钉死。
             var engine = Rig(BaseRules(),
                 (Element.Fire, new Pos(0, 0)),
                 (Element.Metal, new Pos(2, 0)));
 
-            var step = StepOnce(engine, 3, 1);
+            Assert.AreEqual(Element.Fire, engine.Reactions.Get(Element.Metal, Element.Fire).Winner, "火克金：赢家是火");
+            Assert.AreEqual(Element.Fire, engine.Reactions.Get(Element.Fire, Element.Metal).Winner, "反向也必须是火赢");
+
+            var step = StepOnce(engine, 2, 1);
 
             Assert.IsNotNull(step);
-            Assert.AreEqual(0, engine.Board.CountOf(Element.Fire), "火消失");
-            Assert.AreEqual(2, engine.Board.CountOf(Element.Metal), "金赢 → 金+1");
-            Assert.AreEqual(2, engine.CreepCount);
-            Assert.IsTrue(step.CreepWentAway, "消失的是主动撞上去的火");
+            Assert.AreEqual(0, engine.Board.CountOf(Element.Metal), "金被火克掉");
+            Assert.AreEqual(1, engine.Board.CountOf(Element.Fire), "火留下，场上只有它自己");
+            Assert.AreEqual(1, engine.CreepCount);
+            Assert.AreEqual(Element.Fire, engine.Board.At(new Pos(2, 0)).Element, "火占住让出来的那一格");
+            Assert.AreEqual(1, engine.RemovedOf(Element.Metal), "金瓶 +1");
         }
 
         [Test]
-        public void 不同元素相遇_水和土_土赢水输()
+        public void 相克_水撞土_土克水_水消失()
         {
-            // 水行：「与土元素/土牌相遇，该水元素消失」；土行：「与水元素相遇，该水元素消失」。
-            // 两条都只说水消失 → 赢家是土，能唯一确定。
+            // 水行「与土元素/土牌相遇，该水元素消失」；土行「与水元素相遇，该水元素消失」。
+            // 两条都只说水消失 → 赢家是土。
             var engine = Rig(BaseRules(),
                 (Element.Water, new Pos(0, 0)),
                 (Element.Earth, new Pos(2, 0)));
@@ -291,46 +360,50 @@ namespace TapGJ.Tests
             var step = StepOnce(engine, 3, 1);
 
             Assert.IsNotNull(step);
-            Assert.AreEqual(0, engine.Board.CountOf(Element.Water), "水撞上去后消失");
-            Assert.AreEqual(2, engine.Board.CountOf(Element.Earth), "土赢 → 土+1");
-            Assert.AreEqual(2, engine.CreepCount, "原来的土 + 新生成的土");
+            Assert.AreEqual(0, engine.Board.CountOf(Element.Water), "撞上去的水被克掉");
+            Assert.AreEqual(1, engine.Board.CountOf(Element.Earth), "土留下，且没有生成复制");
+            Assert.AreEqual(1, engine.CreepCount, "元素总数 −1");
             Assert.IsTrue(step.CreepWentAway, "消失的是主动撞上去的水");
+            Assert.AreEqual(Element.Earth, engine.Board.At(new Pos(2, 0)).Element, "土留在原地");
+            Assert.AreEqual(1, engine.RemovedOf(Element.Water));
         }
 
         [Test]
-        public void 反应生成_撞上去的一方消失并生成一个新的赢家()
+        public void 相生_土撞金_土变成金_不会凭空生成新小怪()
         {
-            // 火 × 金：金赢、火输。所以撞上去的火消失，并在金旁边生成一个新的金。
-            // 顺带验证出生统计：成功生成 1 个、出生失败 0 次。
+            // 金行「与土牌相遇金元素+1」= 相生：土变成金。
+            // 旧实现是「输家消失 + 赢家在旁边生成一只自己的复制」，会让元素无限增殖；
+            // 新实现里棋盘上的相生只换身份，总数不变 —— 这里把这条不变量钉死。
             var engine = new GameEngine(BaseRules(), 1);
             engine.ClearBoard();
 
-            // 火放最前面（uid 最小）→ 第一只被推进的就是它
-            var fire = engine.PlaceCreep(Element.Fire, new Pos(2, 0));
-            Assert.IsNotNull(fire, "火应该放得下");
+            var earth = engine.PlaceCreep(Element.Earth, new Pos(2, 0));
+            Assert.IsNotNull(earth, "土应该放得下");
 
             var metal = engine.PlaceCreep(Element.Metal, new Pos(2, 1));
             Assert.IsNotNull(metal, "金应该放得下");
 
-            var bystander = engine.PlaceCreep(Element.Earth, new Pos(7, 7));
+            var bystander = engine.PlaceCreep(Element.Wood, new Pos(7, 7));
             Assert.IsNotNull(bystander, "旁观元素应该放得下");
             engine.BeginRound();
 
-            // 火向上走 1 格撞上金；其余小怪原地不动
+            // 土向上走 1 格撞上金（方向 0 = +Y）；其余小怪原地不动
             StepOnce(engine, 1, 0);
 
             Assert.AreEqual(GamePhase.PlayerAction, engine.Phase);
-            Assert.AreEqual(0, engine.Board.CountOf(Element.Fire), "火撞上去后消失");
-            Assert.AreEqual(2, engine.Board.CountOf(Element.Metal), "金赢 → 金+1（原来的金 + 新生成的金）");
-            Assert.AreEqual(3, engine.CreepCount, "两个金 + 一个旁观元素");
-            Assert.AreEqual(1, engine.TotalSpawned, "成功生成 1 个新元素");
-            Assert.AreEqual(0, engine.SpawnBlockedCount, "棋盘很空，不该出生失败");
+            Assert.AreEqual(0, engine.Board.CountOf(Element.Earth), "土变成了金");
+            Assert.AreEqual(2, engine.Board.CountOf(Element.Metal), "原来的金 + 变成金的土");
+            Assert.AreEqual(3, engine.CreepCount, "小怪总数不变（没有消失、也没有生成）");
+            Assert.AreEqual(1, engine.TotalTransformed);
+            Assert.AreEqual(0, engine.TotalRemoved, "相生不计瓶子");
+            Assert.AreEqual(0, engine.TotalSpawned, "棋盘上的相生不会生成新小怪");
+            Assert.AreEqual(0, engine.SpawnBlockedCount);
 
-            bool vanished = false;
+            bool transformed = false;
             foreach (var s in engine.History)
                 foreach (var e in s.Events)
-                    if (e.Type == GameEventType.Vanish) vanished = true;
-            Assert.IsTrue(vanished, "应该有 Vanish 事件");
+                    if (e.Type == GameEventType.Transform) transformed = true;
+            Assert.IsTrue(transformed, "应该有 Transform 事件");
 
             var seen = new System.Collections.Generic.HashSet<Pos>();
             foreach (var c in engine.Creeps) Assert.IsTrue(seen.Add(c.Pos), $"{c.Pos} 被占了两次");
@@ -361,8 +434,10 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 出牌_把牌当作虚拟元素与目标反应_目标消失并有新元素生成()
+        public void 出牌_相生_木牌打水小怪_目标变成木且旁边再多一个木()
         {
+            // 木行「与水牌相遇木元素+1」= 相生，牌面元素（木）赢：
+            // 水就地变成木，同时相生的「+1」在目标旁边再生成一只木。
             var rules = BaseRules();
             rules.InitialHandSize = 1;
             rules.CardEffect = CardEffectMode.CardAsVirtualElement;
@@ -371,7 +446,7 @@ namespace TapGJ.Tests
             engine.ClearBoard();
             engine.PlaceCreep(Element.Water, new Pos(3, 3));
             engine.BeginRound();
-            engine.ForceHandForTest(new[] { Element.Wood }); // 水 遇 木 → 木+1
+            engine.ForceHandForTest(new[] { Element.Wood });
             engine.FreezeHandLimitForTest();                 // 本用例要精确控制手牌，别让抽牌阶段补牌
             engine.SetupBottleForTest(0);                    // 本用例不测瓶子，避免满瓶发牌干扰
             engine.SetNextRandomValues(0, 0);                // 准备阶段别把小怪挪走
@@ -385,22 +460,55 @@ namespace TapGJ.Tests
 
             Assert.IsNotNull(record, engine.FailReason);
             Assert.AreEqual(0, engine.Hand.Count, "出牌后手牌 -1");
-            Assert.AreEqual(0, engine.Board.CountOf(Element.Water), "水被牌消灭");
-            Assert.AreEqual(1, engine.Board.CountOf(Element.Wood), "按图2「水 遇 木 → 木+1」生成 1 个木");
-            Assert.AreEqual(1, engine.CreepCount, "消失与生成各一次，总数仍为 1");
+            Assert.AreEqual(0, engine.Board.CountOf(Element.Water), "水被相生转换掉了");
+            Assert.AreEqual(2, engine.Board.CountOf(Element.Wood), "目标变成木 + 相生的「+1」= 2 个木");
+            Assert.AreEqual(2, engine.CreepCount, "相生的 +1 让场上多了一只");
+            Assert.AreEqual(Element.Wood, engine.Board.At(new Pos(3, 3)).Element, "目标就地变成木（uid 不变）");
+            Assert.AreEqual(1, engine.TotalTransformed);
+            Assert.AreEqual(1, engine.TotalSpawned, "相生的 +1 生成了一只");
+            Assert.AreEqual(0, engine.TotalRemoved, "相生没有元素真正消失，所以瓶子不计");
 
-            bool vanished = false, spawned = false;
+            bool transformed = false, spawned = false;
             foreach (var e in record.Events)
             {
-                if (e.Type == GameEventType.Vanish) vanished = true;
+                if (e.Type == GameEventType.Transform) transformed = true;
                 if (e.Type == GameEventType.Spawn) spawned = true;
             }
-            Assert.IsTrue(vanished, "应该记录一次消失");
+            Assert.IsTrue(transformed, "应该记录一次相生转换");
             Assert.IsTrue(spawned, "应该记录一次生成");
         }
 
         [Test]
-        public void 出牌_水牌打火小怪_火消失并生成一个新水()
+        public void 出牌_相生_金牌打水小怪_目标不变但旁边生成一只水()
+        {
+            // 金行「与水牌相遇水元素+1」→ 金生水，赢家是水（也就是目标）：
+            // 目标不变，牌自己变成目标元素落到旁边 → 场上多出一只水。
+            var rules = BaseRules();
+            rules.CardEffect = CardEffectMode.CardAsVirtualElement;
+
+            var engine = new GameEngine(rules, 5);
+            engine.ClearBoard();
+            engine.PlaceCreep(Element.Water, new Pos(3, 3));
+            engine.BeginRound();
+            engine.ForceHandForTest(new[] { Element.Metal });
+            engine.FreezeHandLimitForTest();
+            engine.SetupBottleForTest(0);
+            engine.SetNextRandomValues(0, 0);
+            engine.EndPreparationNow();
+
+            var record = engine.TryPlayCard(engine.Hand[0].Id, new Pos(3, 3));
+
+            Assert.IsNotNull(record, engine.FailReason);
+            Assert.AreEqual(Element.Water, engine.Board.At(new Pos(3, 3)).Element, "目标还是水，位置不变");
+            Assert.AreEqual(2, engine.Board.CountOf(Element.Water), "牌自己变成了水落到旁边 → 场上共 2 只水");
+            Assert.AreEqual(2, engine.CreepCount, "牌变成了水落到旁边");
+            Assert.AreEqual(0, engine.TotalTransformed, "目标没有换元素");
+            Assert.AreEqual(1, engine.TotalSpawned);
+            Assert.AreEqual(0, engine.TotalRemoved);
+        }
+
+        [Test]
+        public void 出牌_相克_水牌打火小怪_火直接消失且不生成任何东西()
         {
             var rules = BaseRules();
             rules.CardEffect = CardEffectMode.CardAsVirtualElement;
@@ -409,7 +517,7 @@ namespace TapGJ.Tests
             engine.ClearBoard();
             engine.PlaceCreep(Element.Fire, new Pos(2, 2));
             engine.BeginRound();
-            engine.ForceHandForTest(new[] { Element.Water }); // 火 × 水 → 水赢、火消失
+            engine.ForceHandForTest(new[] { Element.Water }); // 水克火：牌面元素赢
             engine.FreezeHandLimitForTest();
             engine.SetupBottleForTest(0);
             engine.SetNextRandomValues(0, 0);                // 准备阶段别把小怪挪走
@@ -419,9 +527,39 @@ namespace TapGJ.Tests
             var record = engine.TryPlayCard(engine.Hand[0].Id, new Pos(2, 2));
 
             Assert.IsNotNull(record, engine.FailReason);
-            Assert.AreEqual(0, engine.Board.CountOf(Element.Fire), "火消失");
-            Assert.AreEqual(1, engine.Board.CountOf(Element.Water), "水赢 → 生成 1 个水");
-            Assert.AreEqual(1, engine.CreepCount);
+            Assert.AreEqual(0, engine.Board.CountOf(Element.Fire), "火直接消失");
+            Assert.AreEqual(0, engine.Board.CountOf(Element.Water), "相克不生成任何东西，场上没有水");
+            Assert.AreEqual(0, engine.CreepCount);
+            Assert.AreEqual(1, engine.TotalRemoved, "真消失 → 火瓶 +1");
+            Assert.AreEqual(0, engine.TotalSpawned, "相克不生成");
+            Assert.AreEqual(1, engine.Bottle.Count(Element.Fire));
+        }
+
+        [Test]
+        public void 出牌_相克里牌面元素输时被拒绝()
+        {
+            // 金克木：木牌打在金小怪上，输的是牌（木），场上什么都不会变 → 不该能打出去。
+            var rules = BaseRules();
+            rules.CardEffect = CardEffectMode.CardAsVirtualElement;
+
+            var engine = new GameEngine(rules, 5);
+            engine.ClearBoard();
+            engine.PlaceCreep(Element.Metal, new Pos(1, 1));
+            engine.BeginRound();
+            engine.ForceHandForTest(new[] { Element.Wood });
+            engine.FreezeHandLimitForTest();
+            engine.SetupBottleForTest(0);
+            engine.SetNextRandomValues(0, 0);
+            engine.EndPreparationNow();
+
+            var record = engine.TryPlayCard(engine.Hand[0].Id, new Pos(1, 1));
+
+            Assert.IsNull(record, "相克里牌面元素是输家 → 打出去没有任何变化，应该被拒绝");
+            Assert.IsNotNull(engine.FailReason);
+            Assert.AreEqual(1, engine.Hand.Count, "被拒绝时不该消耗手牌");
+            Assert.AreEqual(1, engine.Board.CountOf(Element.Metal), "目标原封不动");
+            Assert.AreEqual(0, engine.TotalRemoved);
+            Assert.AreEqual(0, engine.TotalSpawned);
         }
 
         [Test]

@@ -120,9 +120,9 @@ namespace TapGJ.Tests
             view.Sync();
 
             Assert.AreEqual(engine.CreepCount, view.CreepObjectCount, "显示对象数量必须跟上逻辑层");
-            // 注意：不能断言「场上数量变少」—— 水消失的同时土会 +1 生成一只，总数不变。
-            Assert.AreEqual(1, engine.RemovedOf(Element.Water), "水应该被土吃掉 1 只");
-            Assert.AreEqual(1, engine.SpawnedOf(Element.Earth), "土应该 +1 生成过 1 只");
+            // 注意：不能断言「场上数量变少」以外的具体数字 —— 水×土是相克：水直接消失、土原地不动。
+            Assert.AreEqual(1, engine.RemovedOf(Element.Water), "水应该被土克掉 1 只");
+            Assert.AreEqual(0, engine.TotalSpawned, "相克不会生成任何东西");
             Assert.IsNull(view.CreepViewAt(new Pos(0, 0)), "水原来站的格子应该空了");
 
             // 注意：必须写成 == null 让 GameObject 的重载运算符来判断。
@@ -165,11 +165,14 @@ namespace TapGJ.Tests
             var engine = new GameEngine(rules, 5);
             engine.Start();       // Start 会清空棋盘重新铺元素，所以要摆盘必须放在它后面
             engine.ClearBoard();
-            // 水贴着土的左边：水先行动（uid 小），一步就撞上去 → 第 1 回合必然发生「消失 + 生成」。
-            // 摆成不同行 / 同方向的话两边永远追不上，这条测试就会悄悄退化成什么都没覆盖到。
-            engine.PlaceCreep(Element.Water, new Pos(1, 0));
-            engine.PlaceCreep(Element.Earth, new Pos(2, 0));
-            engine.PlaceCreep(Element.Wood, new Pos(6, 6));
+            // 摆两组，保证第 1 回合里相生和相克都会发生 —— 否则这条测试会悄悄退化成什么都没覆盖到：
+            //   土(1,0) + 金(2,0) → 相生：土变成金（同一个 uid 换元素）
+            //   水(1,5) + 火(2,5) → 相克：火直接消失（对象被销毁）
+            // 每只都朝 +X 走 1 格，所以上面两对在第 1 回合必然碰上。
+            engine.PlaceCreep(Element.Earth, new Pos(1, 0));
+            engine.PlaceCreep(Element.Metal, new Pos(2, 0));
+            engine.PlaceCreep(Element.Water, new Pos(1, 5));
+            engine.PlaceCreep(Element.Fire, new Pos(2, 5));
 
             _root = new GameObject("SoakRoot");
             var view = _root.AddComponent<BoardView>();
@@ -201,10 +204,49 @@ namespace TapGJ.Tests
                 AssertNoCellLeftovers(view);
             }
 
-            // 防止这条测试悄悄失效：确认这一局真的发生过反应（有消失、有生成），
+            // 防止这条测试悄悄失效：确认这一局真的发生过相克（有消失）和相生（有转换），
             // 否则「对账路径」根本没被走到，绿得毫无意义。
-            Assert.Greater(engine.TotalRemoved, 0, "这一局必须真的发生过元素消失，否则覆盖不到清理路径");
-            Assert.Greater(engine.TotalSpawned, 0, "这一局必须真的发生过元素生成，否则覆盖不到补齐路径");
+            Assert.Greater(engine.TotalRemoved, 0, "这一局必须真的发生过元素消失（相克），否则覆盖不到清理路径");
+            Assert.Greater(engine.TotalTransformed, 0, "这一局必须真的发生过相生转换，否则覆盖不到换元素路径");
+        }
+
+        [Test]
+        public void 表现层_相生之后同一只小怪换颜色和元素字()
+        {
+            // 土撞金 → 相生：土就地变成金。uid 不变，所以表现层必须是**同一个对象换皮**，
+            // 而不是销毁重建（重建会闪、也让 uid 追踪失效）。
+            var rules = new Rules { CreepsPerElement = 0, InitialHandSize = 0, MaxMoveSteps = 1, RoundLimit = 5 };
+            var engine = new GameEngine(rules, 9);
+            engine.Start();
+            engine.ClearBoard();
+            engine.PlaceCreep(Element.Earth, new Pos(1, 0));
+            engine.PlaceCreep(Element.Metal, new Pos(2, 0));
+
+            _root = new GameObject("TransformRoot");
+            var view = _root.AddComponent<BoardView>();
+            view.Setup(engine);
+            view.Sync();
+
+            int uid = 0;
+            foreach (var c in engine.Creeps)
+                if (c.Element == Element.Earth) uid = c.Uid;
+            Assert.AreNotEqual(0, uid, "应该有一只土");
+
+            var go = view.CreepGo(uid);
+            Assert.IsNotNull(go, "土的显示对象应该在");
+            var cv = go.GetComponent<CreepView>();
+            Assert.AreEqual("土", cv.Label.text);
+
+            engine.SetNextRandomValues(1, 1); // 走 1 格 +X，正好撞上右边的金
+            Assert.IsNotNull(engine.AdvancePreparation());
+            view.Sync();
+
+            Assert.AreSame(go, view.CreepGo(uid), "uid 不变 → 还是同一个显示对象（只换皮）");
+            Assert.AreEqual(Element.Metal, cv.Element, "元素已经变成金");
+            Assert.AreEqual("金", cv.Label.text, "元素字要跟着换");
+            Assert.AreEqual(ElementDefs.Tint(Element.Metal), cv.Body.color, "颜色要跟着换成金的配色");
+            Assert.AreEqual(2, view.CreepObjectCount, "相生不生成新对象，场上还是 2 只");
+            AssertNoCellLeftovers(view);
         }
 
         [Test]

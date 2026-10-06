@@ -154,7 +154,7 @@ namespace TapGJ.EditorTools
             sb.AppendLine($"场上：{e.StatusLine()}");
             sb.AppendLine($"瓶子：{e.Bottle.DebugLine()}");
             sb.AppendLine($"手牌：{e.Hand.Count} 张　[出牌] {string.Join(" ", e.Hand.Select(c => c.Label))}");
-            sb.AppendLine($"累计消失 {e.TotalRemoved}　生成 {e.TotalSpawned}　出生失败 {e.SpawnBlockedCount}");
+            sb.AppendLine($"累计消失 {e.TotalRemoved}（相克）　相生转换 {e.TotalTransformed}　生成 {e.TotalSpawned}　出生失败 {e.SpawnBlockedCount}");
             sb.AppendLine($"胜利条件：{e.WinConditionDescription()}");
             sb.AppendLine($"Board 位置：{runner.Board.transform.position}　相机正交大小：{runner.Cam.orthographicSize}");
 

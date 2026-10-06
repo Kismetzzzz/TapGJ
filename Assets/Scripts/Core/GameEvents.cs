@@ -27,9 +27,11 @@ namespace TapGJ.Core
         Move,
         /// <summary>同元素相遇：禁止本次移动。</summary>
         Bump,
-        /// <summary>不同元素相遇：发生反应（某个小怪消失）。</summary>
+        /// <summary>相生：输的一方就地变成赢家元素（uid 不变，只换元素）。</summary>
+        Transform,
+        /// <summary>相克：输的一方直接消失。</summary>
         Vanish,
-        /// <summary>反应生成了新的元素小怪。</summary>
+        /// <summary>反应生成了新的元素小怪（出牌相生时的「+1」）。</summary>
         Spawn,
         /// <summary>反应本应生成，但周围没有空格。</summary>
         SpawnBlocked,
@@ -40,7 +42,8 @@ namespace TapGJ.Core
         /// <summary>抽牌阶段抽到一张牌。</summary>
         DrawCard,
         /// <summary>弃牌阶段弃掉一张牌。</summary>
-        DiscardCard,        Message,
+        DiscardCard,
+        Message,
         Win,
         Lose,
     }

@@ -26,7 +26,13 @@ namespace TapGJ.Core
     public sealed class Creep
     {
         public int Uid { get; }
-        public Element Element { get; }
+
+        /// <summary>
+        /// 元素。**相生会让它就地变成另一种元素**（金遇水 → 金变水），所以不是只读的。
+        /// 注意：uid 不变，表现层只需要换颜色和字，不需要换对象。
+        /// </summary>
+        public Element Element { get; internal set; }
+
         public Pos Pos { get; internal set; }
         public bool Alive { get; internal set; } = true;
 

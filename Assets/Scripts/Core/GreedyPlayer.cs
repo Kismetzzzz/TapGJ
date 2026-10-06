@@ -26,11 +26,15 @@ namespace TapGJ.Core
 
                         var def = engine.Reactions.Get(creep.Element, card.Element);
 
-                        // 打分：优先消耗场上数量最多的元素；能不新增元素更好；
+                        // 打分：优先消耗场上数量最多的元素；相克能真正减少元素种类，相生只是换身份；
                         // 胜利条件相关的元素（默认是水）尽量留着。
                         int score = engine.Board.CountOf(creep.Element) * 10;
-                        if (!def.CreatesCreep) score += 6;
+                        if (def.IsDestroying) score += 12;              // 相克：直接把目标清掉
+                        else if (def.Winner == card.Element) score += 3; // 相生且牌赢：目标元素 −1（但会多出牌面元素）
+                        else score -= 8;                                 // 相生且目标赢：等于白送目标 +1
+
                         if (creep.Element == PreferredElement(engine)) score -= 100;
+                        if (def.IsGenerating && card.Element != PreferredElement(engine)) score -= 6;
 
                         if (score > bestScore)
                         {

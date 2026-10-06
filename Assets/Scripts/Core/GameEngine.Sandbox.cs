@@ -18,8 +18,10 @@ namespace TapGJ.Core
             _creeps.Clear();
             _removed.Clear();
             _spawned.Clear();
+            _converted.Clear();
             TotalRemoved = 0;
             TotalSpawned = 0;
+            TotalTransformed = 0;
             SpawnBlockedCount = 0;
         }
 
@@ -158,10 +160,13 @@ namespace TapGJ.Core
         /// <summary>本回合已经行动过的小怪数量。</summary>
         public int MovedThisRound => _movedThisRound.Count;
 
-        /// <summary>每个元素被反应消耗掉的次数。</summary>
+        /// <summary>每个元素被反应消耗掉的次数（相克输家 / 出牌直接移除）。</summary>
         public int RemovedOf(Element e) => _removed.TryGetValue(e, out var n) ? n : 0;
 
-        /// <summary>每个元素通过反应新生出来的次数。</summary>
+        /// <summary>每个元素通过出牌相生新生成出来的次数。</summary>
         public int SpawnedOf(Element e) => _spawned.TryGetValue(e, out var n) ? n : 0;
+
+        /// <summary>每个元素**被相生变成别的元素**的次数（键是变之前的那个元素）。</summary>
+        public int ConvertedOf(Element e) => _converted.TryGetValue(e, out var n) ? n : 0;
     }
 }

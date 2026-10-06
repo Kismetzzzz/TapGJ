@@ -452,6 +452,11 @@ namespace TapGJ.View
                     case GameEventType.Bump:
                         yield return PlayBump(e);
                         break;
+                    case GameEventType.Transform:
+                        // 相生：小怪换了元素。闪一下格子，动画播完 GameRunner 会 Sync 一次，
+                        // 颜色和元素字就跟着换过来了（uid 没变，所以是同一个对象换皮）。
+                        yield return PlayFlash(e.From, new Color(0.75f, 0.95f, 1f), 0.20f);
+                        break;
                     case GameEventType.Vanish:
                         yield return PlayVanish(e, 0.16f);
                         break;
@@ -475,6 +480,7 @@ namespace TapGJ.View
             {
                 case GameEventType.Move:
                 case GameEventType.Bump:
+                case GameEventType.Transform:
                 case GameEventType.Vanish:
                 case GameEventType.Spawn:
                     return true;
