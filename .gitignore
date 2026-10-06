@@ -1,0 +1,78 @@
+# TapGJ — Unity 工程 .gitignore
+#
+# 一句话原则：**Assets/ + Packages/ + ProjectSettings/ + README 进仓库，其余全部是生成物。**
+# Library/ 是 Unity 的本地缓存（1.5 GB+），Temp/ obj/ Logs/ UserSettings/ 都是每次打开工程重建的东西，
+# 提交它们只会把仓库撑爆、并且每次制造无意义的冲突。
+
+# ---------------------------------------------------------------- Unity 生成目录
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Asset 的 .meta 必须跟着 asset 一起提交，所以这里只排除「被忽略的 asset 的 meta」
+!/[Aa]ssets/**/*.meta
+
+# 想在 Assets 里放插件/商店资源时再按需放开
+# /[Aa]ssets/AssetStoreTools*
+# /[Aa]ssets/Plugins/Editor/JetBrains*
+
+# ---------------------------------------------------------------- IDE
+# Rider / IntelliJ（工程里已经有一个 .idea/）
+/.idea/
+.vs/
+.vsconfig
+ExportedObj/
+.consulo/
+
+# Unity / IDE 自动生成的解决方案与工程文件：每台机器的绝对路径都不同，不该进仓库
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# ---------------------------------------------------------------- 本项目：无头测试输出
+# 这些是跑 EditMode 测试时由命令行产生的（见 README 第七节）
+/Artifacts/
+/TestResults-*.xml
+/unity-test.log
+*.log
+
+# ---------------------------------------------------------------- Unity 杂项
+# Unity 生成的那些 meta 的 meta
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# 崩溃时 Unity 自己吐的报告
+sysinfo.txt
+
+# 打包产物
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+crashlytics-build.properties
+
+# Addressables 打包产物
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+
+# Android 临时生成的 StreamingAssets
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
