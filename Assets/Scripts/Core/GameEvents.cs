@@ -43,6 +43,10 @@ namespace TapGJ.Core
         DrawCard,
         /// <summary>弃牌阶段弃掉一张牌。</summary>
         DiscardCard,
+        /// <summary>复合元素出现在棋盘上（融合成功）。</summary>
+        CompositeSpawn,
+        /// <summary>复合元素从棋盘上消失（分解 / 被机制移除）。</summary>
+        CompositeVanish,
         Message,
         Win,
         Lose,
@@ -89,6 +93,14 @@ namespace TapGJ.Core
         public bool IsPlayerCard;
         /// <summary>抽牌阶段的补牌步骤（没有棋盘上的移动，只有手牌变化）。</summary>
         public bool IsDrawPhase;
+        /// <summary>这一步是「打出元素牌在空格上召唤小怪」（图1 第 2 条）：To = 召唤到的那一格。</summary>
+        public bool IsSummon;
+        /// <summary>这一步是「打出融合牌」：From = 元素1 的位置，To = 复合元素出现的位置（同一个格）。</summary>
+        public bool IsFusion;
+        /// <summary>这一步是「打出分解牌」：From = 被拆掉的复合元素的位置。</summary>
+        public bool IsDecompose;
+        /// <summary>这一步是「复合元素产生元素」（回合开始 / 融合当回合）。</summary>
+        public bool IsCompositeEffect;
         public bool CreepWentAway;
 
         public bool HasVisualMovement => Path.Count > 1;
@@ -96,6 +108,10 @@ namespace TapGJ.Core
         public override string ToString()
         {
             if (IsDrawPhase) return $"[抽牌]{Events.Count} 张";
+            if (IsSummon) return $"[召唤]{ElementDefs.Name(Element)} @{To}";
+            if (IsFusion) return $"[融合牌]@{To}";
+            if (IsDecompose) return $"[分解牌]@{From}";
+            if (IsCompositeEffect) return $"[复合元素产生]@{From}";
             if (IsPlayerCard) return $"[出牌]{ElementDefs.Name(Element)} @{To}";
             return $"#{Uid}{ElementDefs.Name(Element)} {From}→{To} 走{Distance}格";
         }

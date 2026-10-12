@@ -22,8 +22,20 @@ namespace TapGJ.Core
         public static bool operator !=(Pos a, Pos b) => !a.Equals(b);
     }
 
+    /// <summary>
+    /// 棋盘上的一个「占格者」：元素小怪（<see cref="Creep"/>）或复合元素（<see cref="Composite"/>）。
+    /// 两者共用 uid 空间，表现层用一个字典（uid → 显示对象）同时管它们。
+    /// </summary>
+    public interface IBoardOccupant
+    {
+        int Uid { get; }
+        Pos Pos { get; }
+        /// <summary>复合元素没有五行元素，这个属性只对 <see cref="Creep"/> 有意义。</summary>
+        bool IsComposite { get; }
+    }
+
     /// <summary>棋盘上的一只元素小怪。uid 在一局内唯一，供表现层追踪同一个物体。</summary>
-    public sealed class Creep
+    public sealed class Creep : IBoardOccupant
     {
         public int Uid { get; }
 
@@ -36,6 +48,8 @@ namespace TapGJ.Core
         public Pos Pos { get; internal set; }
         public bool Alive { get; internal set; } = true;
 
+        public bool IsComposite => false;
+
         internal Creep(int uid, Element element, Pos pos)
         {
             Uid = uid;
@@ -47,12 +61,53 @@ namespace TapGJ.Core
     }
 
     /// <summary>
-    /// 8x8 网格。每个格子最多存在一个元素（不变量：_cells 里死掉的小怪一律为 null）。
+    /// 棋盘上的一个**复合元素**（烬 / 熔岩 / 矿晶 / 寒钢 / 灵泉）。
+    ///
+    /// 和 <see cref="Creep"/> 的区别（这几条是玩法约定，不是实现细节）：
+    ///   · **占据格子**：一格只能有一个占格者，复合元素压住的格子元素小怪走不进去、也生不出来
+    ///   · **不会移动**：准备阶段只推进元素小怪，复合元素原地不动、也不会被撞
+    ///   · **不受元素反应影响**：元素牌只能打元素小怪；复合元素只有「分解牌」能动它
+    ///   · **每回合产生元素**：回合开始在四周生成自己的两种组成元素各若干份
+    /// </summary>
+    public sealed class Composite : IBoardOccupant
+    {
+        public int Uid { get; }
+        public CompositeKind Kind { get; }
+
+        public Pos Pos { get; internal set; }
+
+        public bool IsComposite => true;
+
+        /// <summary>本回合是不是已经「产生」过了（每回合只产生一次）。</summary>
+        public bool ProducedThisRound { get; internal set; }
+
+        internal Composite(int uid, CompositeKind kind, Pos pos)
+        {
+            Uid = uid;
+            Kind = kind;
+            Pos = pos;
+        }
+
+        public Element[] Ingredients => CompositeDefs.Ingredients(Kind);
+
+        public override string ToString() => $"#{Uid}{CompositeDefs.Name(Kind)}{Pos}";
+    }
+
+    /// <summary>
+    /// 8x8 网格。每个格子最多存在一个占格者（元素小怪 **或** 复合元素）。
     /// 坐标 (0,0) 是左下角，(W-1,0) 是右下角。
+    /// 另外支持「墙格」（_blocked）：小怪不能走进去、不能在上面生成，用于关卡里的固定障碍。
+    ///
+    /// ⚠ 复合元素放在**另一个数组**（_composites）里，和 _cells 一一对应、互斥占位。
+    /// 这样做的目的是让「元素」那套代码完全不用改：
+    ///   <see cref="At"/> 只返回元素小怪（复合元素那格返回 null），
+    ///   <see cref="IsEmpty"/> 对复合元素那格返回 false（小怪走不进去、也生不出来）。
     /// </summary>
     public sealed class Board
     {
         readonly Creep[] _cells;
+        readonly Composite[] _composites;
+        readonly bool[] _blocked;
 
         public int Width { get; }
         public int Height { get; }
@@ -62,29 +117,113 @@ namespace TapGJ.Core
             Width = width;
             Height = height;
             _cells = new Creep[width * height];
+            _composites = new Composite[width * height];
+            _blocked = new bool[width * height];
         }
 
         public bool InBounds(Pos p) => p.X >= 0 && p.X < Width && p.Y >= 0 && p.Y < Height;
 
-        public Creep At(Pos p) => InBounds(p) ? _cells[p.Y * Width + p.X] : null;
+        /// <summary>是不是墙：小怪不能进入、不能在上面生成。</summary>
+        public bool IsBlocked(Pos p) => InBounds(p) && _blocked[p.Y * Width + p.X];
 
-        public bool IsEmpty(Pos p) => InBounds(p) && _cells[p.Y * Width + p.X] == null;
+        /// <summary>小怪能不能走进去：在界内且不是墙。</summary>
+        public bool IsWalkable(Pos p) => InBounds(p) && !_blocked[p.Y * Width + p.X];
+
+        public void SetBlocked(Pos p, bool blocked)
+        {
+            if (!InBounds(p)) return;
+            _blocked[p.Y * Width + p.X] = blocked;
+        }
+
+        public void ClearBlocked()
+        {
+            for (int i = 0; i < _blocked.Length; i++) _blocked[i] = false;
+        }
+
+        /// <summary>
+        /// 格子上的**元素小怪**；空格 / 复合元素 / 越界 / **已经死掉但还没被清掉** 都返回 null。
+        /// 「死了但还在数组里」这个中间态是存在的（先标记 Alive=false、再清格子），
+        /// 中间如果被别处读到就会拿到一只死小怪，所以这里直接过滤掉。
+        /// </summary>
+        public Creep At(Pos p)
+        {
+            if (!InBounds(p)) return null;
+            var creep = _cells[p.Y * Width + p.X];
+            return creep != null && creep.Alive ? creep : null;
+        }
+
+        /// <summary>格子上的**复合元素**；没有就返回 null。</summary>
+        public Composite CompositeAt(Pos p) => InBounds(p) ? _composites[p.Y * Width + p.X] : null;
+
+        /// <summary>格子上有没有复合元素。</summary>
+        public bool HasComposite(Pos p) => CompositeAt(p) != null;
+
+        /// <summary>
+        /// 格子上有没有占格者（元素小怪或复合元素）。越界 / 墙格返回 null。
+        /// 「这格空不空」一律走这个方法，别再直接看 At()。
+        /// </summary>
+        public IBoardOccupant OccupantAt(Pos p)
+        {
+            if (!InBounds(p)) return null;
+            int i = p.Y * Width + p.X;
+            return _cells[i] != null ? (IBoardOccupant)_cells[i] : _composites[i];
+        }
+
+        /// <summary>
+        /// 是不是可用的空格（界内、不是墙、**没有任何占格者**）。
+        /// 复合元素占的格子不算空格 —— 所以元素走不进去、也生不出来。
+        /// </summary>
+        public bool IsEmpty(Pos p)
+            => InBounds(p) && !_blocked[p.Y * Width + p.X]
+               && _cells[p.Y * Width + p.X] == null && _composites[p.Y * Width + p.X] == null;
 
         public void Clear(Pos p)
         {
             if (InBounds(p)) _cells[p.Y * Width + p.X] = null;
         }
 
+        /// <summary>清空所有元素 + 复合元素 + 墙（回到完全空白的棋盘）。</summary>
         public void ClearAll()
         {
-            for (int i = 0; i < _cells.Length; i++) _cells[i] = null;
+            for (int i = 0; i < _cells.Length; i++)
+            {
+                _cells[i] = null;
+                _composites[i] = null;
+            }
+            ClearBlocked();
         }
 
         public void Put(Creep creep)
         {
             if (!InBounds(creep.Pos))
                 throw new ArgumentException($"坐标越界：{creep.Pos}");
-            _cells[creep.Pos.Y * Width + creep.Pos.X] = creep;
+
+            int i = creep.Pos.Y * Width + creep.Pos.X;
+            if (_blocked[i])
+                throw new ArgumentException($"不能把元素放在墙格上：{creep.Pos}");
+            if (_composites[i] != null)
+                throw new ArgumentException($"不能把元素放在复合元素上：{creep.Pos}");
+
+            _cells[i] = creep;
+        }
+
+        /// <summary>把一个复合元素放上棋盘（不变量：那格不能已有元素或另一个复合元素）。</summary>
+        public void PutComposite(Composite composite)
+        {
+            if (composite == null) return;
+            if (!InBounds(composite.Pos))
+                throw new ArgumentException($"坐标越界：{composite.Pos}");
+
+            int i = composite.Pos.Y * Width + composite.Pos.X;
+            if (_blocked[i])
+                throw new ArgumentException($"不能把复合元素放在墙格上：{composite.Pos}");
+
+            _composites[i] = composite;
+        }
+
+        public void ClearComposite(Pos p)
+        {
+            if (InBounds(p)) _composites[p.Y * Width + p.X] = null;
         }
 
         /// <summary>遍历棋盘上所有存活小怪，按行优先顺序（确定性）。</summary>
@@ -116,6 +255,23 @@ namespace TapGJ.Core
         {
             int n = 0;
             foreach (var c in Creeps()) n++;
+            return n;
+        }
+
+        /// <summary>遍历棋盘上所有复合元素（按行优先顺序，确定性）。</summary>
+        public IEnumerable<Composite> Composites()
+        {
+            for (int i = 0; i < _composites.Length; i++)
+            {
+                var c = _composites[i];
+                if (c != null) yield return c;
+            }
+        }
+
+        public int CompositeCount()
+        {
+            int n = 0;
+            foreach (var c in Composites()) n++;
             return n;
         }
 
@@ -162,7 +318,7 @@ namespace TapGJ.Core
                     {
                         if (Math.Abs(dx) != radius && Math.Abs(dy) != radius) continue; // 只取这一圈的边
                         var p = new Pos(origin.X + dx, origin.Y + dy);
-                        if (!InBounds(p)) continue;
+                        if (!IsWalkable(p)) continue; // 界外或墙格都不能生
                         if (p == exclude) continue;
                         if (_cells[p.Y * Width + p.X] != null) continue;
                         ring.Add(p);
@@ -175,7 +331,7 @@ namespace TapGJ.Core
             }
 
             // 外层都找不到，最后才考虑 exclude 本身（调用方保证它已经/即将为空）
-            if (!exclude.IsNone && InBounds(exclude) && _cells[exclude.Y * Width + exclude.X] == null)
+            if (!exclude.IsNone && IsWalkable(exclude) && _cells[exclude.Y * Width + exclude.X] == null)
                 return exclude;
 
             return Pos.None;

@@ -19,9 +19,11 @@ namespace TapGJ.Core
             _removed.Clear();
             _spawned.Clear();
             _converted.Clear();
+            _summoned.Clear();
             TotalRemoved = 0;
             TotalSpawned = 0;
             TotalTransformed = 0;
+            TotalSummoned = 0;
             SpawnBlockedCount = 0;
         }
 
@@ -35,12 +37,61 @@ namespace TapGJ.Core
             return creep;
         }
 
-        /// <summary>清空手牌后按指定顺序发牌。注意：抽牌阶段会把手牌补回上限。</summary>
+        /// <summary>
+        /// 在指定空格摆一个复合元素（测试与编辑器沙盒用）。
+        /// 格子被占 / 越界 / 是墙都返回 null —— 和 PlaceCreep 一样不抛异常。
+        ///
+        /// ⚠ 这是**沙盒**接口，**不看** <see cref="Rules.UseCompositeElements"/> 总开关：
+        /// 它的用途正是「先摆一个复合元素，再验证逻辑」。玩法路径上的复合元素只有两个来源 ——
+        /// 融合牌（<see cref="TryPlayFusionCard"/>）和初始布置（`Rules.InitialComposites`），
+        /// 两个都受总开关管。
+        /// </summary>
+        public Composite PlaceComposite(CompositeKind kind, Pos pos)
+        {
+            if (!Board.IsEmpty(pos)) return null;
+
+            var composite = new Composite(_nextUid++, kind, pos);
+            _composites[composite.Uid] = composite;
+            Board.PutComposite(composite);
+            return composite;
+        }
+
+        /// <summary>清空手牌后按指定顺序发元素牌。注意：抽牌阶段会把手牌补回上限。</summary>
         public void ForceHandForTest(IEnumerable<Element> elements)
         {
             _hand.Clear();
             foreach (var e in elements) DrawCard(e);
         }
+
+        /// <summary>清空手牌（测试里自己决定发什么牌时用）。</summary>
+        public void ClearHandForTest() => _hand.Clear();
+
+        /// <summary>
+        /// 往手牌里直接加一张指定种类的牌 —— 测试/沙盒用，
+        /// 好处是不用为了拿到一张融合牌去赌权重（那会让用例随参数飘）。
+        /// </summary>
+        public Card AddCardForTest(Element element) => DrawCard(element);
+
+        /// <summary>往手牌里直接加一张指定的秘术牌。</summary>
+        public Card AddSpecialCardForTest(CardKind kind) => DrawSpecialCard(kind);
+
+        /// <summary>
+        /// 抽一张随机牌（走正常的权重逻辑），但**不进手牌**。
+        /// 用来验证「牌池 / 权重会不会抽出某种牌」，不用为了看结果把手牌塞满。
+        /// </summary>
+        public Card DrawRandomCardForTest()
+        {
+            var card = DrawRandomCard();
+            _hand.Remove(card);
+            return card;
+        }
+
+        /// <summary>复合元素「产出」的取格逻辑，暴露给测试（见 CompositeElementTests 里的取格用例）。</summary>
+        public Pos FirstEmptyProductionCellForTest(Pos origin, int skipCount)
+            => FirstEmptyProductionCell(origin, skipCount, out _);
+
+        /// <summary>范围内第一个被元素占着的格子，暴露给测试。</summary>
+        public Pos FirstOccupiedProductionCellForTest(Pos origin) => FirstOccupiedProductionCell(origin);
 
         /// <summary>
         /// 把本局的手牌上限压到当前手牌数，这样抽牌阶段会「本来就满、一张都不抽」。
@@ -165,6 +216,9 @@ namespace TapGJ.Core
 
         /// <summary>每个元素通过出牌相生新生成出来的次数。</summary>
         public int SpawnedOf(Element e) => _spawned.TryGetValue(e, out var n) ? n : 0;
+
+        /// <summary>每个元素被玩家用元素牌在空格上召唤出来的次数（图1 第 2 条）。</summary>
+        public int SummonedOf(Element e) => _summoned.TryGetValue(e, out var n) ? n : 0;
 
         /// <summary>每个元素**被相生变成别的元素**的次数（键是变之前的那个元素）。</summary>
         public int ConvertedOf(Element e) => _converted.TryGetValue(e, out var n) ? n : 0;

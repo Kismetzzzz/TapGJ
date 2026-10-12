@@ -3,23 +3,6 @@ using System.Collections.Generic;
 
 namespace TapGJ.Core
 {
-    /// <summary>玩家手里的一张元素牌。牌面元素 = 打出后能与场上哪个元素发生反应。</summary>
-    public sealed class Card
-    {
-        public int Id { get; }
-        public Element Element { get; }
-
-        internal Card(int id, Element element)
-        {
-            Id = id;
-            Element = element;
-        }
-
-        public string Label => $"{ElementDefs.Name(Element)}牌";
-
-        public override string ToString() => $"#{Id}{Label}";
-    }
-
     /// <summary>
     /// 元素小瓶子：与五行元素一一对应，贯穿整个流程。
     /// 场上每消失一个某元素的小怪，对应瓶子 +1；满瓶（上限 5）自动产出一张对应元素牌并清空。
@@ -63,7 +46,10 @@ namespace TapGJ.Core
     ///
     /// 一回合流程（图1）：
     ///   准备阶段  → 每只小怪随机方向走 0~3 格，遇不同元素发生反应，遇同元素禁止移动
-    ///   玩家行动  → 小怪静止，玩家打出元素牌，与场上同元素小怪发生反应，自行结束回合
+    ///   玩家行动  → 小怪静止。玩家出元素牌有两个用途（图1 第 1、2 条）：
+    ///               打在元素格上 → 按图2 发生反应；
+    ///               打在空格上   → 在该格召唤 1 个牌面元素的小怪（<see cref="EmptyCellCardMode"/> 可关）
+    ///               玩家自行结束回合
     ///   判定阶段  → 判胜负，未达成则进入下一回合
     /// </summary>
     public sealed partial class GameEngine
@@ -83,6 +69,8 @@ namespace TapGJ.Core
         readonly Dictionary<Element, int> _spawned = new Dictionary<Element, int>();
         /// <summary>键是「变之前」的元素：金变水记在金的账上。</summary>
         readonly Dictionary<Element, int> _converted = new Dictionary<Element, int>();
+        /// <summary>玩家打出元素牌在空格上召唤出来的数量（图1 第 2 条），和相生生成分开记。</summary>
+        readonly Dictionary<Element, int> _summoned = new Dictionary<Element, int>();
 
         int _nextUid = 1;
         int _nextCardId = 1;
@@ -145,6 +133,12 @@ namespace TapGJ.Core
         /// <summary>本局累计发生的相生转换次数。</summary>
         public int TotalTransformed { get; private set; }
 
+        /// <summary>本局累计「打出元素牌在空格上召唤」的次数（图1 第 2 条，和相生生成分开统计）。</summary>
+        public int TotalSummoned { get; private set; }
+
+        /// <summary>每个元素被玩家用牌召唤出来的次数。</summary>
+        public IReadOnlyDictionary<Element, int> SummonedCounts => _summoned;
+
         /// <summary>出生失败的次数（反应本该生成新元素但四周无空格）。</summary>
         public int SpawnBlockedCount { get; private set; }
 
@@ -163,7 +157,12 @@ namespace TapGJ.Core
         // ---------------------------------------------------------------- 开局
 
         /// <summary>初始化棋盘：五种元素各 CreepsPerElement 个均匀随机撒在棋盘上；玩家发初始手牌；进入第 1 回合准备阶段。</summary>
-        public void Start()
+        public void Start() => Start(null);
+
+        /// <summary>
+        /// 初始化一局。setup 传 null 走现有的随机铺盘；传了就走关卡布置（固定格子 + 墙 + 起手牌）。
+        /// </summary>
+        public void Start(LevelSetup setup)
         {
             Board.ClearAll();
             _creeps.Clear();
@@ -174,9 +173,11 @@ namespace TapGJ.Core
             _removed.Clear();
             _spawned.Clear();
             _converted.Clear();
+            _summoned.Clear();
             _nextUid = 1;
             _nextCardId = 1;
             _movedThisRound.Clear();
+            ResetCompositeState();
             _cardsDrawnThisRound = 0;
             _discardsUsed = 0;
             _cardsPlayedThisRound = 0;
@@ -189,30 +190,131 @@ namespace TapGJ.Core
             TotalRemoved = 0;
             TotalSpawned = 0;
             TotalTransformed = 0;
+            TotalSummoned = 0;
             SpawnBlockedCount = 0;
 
-            // 均匀生成：把 64 格洗牌，前 20 格按「每种元素 4 个」铺开。
-            var cells = new List<Pos>(Rules.CellCount);
-            for (int y = 0; y < Board.Height; y++)
-                for (int x = 0; x < Board.Width; x++)
-                    cells.Add(new Pos(x, y));
-            Board.Shuffle(cells, _rng);
-
-            int index = 0;
-            foreach (var element in ElementDefs.All)
+            if (setup == null)
             {
-                for (int i = 0; i < Rules.CreepsPerElement; i++)
+                // 均匀生成：把 64 格洗牌，前 20 格按「每种可用元素 CreepsPerElement 个」铺开。
+                // 用 Rules.PoolElements 而不是 ElementDefs.All —— 这就是「本关只出现这几种元素」。
+                var cells = new List<Pos>(Rules.CellCount);
+                for (int y = 0; y < Board.Height; y++)
+                    for (int x = 0; x < Board.Width; x++)
+                        cells.Add(new Pos(x, y));
+                Board.Shuffle(cells, _rng);
+
+                int index = 0;
+                foreach (var element in Rules.PoolElements)
                 {
-                    if (index >= cells.Count) break;
-                    var creep = new Creep(_nextUid++, element, cells[index++]);
+                    for (int i = 0; i < Rules.CreepsPerElement; i++)
+                    {
+                        if (index >= cells.Count) break;
+                        var creep = new Creep(_nextUid++, element, cells[index++]);
+                        _creeps[creep.Uid] = creep;
+                        Board.Put(creep);
+                    }
+                }
+
+                for (int i = 0; i < Rules.InitialHandSize; i++) DrawRandomCard();
+            }
+            else
+            {
+                ApplyLevelSetup(setup);
+            }
+
+            // 初始复合元素和「布局 / 随机铺盘」无关：布局留空时 LevelSetup 是 null，这里也要照摆。
+            ApplyInitialComposites(Rules.InitialComposites);
+
+            // 关卡机制在第 1 回合开始之前先跑 OnLevelStart（这时棋盘和手牌都已经就位）。
+            FireLevelStart();
+            BeginRound();
+        }
+
+        /// <summary>按关卡布置铺盘：墙、固定元素、起手牌（没给起手牌就随机抽）。</summary>
+        void ApplyLevelSetup(LevelSetup setup)
+        {
+            int w = Board.Width;
+            int h = Board.Height;
+
+            for (int i = 0; i < w * h; i++)
+            {
+                if (setup.Blocked == null || i >= setup.Blocked.Length || !setup.Blocked[i]) continue;
+                Board.SetBlocked(new Pos(i % w, i / w), true);
+            }
+
+            if (setup.Cells != null)
+            {
+                for (int i = 0; i < w * h && i < setup.Cells.Length; i++)
+                {
+                    var element = setup.Cells[i];
+                    if (!element.HasValue) continue;
+
+                    var pos = new Pos(i % w, i / w);
+                    if (Board.IsBlocked(pos)) continue; // 不变量兜底：元素不能站在墙上（解析层不会产出这种，但保险）
+
+                    var creep = new Creep(_nextUid++, element.Value, pos);
                     _creeps[creep.Uid] = creep;
                     Board.Put(creep);
                 }
             }
 
-            for (int i = 0; i < Rules.InitialHandSize; i++) DrawRandomCard();
+            if (setup.InitialHand != null && setup.InitialHand.Length > 0)
+                foreach (var e in setup.InitialHand) DrawCard(e);
+            else
+                for (int i = 0; i < Rules.InitialHandSize; i++) DrawRandomCard();
+        }
 
-            BeginRound();
+        /// <summary>
+        /// 按关卡布置摆初始复合元素（图2 的复合元素也可以在开局就摆在场上，
+        /// 这样「场上已经有复合元素 → 融合牌用不出去」这条规则一开始就成立）。
+        ///
+        /// ⚠ 总开关 <see cref="Rules.UseCompositeElements"/> 没勾时**一个都不摆**：
+        /// 配置校验会把「配了初始复合元素却没勾开关」明确报出来，不会静默生效。
+        /// 与元素冲突的格子（已被占 / 墙）会被跳过并记一条事件，不抛异常。
+        /// </summary>
+        void ApplyInitialComposites(CompositePlacement[] placements)
+        {
+            if (placements == null) return;
+
+            if (!Rules.UseCompositeElements)
+            {
+                if (placements.Length > 0)
+                {
+                    PushEvent(new GameEvent
+                    {
+                        Type = GameEventType.Message,
+                        Text = $"本关配了 {placements.Length} 个初始复合元素，但「复合元素」总开关没勾，全部跳过",
+                    });
+                }
+                return;
+            }
+
+            foreach (var entry in placements)
+            {
+                var pos = new Pos(entry.X, entry.Y);
+                if (!Board.InBounds(pos))
+                {
+                    PushEvent(new GameEvent
+                    {
+                        Type = GameEventType.Message,
+                        Text = $"初始复合元素坐标 {pos} 越界，已跳过",
+                    });
+                    continue;
+                }
+                if (Board.IsBlocked(pos) || !Board.IsEmpty(pos))
+                {
+                    PushEvent(new GameEvent
+                    {
+                        Type = GameEventType.Message,
+                        Text = $"初始复合元素「{CompositeDefs.Name(entry.Kind)}」的位置 {pos} 已被占用或是墙格，已跳过",
+                    });
+                    continue;
+                }
+
+                var composite = new Composite(_nextUid++, entry.Kind, pos);
+                _composites[composite.Uid] = composite;
+                Board.PutComposite(composite);
+            }
         }
 
         public void BeginRound()
@@ -225,7 +327,11 @@ namespace TapGJ.Core
             _cardsPlayedThisRound = 0;
             _cardsDrawnThisRound = 0;
             _movedThisRound.Clear(); // 新回合：所有存活的小怪重新获得一次移动机会
+            _compositeProducedThisRound.Clear(); // 复合元素每回合产生一次
+            _compositeProducedCountThisRound = 0;
             PushEvent(new GameEvent { Type = GameEventType.Message, Text = $"—— 第 {Round} 回合：准备阶段 ——" });
+
+            FireRoundStart(); // 机制可以在这里生成元素 / 加墙，新生成的小怪本回合就会走
         }
 
         void SetPhase(GamePhase phase)
@@ -254,12 +360,17 @@ namespace TapGJ.Core
         // ------------------------------------------------------------ 准备阶段
 
         /// <summary>
-        /// 推进一个准备阶段步骤（一只小怪的移动决策）。
+        /// 推进一个准备阶段步骤。
+        /// 顺序是「**先让复合元素产生一次**，再让小怪移动」——这样复合元素生出来的元素
+        /// 本回合就能正常参与移动/相遇；也因为回合开始就先跑，玩家看到的是「回合开始→复合元素生效」。
         /// 本回合所有小怪都走完后，本次调用会自动把阶段切到「玩家行动阶段」并返回 null。
         /// </summary>
         public StepRecord AdvancePreparation()
         {
             if (Phase != GamePhase.Preparation) return null;
+
+            if (HasPendingCompositeProduction())
+                return AdvanceCompositeProduction();
 
             var creep = NextIdleCreep();
             if (creep == null)
@@ -291,6 +402,7 @@ namespace TapGJ.Core
 
         /// <summary>
         /// 抽牌阶段：把手牌补到 <see cref="Rules.HandLimit"/>。
+        /// 每张牌的元素/种类由 <see cref="DrawRandomCard"/> 按牌池与权重决定（所以秘术牌的比例可控）。
         /// 返回本次抽到的牌数（0 表示本来就满了）。
         /// </summary>
         public int ResolveDrawPhase()
@@ -301,7 +413,7 @@ namespace TapGJ.Core
 
             while (_hand.Count < target)
             {
-                var card = DrawCard(RandomElement());
+                var card = DrawRandomCard();
                 drawn.Add(card);
             }
 
@@ -379,11 +491,31 @@ namespace TapGJ.Core
             for (int step = 0; step < budget; step++)
             {
                 var next = new Pos(cursor.X + dir.X, cursor.Y + dir.Y);
-                if (!Board.InBounds(next)) break; // 撞到棋盘边界，本次移动结束
 
-                var other = Board.At(next);
-                if (other != null && other.Alive)
+                // 撞到棋盘边界或墙，本次移动结束
+                if (!Board.IsWalkable(next)) break;
+
+                // ⚠ 这里必须用 IsEmpty 而不是 At() == null：
+                //   复合元素占着的格子上 At() 也返回 null，只看 At() 会以为那是空格，
+                //   于是小怪会**直接走进复合元素那一格**（表现层看不出，逻辑层会抛异常）。
+                if (!Board.IsEmpty(next))
                 {
+                    var other = Board.At(next);
+                    if (other == null)
+                    {
+                        // 那格是复合元素：走不进去，也不发生任何元素反应
+                        record.Events.Add(new GameEvent
+                        {
+                            Type = GameEventType.Bump,
+                            From = cursor,
+                            To = next,
+                            Element = creep.Element,
+                            Uid = creep.Uid,
+                            Text = $"被复合元素挡住，本次移动结束",
+                        });
+                        break;
+                    }
+
                     if (other.Element == creep.Element)
                     {
                         // 同种元素相遇：禁止此次移动，双方留在原地
@@ -443,6 +575,9 @@ namespace TapGJ.Core
         /// <summary>统一随机入口：沙盒/测试可以注入固定序列。</summary>
         int NextRandom(int maxExclusive) => _overrideRng != null ? _overrideRng.Next(maxExclusive) : _rng.Next(maxExclusive);
 
+        /// <summary>Core 不引用 UnityEngine，进度条的钳制自己写。</summary>
+        static float Clamp01(float x) => x < 0f ? 0f : (x > 1f ? 1f : x);
+
         Pos RandomDirection()
         {
             switch (NextRandom(4))
@@ -465,7 +600,13 @@ namespace TapGJ.Core
         /// </returns>
         bool ResolveEncounter(Creep trigger, Creep target, Pos meetingPoint, StepRecord record)
         {
-            var def = Reactions.Get(trigger.Element, target.Element);
+            // 快照要在结算之前取：相生会把输家的元素就地改掉，事后就读不到「谁遇上了谁」了。
+            int triggerUid = trigger.Uid;
+            int targetUid = target.Uid;
+            var triggerElement = trigger.Element;
+            var targetElement = target.Element;
+
+            var def = Reactions.Get(triggerElement, targetElement);
 
             if (def.Rule == ReactionRule.NoReaction)
             {
@@ -474,15 +615,19 @@ namespace TapGJ.Core
                     Type = GameEventType.Bump,
                     From = trigger.Pos,
                     To = meetingPoint,
-                    Element = trigger.Element,
-                    Uid = trigger.Uid,
-                    Text = $"同种{ElementDefs.Name(trigger.Element)}相遇，禁止移动",
+                    Element = triggerElement,
+                    Uid = triggerUid,
+                    Text = $"同种{ElementDefs.Name(triggerElement)}相遇，禁止移动",
                 });
+                FireEncounter(Encounter(triggerUid, triggerElement, targetUid, targetElement, def.Rule, meetingPoint,
+                    false, triggerElement, triggerElement));
                 return false;
             }
 
-            var winnerIsTrigger = def.Winner == trigger.Element;
+            var winnerIsTrigger = def.Winner == triggerElement;
             var loser = winnerIsTrigger ? target : trigger;
+            var loserElement = loser.Element;
+            bool winnerClaimsCell = false;
 
             if (def.Rule == ReactionRule.BothVanish)
             {
@@ -493,59 +638,69 @@ namespace TapGJ.Core
                 {
                     Type = GameEventType.Vanish,
                     From = meetingPoint,
-                    Element = trigger.Element,
-                    Uid = trigger.Uid,
-                    Text = $"{ElementDefs.Name(trigger.Element)} × {ElementDefs.Name(target.Element)} → 双方都消失",
+                    Element = triggerElement,
+                    Uid = triggerUid,
+                    Text = $"{ElementDefs.Name(triggerElement)} × {ElementDefs.Name(targetElement)} → 双方都消失",
                 });
-                return false;
             }
-
-            if (def.Rule == ReactionRule.Transform)
+            else if (def.Rule == ReactionRule.Transform)
             {
                 // 相生：输家变成赢家元素。uid / 位置 / 存活状态全都不变，只换元素。
-                var before = loser.Element;
                 loser.Element = def.Winner;
 
                 TotalTransformed++;
-                _converted[before] = ConvertedCounts.TryGetValue(before, out var n) ? n + 1 : 1;
+                _converted[loserElement] = ConvertedOf(loserElement) + 1;
 
                 record.Events.Add(new GameEvent
                 {
                     Type = GameEventType.Transform,
                     From = loser.Pos,
                     To = loser.Pos,
-                    Element = before,
+                    Element = loserElement,
                     Uid = loser.Uid,
-                    Text = $"{ElementDefs.Name(trigger.Element)} × {ElementDefs.Name(target.Element)} → "
-                           + $"{ElementDefs.Name(before)}变为{ElementDefs.Name(def.Winner)}（相生）",
+                    Text = $"{ElementDefs.Name(triggerElement)} × {ElementDefs.Name(targetElement)} → "
+                           + $"{ElementDefs.Name(loserElement)}变为{ElementDefs.Name(def.Winner)}（相生）",
                 });
-                return false; // 格子没空出来，主动方走不动
+                // 格子没空出来，主动方走不动
+            }
+            else
+            {
+                // 相克：输家直接消失
+                RemoveCreep(loser, record, meetingPoint);
+                record.Events.Add(new GameEvent
+                {
+                    Type = GameEventType.Vanish,
+                    From = meetingPoint,
+                    Element = loserElement,
+                    Uid = loser.Uid,
+                    Text = $"{ElementDefs.Name(triggerElement)} × {ElementDefs.Name(targetElement)} → "
+                           + $"{ElementDefs.Name(loserElement)}消失（{ElementDefs.Name(def.Winner)}克之）",
+                });
+
+                // 赢家是撞上去的那一方时，它顺势占住让出来的那一格（等于往前走了一步）
+                if (winnerIsTrigger && Board.IsEmpty(meetingPoint))
+                {
+                    Board.Clear(trigger.Pos);
+                    trigger.Pos = meetingPoint;
+                    Board.Put(trigger);
+                    record.Path.Add(meetingPoint);
+                    record.To = meetingPoint;
+                    winnerClaimsCell = true;
+                }
             }
 
-            // 相克：输家直接消失
-            RemoveCreep(loser, record, meetingPoint);
-            record.Events.Add(new GameEvent
-            {
-                Type = GameEventType.Vanish,
-                From = meetingPoint,
-                Element = loser.Element,
-                Uid = loser.Uid,
-                Text = $"{ElementDefs.Name(trigger.Element)} × {ElementDefs.Name(target.Element)} → "
-                       + $"{ElementDefs.Name(loser.Element)}消失（{ElementDefs.Name(def.Winner)}克之）",
-            });
+            // 结算完再通知机制：它看到的棋盘已经是最新状态，但快照里是「相遇时的两种元素」。
+            FireEncounter(Encounter(triggerUid, triggerElement, targetUid, targetElement, def.Rule, meetingPoint,
+                false, def.Rule == ReactionRule.BothVanish ? triggerElement : def.Winner, loserElement));
+            return winnerClaimsCell;
+        }
 
-            // 赢家是撞上去的那一方时，它顺势占住让出来的那一格（等于往前走了一步）
-            if (winnerIsTrigger && Board.IsEmpty(meetingPoint))
-            {
-                Board.Clear(trigger.Pos);
-                trigger.Pos = meetingPoint;
-                Board.Put(trigger);
-                record.Path.Add(meetingPoint);
-                record.To = meetingPoint;
-                return true;
-            }
-
-            return false;
+        /// <summary>组装相遇快照。元素一律显式传入，避免读到相生之后已经被改掉的值。</summary>
+        static EncounterInfo Encounter(int triggerUid, Element triggerElement, int targetUid, Element targetElement,
+            ReactionRule rule, Pos cell, bool isPlayerCard, Element winner, Element loser)
+        {
+            return new EncounterInfo(triggerUid, targetUid, triggerElement, targetElement,
+                rule, winner, loser, cell, isPlayerCard);
         }
 
         /// <summary>
@@ -560,6 +715,21 @@ namespace TapGJ.Core
 
         void SpawnCreep(Element element, Pos cell, StepRecord record, Pos reactionOrigin)
         {
+            // 本关不用这个元素 → 不生成，但要说清楚原因（和「周围没空格」不是一回事）。
+            // 只在关卡把元素池限制成子集时才会走到这里；默认池是「全部」，行为与以前完全一致。
+            if (!Rules.ElementPool.Has(element))
+            {
+                SpawnBlockedCount++;
+                record.Events.Add(new GameEvent
+                {
+                    Type = GameEventType.SpawnBlocked,
+                    From = reactionOrigin,
+                    Element = element,
+                    Text = $"{ElementDefs.Name(element)}元素本应生成，但本关可用元素只有「{Rules.ElementPool.Names()}」",
+                });
+                return;
+            }
+
             // 不变量：棋盘每格最多一个元素。兜底再确认一次，绝不允许盖在别人身上。
             if (!cell.IsNone && !Board.IsEmpty(cell))
                 cell = Board.FindSpawnCell(reactionOrigin, _rng, Pos.None, 7);
@@ -577,9 +747,7 @@ namespace TapGJ.Core
                 return;
             }
 
-            var creep = new Creep(_nextUid++, element, cell);
-            _creeps[creep.Uid] = creep;
-            Board.Put(creep);
+            var creep = CreateCreepAt(element, cell);
 
             TotalSpawned++;
             _spawned[element] = SpawnedCounts.TryGetValue(element, out var n) ? n + 1 : 1;
@@ -595,7 +763,27 @@ namespace TapGJ.Core
             });
         }
 
-        void RemoveCreep(Creep creep, StepRecord record, Pos where)
+        /// <summary>
+        /// 真正把一只新小怪放上棋盘：建对象、进 uid 表、占格。
+        /// **不记账、不发事件** —— 三种来源（反应生成 / 复合元素产出 / 玩家召唤）各自决定怎么记账。
+        /// 调用方保证 <paramref name="cell"/> 是空格（<see cref="Board.Put"/> 会挡住墙和复合元素）。
+        /// </summary>
+        Creep CreateCreepAt(Element element, Pos cell)
+        {
+            var creep = new Creep(_nextUid++, element, cell);
+            _creeps[creep.Uid] = creep;
+            Board.Put(creep);
+            return creep;
+        }
+
+        void RemoveCreep(Creep creep, StepRecord record, Pos where) => RemoveCreep(creep, record, where, true);
+
+        /// <summary>
+        /// 让一只小怪从棋盘上消失。
+        /// <paramref name="feedBottle"/> = false 用于「被消耗掉」的场合（融合牌的素材）——
+        /// 那些元素不是被相克湮灭的，按图2 的设定不该喂小瓶子。
+        /// </summary>
+        void RemoveCreep(Creep creep, StepRecord record, Pos where, bool feedBottle)
         {
             if (!creep.Alive) return;
 
@@ -604,7 +792,7 @@ namespace TapGJ.Core
             _creeps.Remove(creep.Uid);
 
             // 场上消失一个元素 → 对应瓶子 +1；满瓶自动产出一张对应元素牌。
-            if (Bottle.Add(creep.Element))
+            if (feedBottle && Bottle.Add(creep.Element))
             {
                 record.Events.Add(new GameEvent
                 {
@@ -615,16 +803,19 @@ namespace TapGJ.Core
                 DrawCard(creep.Element);
             }
 
-            record.Events.Add(new GameEvent
+            if (feedBottle)
             {
-                Type = GameEventType.BottleFill,
-                From = where,
-                Element = creep.Element,
-                Text = $"{ElementDefs.Name(creep.Element)}瓶 +1",
-            });
+                record.Events.Add(new GameEvent
+                {
+                    Type = GameEventType.BottleFill,
+                    From = where,
+                    Element = creep.Element,
+                    Text = $"{ElementDefs.Name(creep.Element)}瓶 +1",
+                });
+            }
 
             TotalRemoved++;
-            _removed[creep.Element] = RemovedCounts.TryGetValue(creep.Element, out var n) ? n + 1 : 1;
+            _removed[creep.Element] = RemovedOf(creep.Element) + 1;
         }
 
         // -------------------------------------------------------- 玩家行动阶段
@@ -633,6 +824,9 @@ namespace TapGJ.Core
         /// 打出一张元素牌（默认 CardEffectMode.CardAsVirtualElement）：
         /// 牌面元素被当作一个「虚拟小怪」，与目标格上的元素按图2 的表发生反应，
         /// 消失/生成的结果直接作用在棋盘上（棋盘元素计数变化）。
+        ///
+        /// 目标是**空格**时走另一条路（图1 第 2 条）：在该格召唤 1 个牌面元素的小怪，
+        /// 见 <see cref="TrySummonCard"/>；墙格 / 复合元素格两种都用不了。
         /// 返回 null 表示这次操作不合法，原因见 FailReason。
         /// </summary>
         public StepRecord TryPlayCard(int cardId, Pos target)
@@ -657,9 +851,52 @@ namespace TapGJ.Core
                 return null;
             }
 
+            // 秘术牌（融合牌/分解牌）不走这条路径：它们没有牌面元素，也不和元素发生反应。
+            // 走错了要明确报出来，而不是默默拿占位元素去算反应。
+            if (!card.IsElementCard)
+            {
+                FailReason = card.IsFusionCard
+                    ? "融合牌要这样用：先点这张牌，再依次点场上相邻的两个元素（点右键可以取消）"
+                    : "分解牌要这样用：先点这张牌，再点场上要拆掉的复合元素（点右键可以取消）";
+                return null;
+            }
+
+            // 本关可用元素之外的牌不能打：否则相生会把池外元素变到棋盘上，
+            // 「本关只出现这些元素」这个约定就保不住了。配置正确时永远走不到这里
+            // （CardPool 必须是 ElementPool 的子集，Rules.CollectIssues 会报）。
+            if (!Rules.ElementPool.Has(card.Element))
+            {
+                FailReason = $"本关可用元素只有「{Rules.ElementPool.Names()}」，"
+                             + $"{ElementDefs.Name(card.Element)}牌在本关用不了";
+                return null;
+            }
+
+            if (!Board.InBounds(target))
+            {
+                FailReason = $"目标格 {target} 不在棋盘内（棋盘 {Board.Width}×{Board.Height}）";
+                return null;
+            }
+
+            // 图1 玩家行动阶段的第 2 条：空格也能用牌 —— 在该格召唤牌面元素的小怪。
+            // 判定放在最前面，因为「打在空格上」和「打在墙 / 复合元素上」要给完全不同的说法。
+            if (Board.IsEmpty(target)) return TrySummonCard(card, target);
+
+            if (Board.IsBlocked(target))
+            {
+                FailReason = $"{target} 是墙格，不能出牌";
+                return null;
+            }
+
+            if (Board.HasComposite(target))
+            {
+                FailReason = $"{target} 上是复合元素，元素牌打不动它（要用分解牌）";
+                return null;
+            }
+
             var victim = Board.At(target);
             if (victim == null)
             {
+                // 兜底：既不是空格、又不是墙 / 复合元素，那格一定有小怪。真走到这里说明棋盘不变量坏了。
                 FailReason = "该格没有元素小怪，无法发生反应";
                 return null;
             }
@@ -683,11 +920,127 @@ namespace TapGJ.Core
 
             _hand.Remove(card);
             _cardsPlayedThisRound++;
+            var playedElement = victim.Element;
             ApplyCardEffect(plan.Value, victim, card, target, record);
 
             foreach (var e in record.Events) e.StepIndex = record.Index;
             Enqueue(record);
+
+            // 出牌也是一次「元素相遇」，机制照样要收到通知（相生转换计数之类全靠它）。
+            FireEncounter(CardEncounter(card, victim, playedElement, plan.Value, target));
             return record;
+        }
+
+        /// <summary>
+        /// 本关允不允许把元素牌打在空格上召唤（图1 第 2 条，见 <see cref="EmptyCellCardMode"/>）。
+        /// 表现层用它决定「空格要不要一起高亮」。
+        /// </summary>
+        public bool CanSummonOnEmptyCell => Rules.EmptyCellCard == EmptyCellCardMode.Summon;
+
+        /// <summary>
+        /// 图1 玩家行动阶段的第 2 条：「玩家可以对空的棋盘格使用卡牌，可以在该格召唤该元素小怪」。
+        ///
+        /// 和打在元素格上的区别（这几条是玩法约定）：
+        ///   · **不发生任何反应** —— 只是在该格多出一只牌面元素的小怪，不通知关卡机制（没有相遇）
+        ///   · **一样消耗这张牌、一样占每回合出牌上限**（它就是一次正常出牌）
+        ///   · **不喂小瓶子**（瓶子只认「元素从棋盘上消失」，召唤是凭空多一只）
+        ///   · 只有空格可以：墙格、复合元素占着的格子都会被 <see cref="TryPlayCard"/> 提前拦下
+        /// </summary>
+        StepRecord TrySummonCard(Card card, Pos cell)
+        {
+            if (!CanSummonOnEmptyCell)
+            {
+                FailReason = $"该格没有元素小怪，无法发生反应"
+                             + $"（当前规则「{nameof(Rules.EmptyCellCard)} = {Rules.EmptyCellCard}」不允许在空格上召唤）";
+                return null;
+            }
+
+            var record = new StepRecord
+            {
+                Index = _stepIndex++,
+                IsPlayerCard = true,
+                IsSummon = true,
+                Element = card.Element,
+                From = Pos.None,
+                To = cell,
+            };
+
+            _hand.Remove(card);
+            _cardsPlayedThisRound++;
+
+            var creep = CreateCreepAt(card.Element, cell);
+            TotalSummoned++;
+            _summoned[card.Element] = SummonedOf(card.Element) + 1;
+
+            record.Events.Add(new GameEvent
+            {
+                Type = GameEventType.Spawn,
+                From = cell,
+                To = cell,
+                Element = card.Element,
+                Uid = creep.Uid,
+                Text = $"打出{ElementDefs.Name(card.Element)}牌 → 召唤 1 个{ElementDefs.Name(card.Element)}元素",
+            });
+
+            foreach (var e in record.Events) e.StepIndex = record.Index;
+            Enqueue(record);
+            return record;
+        }
+
+        /// <summary>
+        /// 选中一张元素牌时该高亮哪些格子：「该点哪里」的唯一真源（表现层不要自己算）。
+        /// 这批格子 = 能按图2 发生反应的元素格（图1 第 1 条）+ 能召唤的空格（图1 第 2 条）。
+        ///
+        /// 池外的牌打不出去（<see cref="TryPlayCard"/> 会拒），所以一张都不高亮。
+        /// 「本回合出牌次数用完了」不在这里判 —— 和 <see cref="CanPlayCardOn"/> 保持一致，
+        /// 高亮只回答「这个目标是合法目标」，阶段 / 次数由调用方把关。
+        /// </summary>
+        public List<Pos> CellsForElementCard(Card card)
+        {
+            var result = new List<Pos>();
+            if (card == null || !card.IsElementCard) return result;
+            if (!Rules.ElementPool.Has(card.Element)) return result;
+
+            foreach (var creep in Board.Creeps())
+                if (CanPlayCardOn(card, creep)) result.Add(creep.Pos);
+
+            if (!CanSummonOnEmptyCell) return result;
+
+            for (int y = 0; y < Board.Height; y++)
+                for (int x = 0; x < Board.Width; x++)
+                {
+                    var pos = new Pos(x, y);
+                    if (Board.IsEmpty(pos)) result.Add(pos);
+                }
+
+            return result;
+        }
+
+        /// <summary>这张牌能不能打在某个空格上召唤（表现层单点判断用；批量用 <see cref="CellsForElementCard"/>）。</summary>
+        public bool CanSummonCardAt(Card card, Pos cell)
+        {
+            if (card == null || !card.IsElementCard) return false;
+            if (!CanSummonOnEmptyCell) return false;
+            if (!Rules.ElementPool.Has(card.Element)) return false;
+            return Board.IsEmpty(cell);
+        }
+
+        /// <summary>把一次出牌的结算计划翻译成相遇快照。</summary>
+        static EncounterInfo CardEncounter(Card card, Creep victim, Element victimElement, CardPlan plan, Pos target)
+        {
+            if (plan.TargetVanishes)
+            {
+                return Encounter(-1, card.Element, victim.Uid, victimElement, ReactionRule.Annihilate, target, true,
+                    card.Element, victimElement);
+            }
+
+            // 相生：输的一方变成赢家元素。目标变掉了 = 牌赢了；目标没变 = 目标赢了。
+            bool cardWins = plan.TargetBecomes != victimElement;
+            return cardWins
+                ? Encounter(-1, card.Element, victim.Uid, victimElement, ReactionRule.Transform, target, true,
+                    card.Element, victimElement)
+                : Encounter(-1, card.Element, victim.Uid, victimElement, ReactionRule.Transform, target, true,
+                    victimElement, card.Element);
         }
 
         /// <summary>一次出牌的结算计划（由 PlanCardEffect 算出，具体生效在 ApplyCardEffect）。</summary>
@@ -774,7 +1127,7 @@ namespace TapGJ.Core
                 victim.Element = plan.TargetBecomes;
 
                 TotalTransformed++;
-                _converted[victimElement] = ConvertedCounts.TryGetValue(victimElement, out var n) ? n + 1 : 1;
+                _converted[victimElement] = ConvertedOf(victimElement) + 1;
 
                 record.Events.Add(new GameEvent
                 {
@@ -840,14 +1193,80 @@ namespace TapGJ.Core
             return null;
         }
 
-        /// <summary>从五行牌堆里随机取一种元素（抽牌阶段与初始手牌都用它）。</summary>
-        Element RandomElement() => ElementDefs.All[NextRandom(ElementDefs.Count)];
+        /// <summary>
+        /// 从本关的**牌池**（Rules.CardPool）里随机取一种元素（元素牌用）。
+        /// 池子空的情况下 Validate 已经把它修成「全部」，所以这里拿得到东西。
+        /// </summary>
+        Element RandomElement()
+        {
+            var pool = Rules.PoolCards;
+            if (pool.Length == 0) return ElementDefs.All[0];
+            return pool[NextRandom(pool.Length)];
+        }
 
-        Card DrawRandomCard() => DrawCard(RandomElement());
+        /// <summary>
+        /// 抽一张牌：先按**权重**决定这一张是元素牌还是哪种秘术牌，再决定具体内容。
+        /// 这是「秘术牌比例可控」的实现点 —— 权重在 <see cref="Rules"/> 上（元素/融合/分解各一个）。
+        /// 元素牌池为空时秘术牌仍然照常抽得出来（反之亦然）。
+        /// </summary>
+        Card DrawRandomCard()
+        {
+            var specials = Rules.DrawableSpecialCards();
+            bool hasElements = Rules.PoolCards.Length > 0 && Rules.ElementCardWeight > 0;
+
+            int elementWeight = hasElements ? Math.Max(0, Rules.ElementCardWeight) : 0;
+            int total = elementWeight;
+            for (int i = 0; i < specials.Length; i++) total += WeightOf(specials[i]);
+
+            if (total <= 0)
+            {
+                // 牌堆里一张能抽的牌都没有（配置错到极点）：退回原来的行为，至少不会崩。
+                return DrawCard(RandomElement());
+            }
+
+            int roll = NextRandom(total);
+            if (roll < elementWeight) return DrawCard(RandomElement());
+
+            roll -= elementWeight;
+            for (int i = 0; i < specials.Length; i++)
+            {
+                int w = WeightOf(specials[i]);
+                if (roll < w) return DrawSpecialCard(specials[i]);
+                roll -= w;
+            }
+
+            // 理论上到不了这里；兜底给最后一种秘术牌。
+            return DrawSpecialCard(specials[specials.Length - 1]);
+        }
+
+        /// <summary>一种秘术牌的抽牌权重。</summary>
+        int WeightOf(CardKind kind) => Rules.DrawWeightOf(kind);
 
         Card DrawCard(Element element)
         {
             var card = new Card(_nextCardId++, element);
+            _hand.Add(card);
+            return card;
+        }
+
+        /// <summary>
+        /// 抽一张指定的**元素牌**（机制给牌、测试摆手牌都走它）。
+        /// ⚠ 与 <see cref="DrawSpecialCard"/> 分开命名：枚举之间可以隐式转换，
+        /// 两个同名的 `DrawCard` 重载会互相抢。
+        /// </summary>
+        public Card DrawElementCard(Element element) => DrawCard(element);
+
+        /// <summary>
+        /// 抽一张指定的**秘术牌**（机制给牌、测试摆手牌都走它）。
+        ///
+        /// ⚠ 方法名故意不叫 `DrawCard(CardKind)`：C# 的枚举之间可以隐式转换，
+        /// `DrawCard(Element)` 与 `DrawCard(CardKind)` 两个重载会互相抢，
+        /// `DrawCard(CardKind.DecomposeCard)` 有被解析成 `DrawCard(Element.Earth)` 的风险。
+        /// 名字分开就不会踩这个坑（同理也没有 `ForceHandForTest(IEnumerable&lt;CardKind&gt;)`）。
+        /// </summary>
+        public Card DrawSpecialCard(CardKind kind)
+        {
+            var card = new Card(_nextCardId++, kind);
             _hand.Add(card);
             return card;
         }
@@ -961,6 +1380,14 @@ namespace TapGJ.Core
                 return false;
             }
 
+            // 关卡机制可以提前判负（例如「水元素被杀光就输」），比回合上限更早生效。
+            if (CheckExtraLose(out var loseReason))
+            {
+                SetPhase(GamePhase.Defeat);
+                PushEvent(new GameEvent { Type = GameEventType.Lose, Text = loseReason });
+                return false;
+            }
+
             if (Round >= Rules.RoundLimit)
             {
                 DefeatByRoundLimit = true;
@@ -985,46 +1412,215 @@ namespace TapGJ.Core
             return ResolveJudgment();
         }
 
+        /// <summary>
+        /// 判定胜负（内置目标 + 关卡机制的额外条件）。
+        ///
+        /// 目标和机制的关系：
+        ///   · 目标是 Custom → 内置判定**完全不参与**，胜负只由 ILevelRule 决定。
+        ///     （不这么做的话，一个自定义目标的关卡会因为 Goal 字段的默认值「只剩水元素」而提前获胜。）
+        ///   · 其余目标     → 内置目标先判；不满足时才问机制，也就是机制只能「加赢」。
+        /// </summary>
         public bool CheckWinCondition(out string reason)
         {
             reason = null;
 
-            if (Rules.WinCondition == WinCondition.WaterOnly)
-            {
-                int water = Board.WaterCount();
-                int total = Board.CreepCount();
-                if (total > 0 && water == total)
-                {
-                    reason = $"胜利：全场只剩水元素（{water} 个）";
-                    return true;
-                }
-                return false;
-            }
+            if (Rules.Goal.Kind != GoalKind.Custom && CheckBuiltInGoal(out reason)) return true;
+            if (CheckExtraWin(out reason)) return true;
 
-            // SingleElement：全场只剩一种元素（含空场）
-            int distinct = Board.DistinctElementCount();
-            if (distinct <= 1)
-            {
-                reason = distinct == 0
-                    ? "胜利：全场元素已清空"
-                    : $"胜利：全场只剩{ElementDefs.Name(Board.FirstElementOrDefault())}元素";
-                return true;
-            }
+            reason = null;
             return false;
         }
 
-        public string WinConditionDescription() => DescribeWinCondition(Rules.WinCondition);
-
-        /// <summary>静态版本：不需要实例就能拿到文案（编辑器窗口用）。</summary>
-        public static string DescribeWinCondition(WinCondition condition)
+        bool CheckBuiltInGoal(out string reason)
         {
-            switch (condition)
+            reason = null;
+
+            switch (Rules.Goal.Kind)
             {
-                case WinCondition.WaterOnly: return "全场只剩水元素";
-                case WinCondition.SingleElement: return "全场只剩一种元素";
-                default: return condition.ToString();
+                case GoalKind.WaterOnly:
+                {
+                    int water = Board.WaterCount();
+                    int total = Board.CreepCount();
+                    if (total > 0 && water == total)
+                    {
+                        reason = $"胜利：全场只剩水元素（{water} 个）";
+                        return true;
+                    }
+                    return false;
+                }
+
+                case GoalKind.SingleElement:
+                {
+                    // 全场只剩一种元素（空场也算，即清空）
+                    int distinct = Board.DistinctElementCount();
+                    if (distinct <= 1)
+                    {
+                        reason = distinct == 0
+                            ? "胜利：全场元素已清空"
+                            : $"胜利：全场只剩{ElementDefs.Name(Board.FirstElementOrDefault())}元素";
+                        return true;
+                    }
+                    return false;
+                }
+
+                case GoalKind.ClearBoard:
+                    if (Board.CreepCount() == 0)
+                    {
+                        reason = "胜利：全场元素已清空";
+                        return true;
+                    }
+                    return false;
+
+                case GoalKind.SurviveRounds:
+                    if (Round >= Rules.Goal.Rounds)
+                    {
+                        reason = $"胜利：撑过了 {Rules.Goal.Rounds} 回合";
+                        return true;
+                    }
+                    return false;
+
+                case GoalKind.ElementAtMost:
+                {
+                    int count = Board.CountOf(Rules.Goal.Target);
+                    if (count <= Rules.Goal.TargetCount)
+                    {
+                        reason = $"胜利：场上{ElementDefs.Name(Rules.Goal.Target)}元素只剩 {count} 个（≤ {Rules.Goal.TargetCount}）";
+                        return true;
+                    }
+                    return false;
+                }
+
+                case GoalKind.ElementAtLeast:
+                {
+                    int count = Board.CountOf(Rules.Goal.Target);
+                    if (count >= Rules.Goal.TargetCount)
+                    {
+                        reason = $"胜利：场上{ElementDefs.Name(Rules.Goal.Target)}元素达到 {count} 个（≥ {Rules.Goal.TargetCount}）";
+                        return true;
+                    }
+                    return false;
+                }
+
+                default:
+                    return false;
             }
         }
+
+        public string WinConditionDescription()
+        {
+            if (Rules.Goal.Kind != GoalKind.Custom) return Rules.Goal.Describe();
+            return CustomGoalDescription() ?? "自定义目标（本关没有挂机制组件）";
+        }
+
+        /// <summary>给 HUD 画进度条用的目标进度（描述 + 填充比例 0~1 + 一行文字）。</summary>
+        public GoalProgress GetGoalProgress()
+        {
+            if (Rules.Goal.Kind == GoalKind.Custom) return CustomGoalProgress();
+
+            switch (Rules.Goal.Kind)
+            {
+                case GoalKind.WaterOnly:
+                {
+                    int water = Board.WaterCount();
+                    int total = Board.CreepCount();
+                    return new GoalProgress
+                    {
+                        Description = Rules.Goal.Describe(),
+                        Fill = total == 0 ? 0f : Clamp01((float)water / total),
+                        Label = $"水 {water} / 场上 {total}",
+                    };
+                }
+
+                case GoalKind.SingleElement:
+                {
+                    int distinct = Board.DistinctElementCount();
+                    return new GoalProgress
+                    {
+                        Description = Rules.Goal.Describe(),
+                        Fill = Clamp01(1f - (distinct - 1) / 4f),
+                        Label = $"元素种类 {distinct} / 5",
+                    };
+                }
+
+                case GoalKind.ClearBoard:
+                {
+                    int left = Board.CreepCount();
+                    float max = Math.Max(1, Rules.CellCount);
+                    return new GoalProgress
+                    {
+                        Description = Rules.Goal.Describe(),
+                        Fill = Clamp01(1f - left / max),
+                        Label = $"剩余 {left} 个",
+                    };
+                }
+
+                case GoalKind.SurviveRounds:
+                    return new GoalProgress
+                    {
+                        Description = Rules.Goal.Describe(),
+                        Fill = Rules.Goal.Rounds <= 0 ? 0f : Clamp01((float)Round / Rules.Goal.Rounds),
+                        Label = $"第 {Round} / {Rules.Goal.Rounds} 回合",
+                    };
+
+                case GoalKind.ElementAtMost:
+                {
+                    int count = Board.CountOf(Rules.Goal.Target);
+                    float max = Math.Max(1, Rules.Goal.TargetCount);
+                    return new GoalProgress
+                    {
+                        Description = Rules.Goal.Describe(),
+                        Fill = Clamp01(1f - count / max),
+                        Label = $"{ElementDefs.Name(Rules.Goal.Target)} {count} / ≤{Rules.Goal.TargetCount}",
+                    };
+                }
+
+                case GoalKind.ElementAtLeast:
+                {
+                    int count = Board.CountOf(Rules.Goal.Target);
+                    float target = Math.Max(1, Rules.Goal.TargetCount);
+                    return new GoalProgress
+                    {
+                        Description = Rules.Goal.Describe(),
+                        Fill = Clamp01(count / target),
+                        Label = $"{ElementDefs.Name(Rules.Goal.Target)} {count} / ≥{Rules.Goal.TargetCount}",
+                    };
+                }
+
+                default:
+                    return new GoalProgress { Description = Rules.Goal.Describe(), Fill = 0f, Label = "" };
+            }
+        }
+
+        /// <summary>
+        /// 自定义目标的进度条：取第一个给出了进度（Label 非空）的机制。
+        /// 机制没做进度条就退化成「只有描述、不填充」。
+        /// </summary>
+        GoalProgress CustomGoalProgress()
+        {
+            foreach (var rule in _levelRules)
+            {
+                if (rule == null) continue;
+
+                GoalProgress progress;
+                try
+                {
+                    progress = rule.GetGoalProgress(this);
+                }
+                catch (Exception)
+                {
+                    continue; // 进度条不值得为它停掉一局，异常留给判定钩子那套去报
+                }
+
+                if (!string.IsNullOrEmpty(progress.Label))
+                {
+                    if (string.IsNullOrEmpty(progress.Description)) progress.Description = WinConditionDescription();
+                    return progress;
+                }
+            }
+
+            return new GoalProgress { Description = WinConditionDescription(), Fill = 0f, Label = "" };
+        }
+
 
         // ------------------------------------------------------------ 事件/回放
 
@@ -1076,6 +1672,11 @@ namespace TapGJ.Core
             var parts = new List<string>();
             foreach (var e in ElementDefs.All)
                 parts.Add($"{ElementDefs.Name(e)}{Board.CountOf(e)}");
+
+            // 复合元素不属于五行，单独列出来（不然 HUD 上会「凭空少了几格」）
+            int composites = Board.CompositeCount();
+            if (composites > 0) parts.Add($"复合{composites}");
+
             return string.Join(" ", parts);
         }
     }

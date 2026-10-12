@@ -575,8 +575,10 @@ namespace TapGJ.Tests
             engine.ForceHandForTest(new[] { Element.Water }); // 水 × 水 不发生反应
             engine.FreezeHandLimitForTest();
             engine.SetupBottleForTest(0);
+            engine.SetNextRandomValues(0, 0);                // 目标必须留在 (3,3)：空格是能召唤的，走开了就不是这条用例了
             engine.EndPreparationNow();
 
+            Assert.IsNotNull(engine.Board.At(new Pos(3, 3)), "目标小怪应该还在原位");
             var record = engine.TryPlayCard(engine.Hand[0].Id, new Pos(3, 3));
 
             Assert.IsNull(record, "同元素之间不发生反应，这次出牌应该被拒绝");
@@ -586,9 +588,14 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 出牌_只能作用于棋盘上真实存在的元素()
+        public void 出牌_关掉召唤之后空格仍然打不出去()
         {
+            // 图1 第 2 条（打在空格上 = 在该格召唤）默认是开的，这条用例把它关掉，
+            // 钉住「加这条规则之前」的行为：空格不是合法目标，出牌被拒绝且不消耗手牌。
+            // 默认开着时的行为在 CardSummonTests 里。
             var rules = BaseRules();
+            rules.EmptyCellCard = EmptyCellCardMode.Reject;
+
             var engine = new GameEngine(rules, 5);
             engine.ClearBoard();
             engine.PlaceCreep(Element.Earth, new Pos(4, 4));
@@ -603,6 +610,8 @@ namespace TapGJ.Tests
 
             Assert.IsNull(record);
             StringAssert.Contains("没有元素", engine.FailReason);
+            Assert.AreEqual(1, engine.Hand.Count, "被拒绝时不该消耗手牌");
+            Assert.IsTrue(engine.Board.IsEmpty(new Pos(0, 0)), "空格上不该凭空冒出元素");
         }
 
         // ------------------------------------------------------------ 回合与胜负
@@ -830,7 +839,7 @@ namespace TapGJ.Tests
         public void 胜利条件_只剩水元素()
         {
             var rules = BaseRules();
-            rules.WinCondition = WinCondition.WaterOnly;
+            rules.Goal = GoalSpec.WaterOnly();
 
             var engine = Rig(rules, (Element.Water, new Pos(0, 0)), (Element.Water, new Pos(1, 0)));
             Assert.IsTrue(engine.CheckWinCondition(out var reason), reason);
@@ -845,7 +854,7 @@ namespace TapGJ.Tests
             var rules = BaseRules();
             rules.RoundLimit = 2;
             rules.CreepsPerElement = 0;
-            rules.WinCondition = WinCondition.WaterOnly;
+            rules.Goal = GoalSpec.WaterOnly();
 
             var engine = new GameEngine(rules, 3);
             engine.ClearBoard();

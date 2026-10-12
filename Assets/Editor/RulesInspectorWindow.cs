@@ -195,13 +195,51 @@ namespace TapGJ.EditorTools
             _rules.RoundLimit = EditorGUILayout.IntField(_rules.RoundLimit, GUILayout.Width(40f));
 
             EditorGUILayout.LabelField("胜利条件", GUILayout.Width(60f));
-            _rules.WinCondition = (WinCondition)EditorGUILayout.EnumPopup(_rules.WinCondition, GUILayout.Width(120f));
+            var goal = _rules.Goal;
+            goal.Kind = (GoalKind)EditorGUILayout.EnumPopup(goal.Kind, GUILayout.Width(130f));
+            _rules.Goal = goal;
             EditorGUILayout.EndHorizontal();
+
+            // 带参数的目标：把参数也摊开
+            if (_rules.Goal.Kind == GoalKind.SurviveRounds)
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("撑过回合数", GUILayout.Width(70f));
+                var g = _rules.Goal;
+                g.Rounds = EditorGUILayout.IntField(g.Rounds, GUILayout.Width(40f));
+                _rules.Goal = g;
+                EditorGUILayout.EndHorizontal();
+            }
+            else if (_rules.Goal.Kind == GoalKind.ElementAtMost || _rules.Goal.Kind == GoalKind.ElementAtLeast)
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("目标元素", GUILayout.Width(60f));
+                var g = _rules.Goal;
+                g.Target = (Element)EditorGUILayout.EnumPopup(g.Target, GUILayout.Width(70f));
+                EditorGUILayout.LabelField("数量", GUILayout.Width(30f));
+                g.TargetCount = EditorGUILayout.IntField(g.TargetCount, GUILayout.Width(40f));
+                _rules.Goal = g;
+                EditorGUILayout.EndHorizontal();
+            }
 
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("可打出的牌的作用", GUILayout.Width(130f));
             _rules.CardEffect = (CardEffectMode)EditorGUILayout.EnumPopup(_rules.CardEffect, GUILayout.Width(200f));
             EditorGUILayout.EndHorizontal();
+
+            // 图1 玩家行动阶段的第 2 条：元素牌打在空格上 = 在该格召唤该元素的小怪。
+            // 默认（Summon = 0）就是为了让旧资产自动拿到这条规则，所以这里把「拒绝」写清楚是回到旧玩法。
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("元素牌打在空格上", GUILayout.Width(130f));
+            _rules.EmptyCellCard = (EmptyCellCardMode)EditorGUILayout.EnumPopup(_rules.EmptyCellCard, GUILayout.Width(200f));
+            EditorGUILayout.LabelField(
+                _rules.EmptyCellCard == EmptyCellCardMode.Summon
+                    ? "（图1 第 2 条：在该格召唤 1 个牌面元素的小怪）"
+                    : "（旧玩法：空格不是合法目标，出牌被拒绝）",
+                EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+
+            DrawSpecialCardControls();
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.BeginHorizontal();
@@ -221,6 +259,70 @@ namespace TapGJ.EditorTools
             _reportScroll = EditorGUILayout.BeginScrollView(_reportScroll, GUILayout.ExpandHeight(true));
             EditorGUILayout.TextArea(_report, GUILayout.ExpandHeight(true));
             EditorGUILayout.EndScrollView();
+        }
+
+        /// <summary>
+        /// 秘术牌 / 复合元素这一块的模拟参数。
+        /// 抽牌比例用「权重」而不是百分比：元素牌一个权重、融合/分解各一个，抽牌时按权重抽。
+        /// </summary>
+        void DrawSpecialCardControls()
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField("复合元素与秘术牌", EditorStyles.boldLabel);
+
+            // 总开关：不勾时下面整块都不生效，所以直接置灰 + 说清楚，别让它看起来「改了有用」。
+            bool wasOn = _rules.UseCompositeElements;
+            _rules.UseCompositeElements = EditorGUILayout.ToggleLeft(
+                "启用复合元素（这一关有复合元素和融合牌 / 分解牌）",
+                _rules.UseCompositeElements, EditorStyles.boldLabel);
+
+            // 刚勾上、而且没配过秘术牌 → 直接给一个能玩的默认配比，
+            // 省得"勾了开关却一张牌都没有"（那种配置会被校验报成「这个开关白勾」）。
+            if (!wasOn && _rules.UseCompositeElements && _rules.SpecialCardPool == SpecialCardMask.None)
+                _rules.SpecialCardPool = SpecialCardMask.All;
+
+            if (!_rules.UseCompositeElements)
+            {
+                EditorGUILayout.HelpBox(
+                    "没勾：这一关不会出现复合元素，也抽不到融合牌 / 分解牌，下面的设置一律被忽略。"
+                    + "（加这层玩法之前的旧关卡资产反序列化出来就是这个状态。）",
+                    MessageType.None);
+                return;
+            }
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("可抽到的秘术牌", GUILayout.Width(110f));
+            _rules.SpecialCardPool = (SpecialCardMask)EditorGUILayout.EnumPopup(_rules.SpecialCardPool, GUILayout.Width(160f));
+            EditorGUILayout.LabelField("（融合牌要求元素池里存在能配对的两种元素，否则自动跳过）", EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("抽牌权重：元素", GUILayout.Width(100f));
+            _rules.ElementCardWeight = EditorGUILayout.IntField(_rules.ElementCardWeight, GUILayout.Width(40f));
+            EditorGUILayout.LabelField("融合", GUILayout.Width(30f));
+            _rules.FusionCardWeight = EditorGUILayout.IntField(_rules.FusionCardWeight, GUILayout.Width(40f));
+            EditorGUILayout.LabelField("分解", GUILayout.Width(30f));
+            _rules.DecomposeCardWeight = EditorGUILayout.IntField(_rules.DecomposeCardWeight, GUILayout.Width(40f));
+
+            EditorGUILayout.LabelField("　每回合生产", GUILayout.Width(70f));
+            _rules.CompositeIngredientsPerRound = EditorGUILayout.IntField(_rules.CompositeIngredientsPerRound, GUILayout.Width(36f));
+            EditorGUILayout.LabelField("范围", GUILayout.Width(28f));
+            _rules.CompositeRange = EditorGUILayout.IntField(_rules.CompositeRange, GUILayout.Width(30f));
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            _rules.FusionRequiresAdjacency = EditorGUILayout.ToggleLeft("融合要求两个元素相邻", _rules.FusionRequiresAdjacency, GUILayout.Width(180f));
+            _rules.CompositeProducesOnCreation = EditorGUILayout.ToggleLeft("融合当回合立刻生效一次", _rules.CompositeProducesOnCreation, GUILayout.Width(200f));
+            _rules.DecomposeGrantsElementCards = EditorGUILayout.ToggleLeft("分解给回两张元素牌", _rules.DecomposeGrantsElementCards, GUILayout.Width(180f));
+            EditorGUILayout.EndHorizontal();
+
+            // 实时把「这个配置能不能玩」列出来（和关卡验证、运行期是同一套检查）。
+            var issues = new List<string>();
+            try { _rules.CollectIssues(issues); }
+            catch (Exception e) { issues.Add("规则数值非法：" + e.Message); }
+
+            foreach (var issue in issues)
+                EditorGUILayout.HelpBox(issue, MessageType.Warning);
         }
 
         /// <summary>
@@ -244,6 +346,10 @@ namespace TapGJ.EditorTools
             int totalRounds = 0;
             int totalCards = 0;
             int totalDiscards = 0;
+            int totalFusions = 0;
+            int totalDecompositions = 0;
+            int totalCompositeSpawns = 0;
+            int maxComposites = 0;
             var endStates = new Dictionary<string, int>();
             var roundHistogram = new Dictionary<int, int>();
 
@@ -284,6 +390,12 @@ namespace TapGJ.EditorTools
                 string key = $"金{engine.Board.CountOf(Element.Metal)} 木{engine.Board.CountOf(Element.Wood)} "
                            + $"水{engine.Board.CountOf(Element.Water)} 火{engine.Board.CountOf(Element.Fire)} "
                            + $"土{engine.Board.CountOf(Element.Earth)}";
+
+                totalFusions += engine.TotalFusions;
+                totalDecompositions += engine.TotalDecompositions;
+                totalCompositeSpawns += engine.CompositeProducedCount;
+                maxComposites = Math.Max(maxComposites, engine.CompositeCount);
+
                 endStates.TryGetValue(key, out var c);
                 endStates[key] = c + 1;
 
@@ -292,7 +404,9 @@ namespace TapGJ.EditorTools
                     sb.AppendLine($"seed={_baseSeed + i}");
                     sb.AppendLine($"  结束阶段：{GameEngine.PhaseName(engine.Phase)}　回合：{engine.Round}");
                     sb.AppendLine($"  终局棋盘：{key}");
-                    sb.AppendLine($"  累计消失 {engine.TotalRemoved} 个（相克），相生转换 {engine.TotalTransformed} 次，生成 {engine.TotalSpawned} 个，出生失败 {engine.SpawnBlockedCount} 次");
+                    sb.AppendLine($"  累计消失 {engine.TotalRemoved} 个（相克），相生转换 {engine.TotalTransformed} 次，生成 {engine.TotalSpawned} 个，召唤 {engine.TotalSummoned} 个，出生失败 {engine.SpawnBlockedCount} 次");
+                    sb.AppendLine($"  融合 {engine.TotalFusions} 次，分解 {engine.TotalDecompositions} 次，"
+                                  + $"复合元素产出 {engine.CompositeProducedCount} 个（其中与已有元素反应 {engine.CompositeProducedEncounters} 次）");
                     sb.AppendLine($"  各元素被相克消失：" + PerElement(engine, Tally.Removed));
                     sb.AppendLine($"  各元素被相生转换：" + PerElement(engine, Tally.Converted));
                     sb.AppendLine($"  各元素新生成次数：" + PerElement(engine, Tally.Spawned));
@@ -308,7 +422,16 @@ namespace TapGJ.EditorTools
             sb.AppendLine($"平均回合数 {(games == 0 ? 0 : (float)totalRounds / games):F2}　"
                           + $"平均出牌 {(games == 0 ? 0f : (float)totalCards / games):F2} 张/局　"
                           + $"平均弃牌 {(games == 0 ? 0f : (float)totalDiscards / games):F2} 张/局　耗时 {sw.ElapsedMilliseconds} ms");
-            sb.AppendLine($"胜利条件：{GameEngine.DescribeWinCondition(rules.WinCondition)}　牌的作用：{rules.CardEffect}　玩家出牌：{(playerPlays ? "是" : "否")}");
+            sb.AppendLine($"胜利条件：{rules.Goal.Describe()}　牌的作用：{rules.CardEffect}　空格出牌：{rules.EmptyCellCard}　玩家出牌：{(playerPlays ? "是" : "否")}");
+            sb.AppendLine($"秘术牌：{rules.SpecialCardPool}（权重 元素{rules.ElementCardWeight}/融合{rules.FusionCardWeight}/分解{rules.DecomposeCardWeight}）"
+                          + $"　复合元素每回合生产 {rules.CompositeProducedPerRound} 个（范围 {rules.CompositeRange}）");
+            sb.AppendLine($"融合 {totalFusions} 次（{(games == 0 ? 0f : (float)totalFusions / games):F2}/局）　"
+                          + $"分解 {totalDecompositions} 次（{(games == 0 ? 0f : (float)totalDecompositions / games):F2}/局）　"
+                          + $"复合元素产出 {totalCompositeSpawns} 个　场上最多同时 {maxComposites} 个");
+
+            if (rules.EmptyCellCard == EmptyCellCardMode.Summon)
+                sb.AppendLine("空格出牌 = 召唤：批量模拟里的贪心玩家不会主动召唤（多一只元素对它要减少种类的目标没好处），"
+                              + "所以「召唤 N 个」恒为 0 —— 这条规则只能靠人工试玩验证。");
 
             sb.AppendLine();
             sb.AppendLine("回合数分布：");
@@ -389,11 +512,17 @@ namespace TapGJ.EditorTools
                 "  注意相生不算「消失」（元素只是换了身份），所以只有相克才会攒瓶子。", EditorStyles.wordWrappedLabel);
 
             EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField("原型里暂时没有做的（图2 里的复合元素）", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("复合元素与秘术牌（图2 上半部分）", EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
-                "烬（木+火）、熔岩（火+土）、矿晶（土+金）、寒钢（金+水）、灵泉（水+木）这几行需要\n" +
-                "「两个元素合成一个复合元素」的机制，属于第二阶段内容，目前只实现了五行基础反应。",
-                EditorStyles.wordWrappedLabel);
+                "五张复合元素：烬（木+火）、熔岩（火+土）、矿晶（土+金）、寒钢（金+水）、灵泉（水+木）。\n" +
+                "· 它们占棋盘一格、**不会移动**、元���牌也打不动它们；只有分解牌能动它。\n" +
+                "· 回合开始时在自己的范围内生产两种组成元素各 N 份（默认 4+4）；融合出来的当回合先生效一次。\n" +
+                "· 产生落在已被占的格子上时，会和那格上的元素按图2 的表反应一次。\n" +
+                "· 「场上没有复合元素」是融合牌的前提：开局没有复合元素时，只能靠融合牌现场合一个。", EditorStyles.wordWrappedLabel);
+
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField("配方表（融合牌：相邻的两个元素 + 顺序无关）", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(GameEngine.RecipeListText(), EditorStyles.wordWrappedLabel);
 
             EditorGUILayout.Space(8f);
             if (GUILayout.Button("导出规则说明到 Console", GUILayout.Height(24f))) DumpRules();

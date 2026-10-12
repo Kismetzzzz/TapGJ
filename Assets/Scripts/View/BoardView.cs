@@ -5,23 +5,36 @@ using UnityEngine;
 namespace TapGJ.View
 {
     /// <summary>
-    /// 棋盘表现层：把 GameEngine 的状态画成 2D 网格，并把点击换算成格子坐标。
-    /// 完全由代码生成（程序化贴图 + 内置字体），所以不需要任何美术资源或预制体。
+    /// 棋盘表现层：把 GameEngine 的状态画成 2D 网格。
+    ///
+    /// ⚠ 尺寸与位置由**场景**决定，不由屏幕决定：
+    ///   · CellSize / CellGap 决定格子多大（Inspector 上改）
+    ///   · 棋盘以**自己的 transform 为中心** —— 把 BoardAnchor 摆到哪儿，棋盘就出现在哪儿
+    ///   相机不再被代码接管：你摆好的构图会一直保持，窗口尺寸变了也不会自己动。
     ///
     /// ⚠ 对象所有权只有两份，不要混：
     ///   CellView  —— 格子自己的底板 / 高亮 / 坐标角标，**静态**，一辈子跟着格子不动。
     ///   CreepView —— 一只小怪的色块 + 元素字，**全部**挂在 _creepRoot 下，位置用局部坐标。
-    ///   以前小怪的表现对象一半在格子里、一半在 _creepRoot 下，两套并存导致
-    ///   「格子有色块没字」（孤儿对象没人销毁）和「方块飞出棋盘」（世界坐标不跟棋盘走）。
-    ///   现在 Sync() 是唯一入口：以引擎为准双向对账，多退少补。
+    ///   Sync() 是唯一入口：以引擎为准双向对账，多退少补。
     ///
-    /// ⚠ 这个组件会自己生成 64 个格子：不要手工往它下面塞格子物体，
-    /// 运行时 Setup() 会先清空子物体再重建（想改格子外观请改 CellView）。
+    /// ⚠ 这个组件会自己生成 W×H 个格子：不要手工往它下面塞格子物体，
+    /// 运行时 Setup() 会先清空子物体再重建。
     /// </summary>
     public sealed class BoardView : MonoBehaviour
     {
-        public const float Cell = 1.0f;
-        public const float Gap = 0.10f;
+        [Header("格子尺寸（世界单位）")]
+        [Tooltip("单个格子多大。1 = 一个 Unity 单位")]
+        public float CellSize = 1.0f;
+
+        [Tooltip("格子之间的间隙")]
+        public float CellGap = 0.10f;
+
+        [Header("编辑器预览（只影响 Scene 视图，不进运行时）")]
+        [Tooltip("没进 Play 时 Scene 视图里画几列格子")]
+        public int PreviewWidth = 8;
+
+        [Tooltip("没进 Play 时 Scene 视图里画几行格子")]
+        public int PreviewHeight = 8;
 
         public GameEngine Engine;
 
@@ -30,7 +43,6 @@ namespace TapGJ.View
 
         /// <summary>小怪表现对象的唯一归属：uid → Creep_{uid}（挂在 _creepRoot 下）。</summary>
         readonly Dictionary<int, GameObject> _creeps = new Dictionary<int, GameObject>();
-
         /// <summary>正在播动画的小怪：这期间 Sync 不许重建 / 挪动 / 销毁它。</summary>
         readonly HashSet<int> _frozen = new HashSet<int>();
 
@@ -73,14 +85,21 @@ namespace TapGJ.View
             else DestroyImmediate(target);
         }
 
-        public float BoardWidthWorld => Engine.Board.Width * Cell + (Engine.Board.Width - 1) * Gap;
-        public float BoardHeightWorld => Engine.Board.Height * Cell + (Engine.Board.Height - 1) * Gap;
+        public float BoardWidthWorld => Engine.Board.Width * CellSize + (Engine.Board.Width - 1) * CellGap;
+        public float BoardHeightWorld => Engine.Board.Height * CellSize + (Engine.Board.Height - 1) * CellGap;
         public Vector3 BoardCenter => _cellRoot != null ? _cellRoot.transform.position : Vector3.zero;
 
         public event System.Action<Pos> CellClicked;
 
-        /// <summary>由 GameRunner 控制：动画播放中 / 过场中时禁止点选。</summary>
+        /// <summary>由 GameSession 控制：动画播放中 / 过场中时禁止点选。</summary>
         public bool InteractionEnabled = true;
+
+        void OnValidate()
+        {
+            // 手滑填 0 或负数会让整个棋盘消失，这里兜一下
+            if (CellSize < 0.05f) CellSize = 0.05f;
+            if (CellGap < 0f) CellGap = 0f;
+        }
 
         public void Setup(GameEngine engine)
         {
@@ -97,103 +116,84 @@ namespace TapGJ.View
             _creeps.Clear();
             _frozen.Clear();
             _selectedCell = Pos.None;
-            _appliedScale = -1f; // 格子是新建的（坐标角标默认隐藏），下次布局必须重刷一次
 
             Build();
+            ApplyCellArt();
         }
 
         /// <summary>
-        /// 按「屏幕比例」的矩形摆放棋盘：内部网格与文字都按这个框等比缩放。
-        /// 这样棋盘永远落在规划好的区域内，不会因为铺满半个屏幕而把格子糊得很大。
-        /// fitScale = 棋盘占这个框的比例（留一点边距，免得贴边）。
+        /// 按当前 CellSize 决定格子的精细度：格子太小就隐藏坐标角标，
+        /// 否则会出现「坐标字比格子还大」的情况。
+        /// 元素字不用管 —— 它挂在小怪下面，跟着格子缩放走。
         /// </summary>
-        public void Layout(Rect screenFraction, float fitScale = 0.92f)
+        void ApplyCellArt()
         {
-            float vx = screenFraction.x * Screen.width;
-            float vy = screenFraction.y * Screen.height;
-            float vw = screenFraction.width * Screen.width;
-            float vh = screenFraction.height * Screen.height;
-            LayoutPixels(vx, vy, vw, vh, fitScale);
-        }
-
-        /// <summary>
-        /// 按屏幕像素矩形摆放棋盘。
-        /// fitToZone = true：把棋盘等比缩放到正好装进这个框（自包含，适合测试或单用）。
-        /// fitToZone = false：只把这个框的中心对准棋盘中心、缩放保持 1（棋盘尺寸交给相机控制）。
-        /// camera 传 null 时用 Camera.main。
-        /// </summary>
-        public void LayoutPixels(float px, float py, float pw, float ph, float fitScale = 0.92f,
-            Camera camera = null, bool fitToZone = true)
-        {
-            if (Engine == null) return;
-
-            var cam = camera != null ? camera : Camera.main;
-            if (cam == null) return;
-
-            float scale = 1f;
-            if (fitToZone)
-            {
-                float bw = BoardWidthWorld;
-                float bh = BoardHeightWorld;
-                if (bw <= 0f || bh <= 0f) return;
-
-                // 取「能放进这个框」的最大缩放：同时受宽高限制，取更小的那个
-                float margin = Mathf.Clamp(fitScale, 0.3f, 1f);
-                scale = Mathf.Min(pw * margin / bw, ph * margin / bh);
-                if (scale <= 0f) return;
-            }
-
-            transform.localScale = Vector3.one * scale;
-
-            // 框中心 → 世界坐标，再把棋盘中心对上去
-            var worldCenter = cam.ScreenToWorldPoint(
-                new Vector3(px + pw * 0.5f, Screen.height - (py + ph * 0.5f), -cam.transform.position.z));
-            worldCenter.z = 0f;
-            transform.position = worldCenter;
-
-            ApplyCellArt(scale);
-        }
-
-        float _appliedScale = -1f;
-
-        /// <summary>直接指定棋盘缩放（GameRunner 用相机控制尺寸时调它保持 scale = 1）。</summary>
-        public void ApplyLayoutScale(float scale)
-        {
-            if (scale <= 0f) return;
-            transform.localScale = Vector3.one * scale;
-            ApplyCellArt(scale);
-        }
-
-        /// <summary>
-        /// 按当前缩放调整格子的精细度：格子变小的时候，坐标角标要跟着隐藏，
-        /// 否则就会出现「文字比格子还大、糊满屏幕」的情况。
-        /// 元素字不用管 —— 它挂在小怪下面，缩放天然跟着棋盘走。
-        /// </summary>
-        void ApplyCellArt(float scale)
-        {
-            if (_appliedScale > 0f && Mathf.Approximately(_appliedScale, scale)) return;
-            _appliedScale = scale;
-
-            bool showCoords = scale > 0.55f; // 棋盘被缩得太小时就别显示坐标了
+            bool showCoords = CellSize > 0.55f;
             foreach (var cell in _cells)
                 cell.ApplyScale(showCoords);
-        }
-
-        public static Vector3 CellWorldPos(Pos p, int width, int height)
-        {
-            float w = width * Cell + (width - 1) * Gap;
-            float h = height * Cell + (height - 1) * Gap;
-            float x = -w * 0.5f + Cell * 0.5f + p.X * (Cell + Gap);
-            float y = -h * 0.5f + Cell * 0.5f + p.Y * (Cell + Gap);
-            return new Vector3(x, y, 0f);
         }
 
         /// <summary>
         /// 格子在棋盘**局部空间**里的位置。
         /// _cellRoot / _creepRoot 的 localPosition 都是零，所以小怪用这个值当 localPosition，
-        /// 就和格子严丝合缝地对齐，而且棋盘被挪动/缩放时小怪会自动跟着走。
+        /// 就和格子严丝合缝地对齐；棋盘被挪动/缩放时小怪也会自动跟着走。
         /// </summary>
-        public Vector3 CellLocalPos(Pos p) => CellWorldPos(p, Engine.Board.Width, Engine.Board.Height);
+        public Vector3 CellLocalPos(Pos p)
+        {
+            if (Engine == null) return Vector3.zero;
+
+            float w = BoardWidthWorld;
+            float h = BoardHeightWorld;
+            float x = -w * 0.5f + CellSize * 0.5f + p.X * (CellSize + CellGap);
+            float y = -h * 0.5f + CellSize * 0.5f + p.Y * (CellSize + CellGap);
+            return new Vector3(x, y, 0f);
+        }
+
+        /// <summary>
+        /// Scene 视图里把棋盘占地 + 每个格子画出来（选中 BoardAnchor 可见）。
+        /// 格子和手牌一样是运行时才生成的，所以用 Gizmo 让你「没进 Play」也能看到
+        /// 棋盘有多大、摆在哪 —— 相机构图时尤其有用。
+        /// </summary>
+        void OnDrawGizmosSelected()
+        {
+            if (CellSize <= 0f) return;
+
+            int w = Engine != null ? Engine.Board.Width : PreviewWidth;
+            int h = Engine != null ? Engine.Board.Height : PreviewHeight;
+            if (w <= 0 || h <= 0) return;
+
+            float bw = w * CellSize + (w - 1) * CellGap;
+            float bh = h * CellSize + (h - 1) * CellGap;
+            var center = transform.position;
+
+            // 外框
+            Gizmos.color = new Color(0.5f, 0.8f, 1f, 0.4f);
+            Gizmos.DrawWireCube(center, new Vector3(bw, bh, 0f));
+
+            // 逐格：Play 里画真实元素色，编辑里画中性色
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var local = new Vector3(
+                        -bw * 0.5f + CellSize * 0.5f + x * (CellSize + CellGap),
+                        -bh * 0.5f + CellSize * 0.5f + y * (CellSize + CellGap), 0f);
+
+                    var pos = center + transform.right * local.x + transform.up * local.y;
+                    pos.z = center.z;
+
+                    Color c = new Color(1f, 1f, 1f, 0.14f);
+                    if (Engine != null)
+                    {
+                        var creep = Engine.Board.At(new Pos(x, y));
+                        if (creep != null) c = ElementDefs.Tint(creep.Element);
+                    }
+
+                    Gizmos.color = c;
+                    Gizmos.DrawWireCube(pos, new Vector3(CellSize, CellSize, 0f));
+                }
+            }
+        }
 
         void Build()
         {
@@ -212,7 +212,7 @@ namespace TapGJ.View
                     cell.transform.localPosition = CellLocalPos(pos);
 
                     var view = cell.AddComponent<CellView>();
-                    view.Build(pos, _font);
+                    view.Build(pos, _font, CellSize, Engine.Board.IsBlocked(pos));
                     _cells.Add(view);
                     _cellByKey[pos.Y * Engine.Board.Width + pos.X] = view;
                 }
@@ -239,6 +239,9 @@ namespace TapGJ.View
         ///   一、引擎里有的小怪 —— 确保恰好一个表现对象，并且站在自己的格子上；
         ///   二、引擎里已经没有的小怪 —— 销毁表现对象（以前这里漏了，色块就留在格子上）。
         /// 格子完全由静态元素组成，不参与小怪显示，所以不会再有「有色无字」的残影。
+        ///
+        /// 复合元素走的是**同一套对象**（同样是 Creep_{uid} 挂在 Creeps 下），
+        /// 所以「表现对象数 = 逻辑层元素数 + 复合元素数」这条不变量依然成立。
         /// </summary>
         public void Sync()
         {
@@ -246,14 +249,25 @@ namespace TapGJ.View
 
             // 一、补齐 + 归位
             _live.Clear();
+
             foreach (var creep in Engine.Creeps)
             {
                 _live.Add(creep.Uid);
                 if (_frozen.Contains(creep.Uid)) continue; // 动画在放，别插手
 
                 var view = EnsureCreepView(creep.Uid);
-                view.Show(creep);
+                view.ShowCreep(creep);
                 view.transform.localPosition = CellLocalPos(creep.Pos);
+            }
+
+            foreach (var composite in Engine.Composites)
+            {
+                _live.Add(composite.Uid);
+                if (_frozen.Contains(composite.Uid)) continue;
+
+                var view = EnsureCreepView(composite.Uid);
+                view.ShowComposite(composite);
+                view.transform.localPosition = CellLocalPos(composite.Pos);
             }
 
             // 二、清掉引擎里已经没有的
@@ -281,7 +295,7 @@ namespace TapGJ.View
 
             go = new GameObject($"Creep_{uid}");
             go.transform.SetParent(_creepRoot.transform, false);
-            go.transform.localScale = Vector3.one * CreepView.BodyScale;
+            go.transform.localScale = Vector3.one * (CellSize * CreepView.BodyScale);
             var view = go.AddComponent<CreepView>();
             view.Build(uid, _font);
             _creeps[uid] = go;
@@ -296,14 +310,45 @@ namespace TapGJ.View
             return go == null ? null : go.GetComponent<CreepView>();
         }
 
-        /// <summary>格子上的小怪表现对象；该格空着就返回 null。</summary>
+        /// <summary>格子上的小怪表现对象；该格空着 / 是复合元素就返回 null。</summary>
         public CreepView CreepViewAt(Pos pos)
         {
             var creep = Engine.Board.At(pos);
             return creep == null ? null : CreepViewOf(creep.Uid);
         }
 
-        /// <summary>场上小怪表现对象的数量（不变量：必须等于 Engine.CreepCount）。</summary>
+        /// <summary>某只占格者（元素小怪或复合元素）的显示对象。</summary>
+        public CreepView OccupantViewAt(Pos pos)
+        {
+            if (Engine == null) return null;
+            var occupant = Engine.Board.OccupantAt(pos);
+            return occupant == null ? null : CreepViewOf(occupant.Uid);
+        }
+
+        /// <summary>某格上复合元素的显示对象（没有就返回 null）。</summary>
+        public CreepView CompositeViewAt(Pos pos)
+        {
+            var composite = Engine.Board.CompositeAt(pos);
+            return composite == null ? null : CreepViewOf(composite.Uid);
+        }
+
+        /// <summary>场上复合元素表现对象的数量。</summary>
+        public int CompositeObjectCount
+        {
+            get
+            {
+                if (Engine == null) return 0;
+                int n = 0;
+                foreach (var c in Engine.Composites)
+                    if (_creeps.ContainsKey(c.Uid)) n++;
+                return n;
+            }
+        }
+
+        /// <summary>
+        /// 场上所有占格者的表现对象数量（小怪 + 复合元素）。
+        /// 不变量：它必须等于 Engine.CreepCount + Engine.CompositeCount。
+        /// </summary>
         public int CreepObjectCount => _creeps.Count;
 
         public IEnumerable<CreepView> CreepViews
@@ -453,7 +498,7 @@ namespace TapGJ.View
                         yield return PlayBump(e);
                         break;
                     case GameEventType.Transform:
-                        // 相生：小怪换了元素。闪一下格子，动画播完 GameRunner 会 Sync 一次，
+                        // 相生：小怪换了元素。闪一下格子，动画播完 GameSession 会 Sync 一次，
                         // 颜色和元素字就跟着换过来了（uid 没变，所以是同一个对象换皮）。
                         yield return PlayFlash(e.From, new Color(0.75f, 0.95f, 1f), 0.20f);
                         break;
@@ -462,6 +507,12 @@ namespace TapGJ.View
                         break;
                     case GameEventType.Spawn:
                         yield return PlaySpawn(e, 0.16f);
+                        break;
+                    case GameEventType.CompositeSpawn:
+                        yield return PlayCompositeSpawn(e, 0.20f);
+                        break;
+                    case GameEventType.CompositeVanish:
+                        yield return PlayVanish(e, 0.18f);
                         break;
                     case GameEventType.SpawnBlocked:
                         yield return PlayFlash(e.From, new Color(1f, 0.4f, 0.3f), 0.14f);
@@ -483,6 +534,8 @@ namespace TapGJ.View
                 case GameEventType.Transform:
                 case GameEventType.Vanish:
                 case GameEventType.Spawn:
+                case GameEventType.CompositeSpawn:
+                case GameEventType.CompositeVanish:
                     return true;
                 default:
                     return false;
@@ -567,7 +620,7 @@ namespace TapGJ.View
             if (creep == null) yield break;
 
             var view = EnsureCreepView(creep.Uid);
-            view.Show(creep);
+            view.ShowCreep(creep);
             view.transform.localPosition = CellLocalPos(e.To);
 
             float t = 0f;
@@ -575,10 +628,40 @@ namespace TapGJ.View
             {
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / duration);
-                view.transform.localScale = Vector3.one * CreepView.BodyScale * k;
+                view.transform.localScale = Vector3.one * (CellSize * CreepView.BodyScale) * k;
                 yield return null;
             }
-            view.transform.localScale = Vector3.one * CreepView.BodyScale;
+            view.transform.localScale = Vector3.one * (CellSize * CreepView.BodyScale);
+        }
+
+        /// <summary>复合元素出现：弹一下 + 先把格子闪成它的配色，比普通生成更有分量。</summary>
+        IEnumerator<object> PlayCompositeSpawn(GameEvent e, float duration)
+        {
+            var composite = FindComposite(e.Uid);
+            if (composite == null) yield break;
+
+            var view = EnsureCreepView(composite.Uid);
+            view.ShowComposite(composite);
+            view.transform.localPosition = CellLocalPos(composite.Pos);
+
+            var cell = CellAt(composite.Pos);
+            if (cell != null && cell.Highlight != null)
+                cell.Highlight.color = new Color(CompositeDefs.Tint(composite.Kind).r,
+                    CompositeDefs.Tint(composite.Kind).g, CompositeDefs.Tint(composite.Kind).b, 0.7f);
+
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.deltaTime;
+                float k = Mathf.Clamp01(t / duration);
+                // 先放大到 1.12 再回到 1，做出「弹出来」的手感
+                float pop = 1f + 0.12f * Mathf.Sin(k * Mathf.PI);
+                view.transform.localScale = Vector3.one * (CellSize * CreepView.BodyScale) * k * pop;
+                yield return null;
+            }
+            view.transform.localScale = Vector3.one * (CellSize * CreepView.BodyScale);
+
+            if (cell != null && cell.Highlight != null) cell.Highlight.color = new Color(1f, 1f, 1f, 0f);
         }
 
         IEnumerator<object> PlayFlash(Pos pos, Color color, float duration)
@@ -603,6 +686,13 @@ namespace TapGJ.View
             return null;
         }
 
+        Composite FindComposite(int uid)
+        {
+            foreach (var c in Engine.Composites)
+                if (c.Uid == uid) return c;
+            return null;
+        }
+
         /// <summary>把所有小怪瞬间归位（跳过动画、重开局时用）。</summary>
         public void SnapAll()
         {
@@ -622,7 +712,7 @@ namespace TapGJ.View
         // ------------------------------------------------------------ 点击与高亮
 
         /// <summary>
-        /// 点击格子的入口。射线检测由 GameRunner 统一做（它要同时区分手牌 / 格子 / HUD），
+        /// 点击格子的入口。射线检测由 ClickRouter 统一做（它要同时区分手牌 / 格子 / UI），
         /// 所以这里不再自己读 Input，避免一处点击被两边各处理一次。
         /// </summary>
         public void NotifyCellClicked(Pos pos)
@@ -631,24 +721,51 @@ namespace TapGJ.View
             OnCellClicked(pos);
         }
 
-        /// <summary>玩家选中的牌：能作用于目标格时高亮，帮助测试时看清规则。</summary>
+        /// <summary>
+        /// 玩家选中的牌：能发生反应的元素格 + 能召唤的空格都高亮，帮助测试时看清规则。
+        /// 「哪些格子合法」由引擎算（<see cref="GameEngine.CellsForElementCard"/>），
+        /// 和融合牌 / 分解牌走同一条路 —— 表现层不自己拼规则。
+        /// </summary>
         public void RefreshHighlights(Card selectedCard)
+        {
+            var valid = new HashSet<Pos>();
+            if (selectedCard != null && Engine != null && selectedCard.IsElementCard)
+            {
+                foreach (var pos in Engine.CellsForElementCard(selectedCard)) valid.Add(pos);
+            }
+
+            RefreshHighlights(valid, Pos.None);
+        }
+
+        /// <summary>
+        /// 高亮一批格子（融合牌的两段式选点、分解牌的目标格都用它），
+        /// <paramref name="focus"/> 那一格再加一层「已选中」的暖色。
+        ///
+        /// 会替换掉之前的高亮，所以「取消选中」只要传两个空参数即可。
+        /// </summary>
+        public void RefreshHighlights(ICollection<Pos> valid, Pos focus)
         {
             for (int i = 0; i < _cells.Count; i++)
             {
                 var view = _cells[i];
-                var creep = Engine.Board.At(view.Pos);
                 Color color;
 
-                if (view.Pos == _selectedCell) color = new Color(1f, 0.85f, 0.3f, 0.30f);
-                else if (selectedCard != null && creep != null && Engine.CanPlayCardOn(selectedCard, creep))
-                    color = new Color(0.4f, 1f, 0.5f, 0.22f);
-                else color = new Color(1f, 1f, 1f, 0f);
+                if (valid != null && valid.Contains(view.Pos))
+                    color = new Color(0.4f, 1f, 0.5f, 0.26f);
+                else if (view.Pos == focus)
+                    color = new Color(1f, 0.85f, 0.3f, 0.34f);
+                else
+                    color = new Color(1f, 1f, 1f, 0f);
 
                 view.SetHighlight(color);
             }
+
+            _selectedCell = focus;
             _selectedCellDirty = false;
         }
+
+        /// <summary>清掉所有高亮（右键取消选中时用）。</summary>
+        public void ClearHighlights() => RefreshHighlights(new HashSet<Pos>(), Pos.None);
 
         public bool SelectedCellDirty => _selectedCellDirty;
         public Pos SelectedCell => _selectedCell;
@@ -671,27 +788,37 @@ namespace TapGJ.View
 
         public SpriteRenderer Highlight => _highlight;
 
-        public void Build(Pos pos, Font font)
+        public void Build(Pos pos, Font font, float cellSize, bool blocked)
         {
             Pos = pos;
 
-            // 格子底板：1×1 单位，正好一格
-            _background = BoardView.MakeBox(transform, "bg", new Color(0.16f, 0.18f, 0.22f), 0);
-            var col = gameObject.AddComponent<BoxCollider2D>();
-            col.size = Vector2.one * BoardView.Cell;
+            if (blocked)
+            {
+                // 墙：实心暗色块，没有碰撞体、没有坐标角标（纯障碍）
+                _background = BoardView.MakeSolid(transform, "bg", new Color(0.15f, 0.14f, 0.19f), 0);
+            }
+            else
+            {
+                // 普通格子：深色方格 + 描边，带碰撞体
+                _background = BoardView.MakeBox(transform, "bg", new Color(0.16f, 0.18f, 0.22f), 0);
+                var col = gameObject.AddComponent<BoxCollider2D>();
+                col.size = Vector2.one * cellSize;
+            }
 
             // 高亮层：默认全透明，鼠标/选牌时上色
             _highlight = BoardView.MakeBox(transform, "highlight", new Color(1f, 1f, 1f, 0f), 3);
             _highlight.color = new Color(1f, 1f, 1f, 0f);
 
-            // 坐标角标：默认隐藏，只有棋盘放得够大时才显示（见 ApplyScale）
+            if (blocked) return;
+
+            // 坐标角标：默认隐藏，只有格子够大时才显示（见 ApplyScale）
             _coord = BoardView.MakeText(transform, "coord", $"{pos.X},{pos.Y}", font,
                 new Color(1f, 1f, 1f, 0.28f), CoordFontSize, CoordGlyphScale, 1);
             _coord.transform.localPosition = new Vector3(0.30f, -0.33f, -0.02f);
             _coord.gameObject.SetActive(false);
         }
 
-        /// <summary>棋盘被缩得太小时就别显示坐标角标了。</summary>
+        /// <summary>格子太小时就别显示坐标角标了。</summary>
         public void ApplyScale(bool showCoords)
         {
             if (_coord == null) return;
@@ -705,9 +832,12 @@ namespace TapGJ.View
     }
 
     /// <summary>
-    /// 一只小怪的显示对象：色块底板 + 元素字。
+    /// 一只小怪（或一个复合元素）的显示对象：色块底板 + 元素字。
     /// 元素字是**子物体**，所以色块在哪字就在哪，移动 / 生成 / 消失的缩放动画也自动联动 ——
     /// 不会再出现「色块还在字没了」或者「字还在色块没了」这种两边不同步的情况。
+    ///
+    /// 复合元素复用同一个显示对象：多一层「光环」ring 把它和普通元素区分开
+    /// （它是静态的、不会被反应吃掉，视觉上应该一眼看得出不一样）。
     /// </summary>
     public sealed class CreepView : MonoBehaviour
     {
@@ -724,7 +854,16 @@ namespace TapGJ.View
 
         public int Uid { get; private set; }
         public Element Element { get; private set; }
+
+        /// <summary>这个显示对象当前画的是不是复合元素。</summary>
+        public bool IsComposite { get; private set; }
+
+        /// <summary>画复合元素时的种类（IsComposite = false 时没意义）。</summary>
+        public CompositeKind CompositeKind { get; private set; }
+
         public SpriteRenderer Body { get; private set; }
+        /// <summary>复合元素的光环；普通元素上没有这个对象。</summary>
+        public SpriteRenderer Ring { get; private set; }
         public TextMesh Label { get; private set; }
 
         public void Build(int uid, Font font)
@@ -740,8 +879,9 @@ namespace TapGJ.View
         }
 
         /// <summary>刷新成逻辑层这只小怪的样子（元素被沙盒改过时也要跟着变）。</summary>
-        public void Show(Creep creep)
+        public void ShowCreep(Creep creep)
         {
+            IsComposite = false;
             Element = creep.Element;
             if (Body == null) return;
 
@@ -750,6 +890,39 @@ namespace TapGJ.View
 
             string text = ElementDefs.Name(creep.Element);
             if (Label != null && Label.text != text) Label.text = text;
+
+            if (Ring != null) Ring.enabled = false;
+        }
+
+        /// <summary>刷新成逻辑层这个复合元素的样子（配色 + 名字 + 光环）。</summary>
+        public void ShowComposite(Composite composite)
+        {
+            IsComposite = true;
+            CompositeKind = composite.Kind;
+            if (Body == null) return;
+
+            var tint = CompositeDefs.Tint(composite.Kind);
+            Body.color = tint;
+            Body.sprite = BoardView.SpriteOf(Color.white);
+
+            string text = CompositeDefs.Name(composite.Kind);
+            if (Label != null && Label.text != text) Label.text = text;
+
+            EnsureRing();
+            if (Ring != null)
+            {
+                Ring.enabled = true;
+                Ring.color = new Color(tint.r, tint.g, tint.b, 0.55f);
+            }
+        }
+
+        /// <summary>复合元素的光环是**按需生成**的：普通元素上不该多一个空 SpriteRenderer 子物体。</summary>
+        void EnsureRing()
+        {
+            if (Ring != null) return;
+
+            Ring = BoardView.MakeSolid(transform, "ring", new Color(1f, 1f, 1f, 0.4f), 1);
+            Ring.transform.localScale = Vector3.one * 1.28f;
         }
     }
 }

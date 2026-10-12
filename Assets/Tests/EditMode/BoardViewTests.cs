@@ -7,13 +7,15 @@ using UnityEngine;
 namespace TapGJ.Tests
 {
     /// <summary>
-    /// 表现层冒烟测试：在 EditMode 下真的把棋盘搭出来，确认 8x8 格、小怪对象、
-    /// 相机布局都不会在运行时报错。截图无法在无头环境验证，所以这里验证「对象图」。
+    /// 表现层测试：在 EditMode 下真的把棋盘 / 手牌搭出来，确认 8x8 格、小怪对象、
+    /// 锚点布局都不会在运行时报错。截图无法在无头环境验证，所以这里验证「对象图」。
     ///
-    /// 这里还钉住了四条不变量。它们对应一次真实的 bug：
-    ///   小怪的表现对象以前一半在格子里、一半在 _creepRoot 下，两套并存并且清理代码是死代码
-    ///   （ShowEmpty 先把字段置空、调用方再去判断该字段），结果格子留下了没人销毁的色块 ——
-    ///   表现就是「格子有颜色但没有元素字」，另外还有方块因为用世界坐标而飞出棋盘。
+    /// ⚠ 尺寸与位置现在由场景决定（CellSize / 各自的 transform），不再由屏幕和相机决定，
+    /// 所以这些用例不需要任何相机。
+    ///
+    /// 这里还钉住了几条不变量。它们对应一次真实的 bug：
+    ///   小怪的表现对象以前一半在格子里、一半在 _creepRoot 下，两套并存并且清理代码是死代码，
+    ///   结果格子留下了没人销毁的色块 —— 表现就是「格子有颜色但没有元素字」。
     /// </summary>
     public class BoardViewTests
     {
@@ -24,7 +26,6 @@ namespace TapGJ.Tests
         {
             if (_root != null) Object.DestroyImmediate(_root);
             _root = null;
-            KillSpawned();
         }
 
         [Test]
@@ -280,81 +281,65 @@ namespace TapGJ.Tests
             Assert.Greater(checkedCreeps, 0, "这个测试至少要有几只小怪才有意义");
         }
 
-        /// <summary>复刻 GameRunner.LayoutViews 的核心计算，保证测试测的是真实布局路径。</summary>
-        static Camera ConfigureCameraForZones(Camera cam, Rect boardZone)
-        {
-            float aspect = cam.aspect <= 0.01f ? 16f / 9f : cam.aspect;
-            float worldH = 8 * BoardView.Cell + (8 - 1) * BoardView.Gap;
-            float worldW = worldH;
-
-            float sizeFromHeight = worldH * 0.5f / Mathf.Max(0.05f, boardZone.height);
-            float sizeFromWidth = worldW * 0.5f / Mathf.Max(0.05f, boardZone.width * aspect);
-            cam.orthographicSize = Mathf.Max(3f, sizeFromHeight, sizeFromWidth) * 1.04f;
-            return cam;
-        }
-
         [Test]
-        public void 布局_棋盘落在规划区域里且字号不会盖满屏幕()
+        public void 锚点布局_棋盘尺寸由格子尺寸决定且以自身transform为中心()
         {
+            // 场景化之后：棋盘多大由 CellSize/CellGap 决定，摆在哪儿由自己的 transform 决定。
+            // 相机不再被代码接管，所以这条用例不需要任何相机。
             var engine = new GameEngine(new Rules(), 7);
             engine.Start();
 
-            var root = new GameObject("LayoutRoot");
-            var cam = MakeCamera("LayoutCam");
-
-            var view = root.AddComponent<BoardView>();
+            _root = new GameObject("LayoutRoot");
+            var view = _root.AddComponent<BoardView>();
+            view.CellSize = 0.8f;
+            view.CellGap = 0.2f;
             view.Setup(engine);
 
-            // GameRunner 现在的分工：相机负责尺寸、棋盘只负责定位（fitToZone:false）
-            var boardZone = new Rect(0.04f, 0.01f, 0.62f, 0.70f);
-            ConfigureCameraForZones(cam, boardZone);
-
-            float px = boardZone.x * Screen.width;
-            float py = boardZone.y * Screen.height;
-            float pw = boardZone.width * Screen.width;
-            float ph = boardZone.height * Screen.height;
-
-            view.LayoutPixels(px, py, pw, ph, 0.92f, cam, fitToZone: false);
-
             Assert.AreEqual(1f, view.transform.localScale.x, 0.001f,
-                "相机控制尺寸时棋盘缩放必须是 1，否则会二次放大");
+                "棋盘自己不该被缩放 —— 尺寸由 CellSize 决定，缩放交给场景作者");
 
-            float boardW = view.BoardWidthWorld;
-            float boardH = view.BoardHeightWorld;
-            float visibleHalfH = cam.orthographicSize;
-            float visibleHalfW = cam.orthographicSize * cam.aspect;
-            Vector3 center = view.transform.position;
+            float expectedW = 8 * 0.8f + 7 * 0.2f;
+            float expectedH = expectedW;
+            Assert.AreEqual(expectedW, view.BoardWidthWorld, 1e-4f);
+            Assert.AreEqual(expectedH, view.BoardHeightWorld, 1e-4f);
 
-            float leftFrac = (center.x - boardW * 0.5f + visibleHalfW) / (visibleHalfW * 2f);
-            float rightFrac = (center.x + boardW * 0.5f + visibleHalfW) / (visibleHalfW * 2f);
-            float bottomFrac = (center.y - boardH * 0.5f + visibleHalfH) / (visibleHalfH * 2f);
-            float topFrac = (center.y + boardH * 0.5f + visibleHalfH) / (visibleHalfH * 2f);
+            // 每个格子都必须落在「以 transform 为中心」的棋盘矩形里
+            foreach (var cell in view.GetComponentsInChildren<CellView>())
+            {
+                var local = cell.transform.localPosition;
+                Assert.LessOrEqual(Mathf.Abs(local.x), expectedW * 0.5f + 1e-4f, $"{cell.Pos} 横向超出棋盘");
+                Assert.LessOrEqual(Mathf.Abs(local.y), expectedH * 0.5f + 1e-4f, $"{cell.Pos} 纵向超出棋盘");
+            }
 
-            // 视野比例：world y 向上、屏幕比例向下，所以 topFrac 对应屏幕上方
-            float screenBottom = 1f - topFrac;
-            float screenTop = 1f - bottomFrac;
+            // 左下 / 右上两个格子中心离棋盘边界正好半个格子
+            var bl = view.CellLocalPos(new Pos(0, 0));
+            var tr = view.CellLocalPos(new Pos(7, 7));
+            Assert.AreEqual(-expectedW * 0.5f + 0.8f * 0.5f, bl.x, 1e-4f);
+            Assert.AreEqual(-expectedH * 0.5f + 0.8f * 0.5f, bl.y, 1e-4f);
+            Assert.AreEqual(expectedW * 0.5f - 0.8f * 0.5f, tr.x, 1e-4f);
+            Assert.AreEqual(expectedH * 0.5f - 0.8f * 0.5f, tr.y, 1e-4f);
 
-            Assert.GreaterOrEqual(leftFrac, boardZone.x - 0.03f, "棋盘左边缘越界");
-            Assert.LessOrEqual(rightFrac, boardZone.xMax + 0.03f, "棋盘右边缘越界（会压到 HUD）");
-            Assert.GreaterOrEqual(screenBottom, boardZone.y - 0.03f, "棋盘下边缘越界（会压到手牌区）");
-            Assert.LessOrEqual(screenTop, boardZone.yMax + 0.03f, "棋盘上边缘越界");
+            // 挪动棋盘，格子必须整体跟着走（棋盘坐标系是局部的）
+            view.transform.position = new Vector3(3f, -1.5f, 0f);
+            var cell00 = FindCell(view, new Pos(0, 0));
+            Assert.Less((cell00.transform.position - (view.transform.position + bl)).magnitude, 1e-4f,
+                "棋盘挪动后格子应该跟着走");
         }
 
         [Test]
         public void 布局_元素字不会比格子还大()
         {
             // 之前的问题：格子被相机放大，而元素字是固定字号，
-            // 棋盘比例一变，字就相对格子变得巨大、糊满屏幕。这里钉住「字高 < 格子高」。
+            // 棋盘比例一变，字就相对格子变得巨大、糊满屏幕。
+            // 现在字挂在格子下面、跟着 CellSize 走，所以换一个格子尺寸也必须保持比例。
             var engine = new GameEngine(new Rules { CreepsPerElement = 1, InitialHandSize = 0 }, 21);
             engine.Start();
 
-            var root = new GameObject("FontRoot");
-            var cam = MakeCamera("FontCam");
-
-            var view = root.AddComponent<BoardView>();
+            _root = new GameObject("FontRoot");
+            var view = _root.AddComponent<BoardView>();
+            view.CellSize = 1.6f; // 故意用非 1 的格子尺寸
             view.Setup(engine);
             view.Sync(); // Setup 只搭格子，Sync 才把小怪和元素字画出来
-            view.LayoutPixels(0f, 0f, Screen.width * 0.6f, Screen.height * 0.7f, 0.92f, cam, fitToZone: false);
 
             CreepView withCreep = null;
             foreach (var cv in view.CreepViews) { withCreep = cv; break; }
@@ -362,14 +347,117 @@ namespace TapGJ.Tests
             Assert.IsNotNull(withCreep.Label, "元素格上应该有元素字");
 
             // 世界字高 ≈ (fontSize/10) × characterSize × lossyScale
-            // （字挂在小怪下面，所以 lossyScale 已经包含 小怪缩放 × 棋盘缩放）
+            // （字挂在小怪下面，所以 lossyScale 已经包含 小怪缩放 × 格子尺寸）
             float glyphWorldHeight = withCreep.Label.fontSize / 10f * withCreep.Label.transform.lossyScale.y;
-            float cellWorldSize = BoardView.Cell * view.transform.lossyScale.y;
+            float cellWorldSize = view.CellSize;
 
             Assert.Less(glyphWorldHeight, cellWorldSize * 0.95f,
                 $"元素字高 {glyphWorldHeight:F3} 应该小于格子高 {cellWorldSize:F3}，否则会糊满屏幕");
             Assert.Greater(glyphWorldHeight, cellWorldSize * 0.3f,
                 "字也不该小到看不见");
+
+            // 小怪色块也必须是「格子的一部分」，不能比格子还大
+            Assert.LessOrEqual(withCreep.Body.transform.lossyScale.x, cellWorldSize + 1e-4f,
+                "小怪色块不能超出格子");
+        }
+
+        [Test]
+        public void 手牌区_卡牌预制体_留空时从裸模板实例化也能回退到代码外观()
+        {
+            // CardPrefab 指向一个「裸」模板（没连 body/ring/text）→ Build 应该回退到代码生成。
+            var engine = new GameEngine(new Rules { CreepsPerElement = 0, InitialHandSize = 3, MaxMoveSteps = 0 }, 24);
+            engine.Start();
+
+            var templateGo = new GameObject("CardTemplate");
+            var template = templateGo.AddComponent<CardView>();
+
+            _root = new GameObject("HandPrefabRoot");
+            var hand = _root.AddComponent<HandView>();
+            hand.CardPrefab = template;
+            hand.Setup(engine);
+
+            Assert.AreEqual(3, hand.CardObjectCount);
+            foreach (var card in hand.Cards)
+            {
+                Assert.IsNotNull(card.GetComponent<BoxCollider2D>(), "预制体路径的牌也要有碰撞体");
+                bool hasText = false;
+                foreach (var tm in card.GetComponentsInChildren<TextMesh>()) hasText = true;
+                Assert.IsTrue(hasText, "牌上要有元素字");
+            }
+
+            Object.DestroyImmediate(templateGo); // 模板是独立物体，不在 _root 下，单独清
+        }
+
+        [Test]
+        public void 手牌区_卡牌预制体_复用预制体里连好的外观()
+        {
+            // 关键不变量：预制体里美术连好的 body/ring/text 会被实例化复制过来并复用，
+            // 而不是被 Build 重新生成一套 —— 否则拖预制体就白拖了。
+            var engine = new GameEngine(new Rules { CreepsPerElement = 0, InitialHandSize = 1, MaxMoveSteps = 0 }, 25);
+            engine.Start();
+
+            var templateGo = new GameObject("CardTemplate");
+            var template = templateGo.AddComponent<CardView>();
+            var body = new GameObject("body").AddComponent<SpriteRenderer>();
+            body.transform.SetParent(templateGo.transform, false);
+            var ring = new GameObject("ring").AddComponent<SpriteRenderer>();
+            ring.transform.SetParent(templateGo.transform, false);
+            var textGo = new GameObject("text");
+            textGo.transform.SetParent(templateGo.transform, false);
+            var text = textGo.AddComponent<TextMesh>();
+
+            var so = new UnityEditor.SerializedObject(template);
+            so.FindProperty("body").objectReferenceValue = body;
+            so.FindProperty("ring").objectReferenceValue = ring;
+            so.FindProperty("text").objectReferenceValue = text;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            _root = new GameObject("HandPrefabRoot");
+            var hand = _root.AddComponent<HandView>();
+            hand.CardPrefab = template;
+            hand.Setup(engine);
+
+            Assert.AreEqual(1, hand.CardObjectCount);
+            var card = hand.Cards[0];
+
+            var cardSo = new UnityEditor.SerializedObject(card);
+            var clonedBody = cardSo.FindProperty("body").objectReferenceValue as SpriteRenderer;
+            Assert.IsNotNull(clonedBody, "预制体里连好的 body 应该被复制过来");
+            Assert.IsTrue(clonedBody.transform.IsChildOf(card.transform), "body 应该是牌的直系子物体（不是模板那个）");
+            Assert.AreEqual(ElementDefs.Tint(engine.Hand[0].Element), clonedBody.color, "Build 应该给复用来的 body 上色");
+
+            Object.DestroyImmediate(templateGo);
+        }
+
+        [Test]
+        public void 锚点布局_手牌整排不超出设定宽度()
+        {
+            // 手牌排布不再看屏幕：整排以自身 transform 为中心，超出 RowWidth 就整排等比缩小。
+            var engine = new GameEngine(new Rules { CreepsPerElement = 0, InitialHandSize = 5, MaxMoveSteps = 0 }, 23);
+            engine.Start();
+
+            _root = new GameObject("HandRowRoot");
+            var hand = _root.AddComponent<HandView>();
+            hand.CardWidth = 1.2f;
+            hand.CardGap = 0.2f;
+            hand.RowWidth = 4.0f; // 故意设窄，逼它缩小
+            hand.Setup(engine);
+
+            Assert.AreEqual(5, hand.CardObjectCount);
+
+            float total = 5 * hand.CardWidth + 4 * hand.CardGap;
+            float scaled = total * hand.transform.localScale.x;
+            Assert.Less(hand.transform.localScale.x, 1f, "这组参数下应该触发了整排缩小");
+            Assert.LessOrEqual(scaled, hand.RowWidth + 1e-4f, "缩小后整排必须装进 RowWidth");
+
+            // 卡牌间距必须一致，且整排以 transform 中心对称
+            var xs = new List<float>();
+            foreach (var card in hand.Cards) xs.Add(card.transform.localPosition.x);
+            xs.Sort();
+
+            Assert.AreEqual(-(4 * (hand.CardWidth + hand.CardGap)) * 0.5f, xs[0], 1e-4f, "整排应该以 transform 为中心");
+            for (int i = 1; i < xs.Count; i++)
+                Assert.AreEqual(hand.CardWidth + hand.CardGap, xs[i] - xs[i - 1], 1e-4f, "卡牌间距必须一致");
         }
 
         [Test]
@@ -381,12 +469,10 @@ namespace TapGJ.Tests
             engine.PlaceCreep(Element.Water, new Pos(0, 0));
             engine.Start();
 
-            var root = new GameObject("HandRoot");
-            var cam = MakeCamera("HandCam");
-
-            var hand = root.AddComponent<HandView>();
+            _root = new GameObject("HandRoot");
+            var hand = _root.AddComponent<HandView>();
             hand.Setup(engine);
-            hand.LayoutPixels(0f, Screen.height * 0.72f, Screen.width * 0.6f, Screen.height * 0.26f, cam);
+            hand.Relayout();
 
             Assert.AreEqual(engine.Hand.Count, hand.CardObjectCount, "手牌对象数应该等于逻辑层手牌数");
             Assert.AreEqual(3, hand.CardObjectCount);
@@ -453,38 +539,6 @@ namespace TapGJ.Tests
             foreach (var c in view.GetComponentsInChildren<CellView>())
                 if (c.Pos == pos) return c;
             return null;
-        }
-
-        /// <summary>
-        /// 造一台独立的测试相机。注意不要挂在被测的 root 下面 ——
-        /// BoardView.Setup() 会清空自己的子物体，挂上去会被一起销毁。
-        /// 也不打 MainCamera 标签，避免和别的测试留下的相机抢 Camera.main。
-        /// </summary>
-        static Camera MakeCamera(string name)
-        {
-            var go = new GameObject(name);
-            var cam = go.AddComponent<Camera>();
-            cam.orthographic = true;
-            cam.orthographicSize = 6f;
-            cam.aspect = 16f / 9f;
-            go.transform.position = new Vector3(0f, 0f, -10f);
-            _spawned.Add(go);
-            return cam;
-        }
-
-        static readonly List<GameObject> _spawned = new List<GameObject>();
-
-        [SetUp]
-        public void SetUpClean()
-        {
-            _spawned.Clear();
-        }
-
-        static void KillSpawned()
-        {
-            foreach (var go in _spawned)
-                if (go != null) Object.DestroyImmediate(go);
-            _spawned.Clear();
         }
     }
 }

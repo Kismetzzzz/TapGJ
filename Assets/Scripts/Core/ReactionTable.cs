@@ -86,7 +86,20 @@ namespace TapGJ.Core
             _table[(int)winner, (int)loser] = def;
         }
 
-        public ReactionDef Get(Element a, Element b) => _table[(int)a, (int)b];
+        /// <summary>
+        /// 查一对元素的反应。
+        /// 元素值越界（理论上不该发生）时返回「不发生反应」而不是抛异常 —— 出牌/移动路径上
+        /// 抛异常会把整个回合循环带崩，代价远大于静默不反应。
+        /// </summary>
+        public ReactionDef Get(Element a, Element b)
+        {
+            int i = (int)a;
+            int j = (int)b;
+            if (i < 0 || i >= ElementDefs.Count || j < 0 || j >= ElementDefs.Count)
+                return ReactionDef.NoReaction();
+
+            return _table[i, j];
+        }
 
         /// <summary>供 UI / 编辑器窗口列举规则用。</summary>
         public static List<(Element a, Element b, ReactionDef def)> AllRules()

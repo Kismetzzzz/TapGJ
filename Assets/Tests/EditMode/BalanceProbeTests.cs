@@ -17,7 +17,7 @@ namespace TapGJ.Tests
         {
             var rules = new Rules
             {
-                WinCondition = WinCondition.SingleElement,
+                Goal = GoalSpec.SingleElement(),
                 RoundLimit = 15,
             };
 
@@ -51,7 +51,7 @@ namespace TapGJ.Tests
         {
             var rules = new Rules
             {
-                WinCondition = WinCondition.WaterOnly, // 图1 原文
+                Goal = GoalSpec.WaterOnly(), // 图1 原文
                 RoundLimit = 15,
             };
 
@@ -73,7 +73,7 @@ namespace TapGJ.Tests
         [Test]
         public void 贪心玩家_同一批种子结果可复现()
         {
-            var rules = new Rules { WinCondition = WinCondition.SingleElement, RoundLimit = 15 };
+            var rules = new Rules { Goal = GoalSpec.SingleElement(), RoundLimit = 15 };
             var a = RunBatch(rules, 10);
             var b = RunBatch(rules, 10);
 

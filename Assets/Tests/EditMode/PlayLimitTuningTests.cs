@@ -33,7 +33,7 @@ namespace TapGJ.Tests
 
             foreach (var row in rows)
             {
-                var single = Probe(WinCondition.SingleElement, row.Limit);
+                var single = Probe(GoalSpec.SingleElement(), row.Limit);
                 log.AppendLine($"  {row.Label,-10} {single.Wins,3}/{Games}  "
                                + $"{single.AverageRounds,8:F2}  {single.AverageCardsPlayed,8:F2}  "
                                + $"{single.AverageCardsDiscarded,8:F2}  {single.AverageFinalElementTypes,10:F2}");
@@ -44,7 +44,7 @@ namespace TapGJ.Tests
             log.AppendLine("  上限        胜率     平均回合   平均出牌   平均弃牌   终局元素种类");
             foreach (var row in rows)
             {
-                var water = Probe(WinCondition.WaterOnly, row.Limit);
+                var water = Probe(GoalSpec.WaterOnly(), row.Limit);
                 log.AppendLine($"  {row.Label,-10} {water.Wins,3}/{Games}  "
                                + $"{water.AverageRounds,8:F2}  {water.AverageCardsPlayed,8:F2}  "
                                + $"{water.AverageCardsDiscarded,8:F2}  {water.AverageFinalElementTypes,10:F2}");
@@ -53,11 +53,11 @@ namespace TapGJ.Tests
             Debug.Log(log.ToString());
         }
 
-        static Stats Probe(WinCondition condition, int maxCardsPerRound)
+        static Stats Probe(GoalSpec goal, int maxCardsPerRound)
         {
             var rules = new Rules
             {
-                WinCondition = condition,
+                Goal = goal,
                 RoundLimit = 15,
                 MaxCardsPerRound = maxCardsPerRound,
             };

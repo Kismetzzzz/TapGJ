@@ -47,8 +47,10 @@ ExportedObj/
 *.VC.db
 
 # ---------------------------------------------------------------- 本项目：无头测试输出
-# 这些是跑 EditMode 测试时由命令行产生的（见 README 第七节）
+# 这些是跑 EditMode 测试时由命令行产生的（见 README 第八节 D）
+# ⚠ 结果文件不要写在 Temp/ 下：Unity 退出时会清 Temp，xml 会被一起删掉（踩过）
 /Artifacts/
+/TestResults/
 /TestResults-*.xml
 /unity-test.log
 *.log
@@ -76,3 +78,8 @@ crashlytics-build.properties
 # Android 临时生成的 StreamingAssets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ---------------------------------------------------------------- 离线编译校验（临时脚手架，不进仓库）
+# 这个环境里 Unity 无头 -runTests 会因为许可命名管道不通直接以 199 退出，
+# 所以用 Unity 自带 Roslyn + Library/Bee 里的 .rsp 自己编一遍来验证「编译过不过」。
+/.compile-check/

@@ -6,6 +6,10 @@ namespace TapGJ.Core
     /// 一个很笨的贪心玩家，只用来回答「玩家有没有操作空间 / 这个胜利条件能不能达成」。
     /// 不是 AI，只是一条可复现的固定策略：能打就打最有利于减少元素种类的那一张。
     /// 测试与编辑器批量模拟共用同一份，保证两边结论一致。
+    ///
+    /// ⚠ 它**不会主动召唤**（图1 第 2 条：元素牌打在空格上召唤一只）—— 召唤是「凭空多一只元素」，
+    /// 对它那几个「减少元素 / 减少种类」的目标基本都是负收益，所以它只考虑打在元素格上。
+    /// 于是批量模拟里的召唤次数恒为 0，这条规则要靠人工试玩验证（见 README 第九节）。
     /// </summary>
     public static class GreedyPlayer
     {
@@ -20,6 +24,9 @@ namespace TapGJ.Core
 
                 foreach (var card in engine.Hand)
                 {
+                    // 这个贪心玩家只理解元素牌（秘术牌要配位置、要挑相邻对，不在它的策略里）。
+                    if (!card.IsElementCard) continue;
+
                     foreach (var creep in engine.Creeps)
                     {
                         if (!engine.CanPlayCardOn(card, creep)) continue;
@@ -52,9 +59,9 @@ namespace TapGJ.Core
             return played;
         }
 
-        /// <summary>胜利条件关注的元素：WaterOnly 时是水，SingleElement 时没有偏好。</summary>
+        /// <summary>胜利条件关注的元素：WaterOnly 时是水，其它目标没有偏好。</summary>
         static Element PreferredElement(GameEngine engine)
-            => engine.Rules.WinCondition == WinCondition.WaterOnly ? Element.Water : (Element)(-1);
+            => engine.Rules.Goal.Kind == GoalKind.WaterOnly ? Element.Water : (Element)(-1);
 
         /// <summary>
         /// 弃牌阶段的简单策略：把手牌里「能打的目标最少」的牌先弃掉，
@@ -74,11 +81,14 @@ namespace TapGJ.Core
                 foreach (var card in engine.Hand)
                 {
                     int score = 0;
-                    foreach (var creep in engine.Creeps)
-                        if (engine.CanPlayCardOn(card, creep)) score++;
+                    if (card.IsElementCard)
+                    {
+                        foreach (var creep in engine.Creeps)
+                            if (engine.CanPlayCardOn(card, creep)) score++;
+                    }
 
                     // 能打的目标越多越值钱；胜利条件关注的元素再减一点价值
-                    if (card.Element == PreferredElement(engine)) score--;
+                    if (card.IsElementCard && card.Element == PreferredElement(engine)) score--;
 
                     if (score < worstScore)
                     {

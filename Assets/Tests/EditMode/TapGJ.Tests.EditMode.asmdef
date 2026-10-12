@@ -2,7 +2,8 @@
     "name": "TapGJ.Tests.EditMode",
     "rootNamespace": "TapGJ.Tests",
     "references": [
-        "TapGJ.Runtime"
+        "TapGJ.Runtime",
+        "TapGJ.Editor"
     ],
     "includePlatforms": [
         "Editor"

@@ -1,25 +1,45 @@
 using System.Collections.Generic;
 using TapGJ.Core;
+using TapGJ.Flow;
 using UnityEngine;
 
 namespace TapGJ.View
 {
     /// <summary>
-    /// 原型 HUD：用最朴素的 IMGUI 画出来，不依赖 Canvas / 预制体，
-    /// 这样「打开工程就能玩」不会因为 UI 没连好而卡住。
+    /// 临时 HUD：用最朴素的 IMGUI 画出来，不依赖 Canvas / 预制体。
+    ///
+    /// ⚠ 它是「场景化重构」过渡期的脚手架：不需要任何场景对象就能跑，
+    ///   所以在 Canvas 还没搭好之前游戏仍然能玩。
+    ///   正式 uGUI 版 `GameHud` 做好后，**删掉这个文件即可** —— GameSession 走的是
+    ///   <see cref="IGameHud"/> 接口，不认识这个类（见该接口的注释）。
+    ///
+    /// ⚠ 它只**调用** GameSession 的 5 个方法推进流程（EndPlayerRound / EndDiscardRound /
+    ///   Restart / RestartWithNewSeed / GoToNextLevel），不自己决定流程 —— 所以换 UI 不需要动回合状态机。
+    ///   「下一关」的知识也不在这里：它问 GameSession（→ ILevelHost → LevelCatalog）要名字和「有没有」。
+    ///
+    /// ⚠ 唯一的例外是**退出游戏**：那不是「这一局」的事，所以它走 `SceneFlow.QuitGame()`
+    ///   （Flow 层负责「编辑器里怎么退、构建里怎么退」），HUD 不自己判断在哪个环境里跑。
     /// </summary>
-    public sealed class Hud : MonoBehaviour
+    public sealed class Hud : MonoBehaviour, IGameHud
     {
         readonly List<string> _lines = new List<string>();
         Vector2 _scroll;
+        QuitConfirm _quit;
         GUIStyle _label, _small, _title, _wrap, _button;
 
-        public int SelectedCardId = -1;
+        [Tooltip("面板宽度（像素）；窄窗口会自动收窄")]
         public float PanelWidth = 430f;
 
-        GameRunner _runner;
+        GameSession _session;
 
-        GameEngine Engine => _runner.Engine;
+        /// <summary>选中的手牌 id：真身存在 GameSession 上，手牌区与 HUD 共用同一份。</summary>
+        public int SelectedCardId
+        {
+            get => _session != null ? _session.SelectedCardId : -1;
+            set { if (_session != null) _session.SelectedCardId = value; }
+        }
+
+        GameEngine Engine => _session != null ? _session.Engine : null;
         public Font Font => BoardView.LoadFont();
 
         /// <summary>面板实际宽度：窄窗口时自动收窄，保证棋盘还有地方显示。</summary>
@@ -35,9 +55,52 @@ namespace TapGJ.View
         /// <summary>HUD 面板在屏幕上的像素矩形，用来挡住棋盘点击。</summary>
         public Rect PanelPixels => new Rect(Screen.width - EffectivePanelWidth, 0f, EffectivePanelWidth, Screen.height);
 
-        public void Setup(GameRunner runner)
+        /// <summary>
+        /// <see cref="IGameHud"/> 的实现。**幂等**：GameSession 的同物体扫描和「自行注册」
+        /// 可能都调到这里。
+        /// </summary>
+        public void Setup(GameSession session)
         {
-            _runner = runner;
+            // 换关 / 重开要清日志面板：换一个实例就把旧实例的订阅摘掉（重复 Setup 也不会挂两遍）
+            if (_session != null) _session.LevelStarted -= OnLevelStarted;
+            _session = session;
+            if (_session != null)
+            {
+                _session.LevelStarted -= OnLevelStarted;
+                _session.LevelStarted += OnLevelStarted;
+            }
+
+            // IMGUI 不参与 EventSystem，所以「面板区域挡住棋盘点击」只能自己注册给 ClickRouter。
+            // ⚠ 换成 uGUI 的 GameHud 时**不要照抄这一段**：Canvas + GraphicRaycaster + EventSystem
+            //   一挂上，ClickRouter 走 IsPointerOverGameObject() 就够了，ExtraBlocker 保持 null。
+            if (session == null || session.Input == null) return;
+            session.Input.ExtraBlocker = p => PanelPixels.Contains(p);
+        }
+
+        void OnDestroy()
+        {
+            if (_session != null) _session.LevelStarted -= OnLevelStarted;
+        }
+
+        /// <summary>
+        /// 新开一局（首次开局 / 重开 / **切到下一关**）时清空日志面板。
+        /// 日志属于「这一局」：不清的话切完关会看到上一关的记录混在里面。
+        /// </summary>
+        void OnLevelStarted(GameEngine engine)
+        {
+            _lines.Clear();
+            _scroll = Vector2.zero;
+        }
+
+        void Awake()
+        {
+            // 跟 GameSession 挂在同一个物体上时，由 GameSession.Awake 扫 IGameHud 调 Setup()；
+            // 挂在别的物体上时这里自己找一次并注册。
+            // 两个 Awake 的先后顺序不保证，所以两边都可能调到 Setup —— 它是幂等的。
+            if (_session != null) return;
+
+            var session = FindFirstObjectByType<GameSession>();
+            if (session != null) session.RegisterHud(this);
         }
 
         void EnsureStyles()
@@ -53,10 +116,10 @@ namespace TapGJ.View
 
         void OnGUI()
         {
-            if (_runner == null || Engine == null) return;
+            if (_session == null || Engine == null) return;
             EnsureStyles();
 
-            _runner.DrainNotes(_lines);
+            _session.DrainNotes(_lines);
 
             DrawTopBar();
             DrawPanel();
@@ -78,7 +141,7 @@ namespace TapGJ.View
                 : phase == GamePhase.Victory ? "#63e6be"
                 : phase == GamePhase.Defeat ? "#ff8787" : "#adb5bd";
 
-            string hint = _runner.Busy ? "播放中…"
+            string hint = _session.Busy ? "播放中…"
                 : phase == GamePhase.PlayerAction ? "可操作：出牌"
                 : phase == GamePhase.Discard ? $"可操作：弃牌（还可弃 {Engine.DiscardsRemaining} 张）"
                 : phase == GamePhase.Draw ? "自动补牌至上限"
@@ -87,11 +150,14 @@ namespace TapGJ.View
             GUI.Label(new Rect(rect.x + 12f, rect.y + 6f, rect.width - 24f, 26f),
                 $"<b>回合 {Engine.Round} / {Engine.Rules.RoundLimit}</b>　" +
                 $"阶段：<color={phaseColor}><b>{GameEngine.PhaseName(phase)}</b></color>　" +
-                $"（{hint}）", _title);
+                $"（{hint}）" +
+                // 现在在玩哪一关：切到下一关之后靠它确认真的换关了（没有关卡时（开发兜底）不显示）
+                (_session.CurrentLevelName != null ? $"　｜　关卡：<b>{_session.CurrentLevelName}</b>" : ""), _title);
 
             GUI.Label(new Rect(rect.x + 12f, rect.y + 34f, rect.width - 24f, 34f),
                 $"场上：{Engine.StatusLine()}　｜　瓶子：{Engine.Bottle.DebugLine()}　｜　"
-                + $"手牌 {Engine.Hand.Count}/{Engine.Rules.HandLimit}", _label);
+                + $"手牌 {Engine.Hand.Count}/{Engine.Rules.HandLimit}"
+                + (Engine.CompositeCount > 0 ? $"　｜　复合元素 {Engine.CompositeCount}" : ""), _label);
         }
 
         // ---------------------------------------------------------------- 右侧面板
@@ -106,47 +172,76 @@ namespace TapGJ.View
             float y = 12f;
 
             // ---- 操作按钮放最上面：面板下沿会被下方手牌区盖住，重要按钮不能放在那里
+            // ⚠ 面板上任何一个**别的**按钮被按下 = 玩家去干别的了 → 顺手把「退出游戏」的确认态清掉，
+            //   否则它还挂着红色的「确认退出游戏？」，下一次误点就直接退了。
             var prevBg = GUI.backgroundColor;
 
             GUI.backgroundColor = new Color(0.9f, 0.85f, 0.5f);
-            GUI.enabled = Engine.Phase == GamePhase.PlayerAction && !_runner.Busy;
+            GUI.enabled = Engine.Phase == GamePhase.PlayerAction && !_session.Busy;
             if (GUI.Button(new Rect(x, y, w * 0.48f, 30f), "结束出牌 → 弃牌", _button))
-                _runner.EndPlayerRound();
+            {
+                _quit.Disarm();
+                _session.EndPlayerRound();
+            }
             GUI.enabled = true;
 
             GUI.backgroundColor = new Color(0.75f, 0.9f, 0.75f);
-            GUI.enabled = Engine.Phase == GamePhase.Discard && !_runner.Busy;
+            GUI.enabled = Engine.Phase == GamePhase.Discard && !_session.Busy;
             if (GUI.Button(new Rect(x + w * 0.52f, y, w * 0.48f, 30f), "结束弃牌 → 判定", _button))
-                _runner.EndDiscardRound();
+            {
+                _quit.Disarm();
+                _session.EndDiscardRound();
+            }
             GUI.enabled = true;
             GUI.backgroundColor = prevBg;
             y += 34f;
 
             GUI.backgroundColor = new Color(0.7f, 0.8f, 0.95f);
             if (GUI.Button(new Rect(x, y, w * 0.48f, 26f), "重开（同种子）", _button))
-                _runner.Restart();
+            {
+                _quit.Disarm();
+                _session.Restart();
+            }
             GUI.backgroundColor = new Color(0.95f, 0.8f, 0.75f);
             if (GUI.Button(new Rect(x + w * 0.52f, y, w * 0.48f, 26f), "重开（换种子）", _button))
-                _runner.RestartWithNewSeed();
+            {
+                _quit.Disarm();
+                _session.RestartWithNewSeed();
+            }
+            GUI.backgroundColor = prevBg;
+            y += 32f;
+
+            // ---- 下一关：目录里当前关的下一关（最后一关绕回第一关）。
+            // 没有关卡加载器（开发兜底路径）/ 目录里没有别的关卡时按钮置灰，标签会写明原因。
+            // ⚠ 播动画时不给按：换关会重建整关，正在播的步骤动画属于上一关，按下去会错位。
+            GUI.backgroundColor = new Color(0.75f, 0.95f, 0.8f);
+            GUI.enabled = _session.HasNextLevel && !_session.Busy;
+            if (GUI.Button(new Rect(x, y, w, 26f), NextLevelButtonLabel(_session), _button))
+            {
+                _quit.Disarm();
+                _session.GoToNextLevel();
+            }
+            GUI.enabled = true;
+            GUI.backgroundColor = prevBg;
+            y += 32f;
+
+            // ---- 退出游戏：**两段式**（第一下变「确认退出游戏？」，第二下才退），
+            // 因为它和上面几个按钮挤在一起，误点一下整局就没了。
+            // ⚠ 退出只能走 SceneFlow（编辑器里 Application.Quit 不生效，由它分流），HUD 不自己判断。
+            // ⚠ 播放动画时也**保持可点**：这是随时能跑掉的出口，不能因为正在播动画就锁住。
+            bool quitArmed = _quit.Armed(Time.time);
+            GUI.backgroundColor = quitArmed ? new Color(1f, 0.42f, 0.38f) : new Color(0.95f, 0.66f, 0.6f);
+            if (GUI.Button(new Rect(x, y, w, 26f), QuitButtonLabel(quitArmed), _button) && _quit.Click(Time.time))
+                SceneFlow.QuitGame();
             GUI.backgroundColor = prevBg;
             y += 32f;
 
             // ---- 目标进度
-            GUI.Label(new Rect(x, y, w, 24f), $"<b>胜利条件</b>：{Engine.WinConditionDescription()}", _label);
+            var progress = Engine.GetGoalProgress();
+            GUI.Label(new Rect(x, y, w, 24f), $"<b>胜利条件</b>：{progress.Description}", _label);
             y += 26f;
 
-            int water = Engine.Board.WaterCount();
-            int total = Engine.Board.CreepCount();
-            if (Engine.Rules.WinCondition == WinCondition.WaterOnly)
-            {
-                DrawBar(new Rect(x, y, w, 18f), total == 0 ? 0f : (float)water / total,
-                    $"水 {water} / 场上 {total}");
-            }
-            else
-            {
-                int distinct = Engine.Board.DistinctElementCount();
-                DrawBar(new Rect(x, y, w, 18f), 1f - (distinct - 1) / 4f, $"元素种类 {distinct} / 5");
-            }
+            DrawBar(new Rect(x, y, w, 18f), progress.Fill, progress.Label);
             y += 30f;
 
             // ---- 元素小瓶子
@@ -171,10 +266,11 @@ namespace TapGJ.View
             switch (Engine.Phase)
             {
                 case GamePhase.PlayerAction:
-                    var sel = Engine.FindCard(SelectedCardId);
-                    hint = sel != null
-                        ? $"已选中 <b>{sel.Label}</b> → 点下方手牌区里的牌可换，或直接点棋盘目标格"
-                        : "点下方手牌区里的牌选中，再点棋盘上绿色高亮的目标格";
+                    var sel = _session.SelectedCard;
+                    hint = sel == null
+                        ? "点下方手牌区里的牌选中，再点棋盘上绿色高亮的目标格"
+                          + (Engine.CanSummonOnEmptyCell ? "（元素格=发生反应，空格=在该格召唤）" : "")
+                        : DescribeSelectedCard(sel);
                     if (Engine.Rules.MaxCardsPerRound > 0)
                         hint += $"\n本回合还可出 {Engine.PlaysRemaining} 张";
                     else
@@ -212,12 +308,83 @@ namespace TapGJ.View
             GUI.EndScrollView();
         }
 
+        /// <summary>选中一张牌之后的操作提示（元素牌 / 融合牌 / 分解牌三种说法）。</summary>
+        string DescribeSelectedCard(Card sel)
+        {
+            if (sel.IsFusionCard)
+                return "已选中 <b>融合牌</b> → 先点第一个元素，再点绿色高亮的第二个元素（点右键返回）";
+
+            if (sel.IsDecomposeCard)
+                return "已选中 <b>分解牌</b> → 点绿色高亮的复合元素把它拆回两张元素牌（点右键返回）";
+
+            if (Engine.CanSummonOnEmptyCell)
+                return $"已选中 <b>{sel.Label}</b> → 点绿色高亮的<b>元素格</b>发生反应，"
+                       + $"或点绿色高亮的<b>空格</b>在该格召唤 1 个{ElementDefs.Name(sel.Element)}元素（点右键返回）";
+
+            return $"已选中 <b>{sel.Label}</b> → 点下方手牌区里的牌可换，或直接点棋盘目标格";
+        }
+
+        /// <summary>这张牌现在有几个合法目标（元素格 + 可召唤的空格）。</summary>
         int CountTargets(Card card)
         {
-            int n = 0;
-            foreach (var creep in Engine.Creeps)
-                if (Engine.CanPlayCardOn(card, creep)) n++;
-            return n;
+            if (card == null || Engine == null) return 0;
+            return Engine.CellsForElementCard(card).Count;
+        }
+
+        /// <summary>
+        /// 「下一关」按钮上的字。**点之前就知道要去哪一关**（关卡名写在按钮上）；
+        /// 没有下一关时写明原因，省得玩家以为按钮坏了。
+        /// </summary>
+        public static string NextLevelButtonLabel(GameSession session)
+        {
+            if (session == null || !session.HasNextLevel) return "下一关（没有下一关）";
+
+            var name = session.NextLevelName;
+            return string.IsNullOrEmpty(name) ? "下一关 →" : $"下一关 → {name}";
+        }
+
+        /// <summary>
+        /// 「退出游戏」按钮上的字。**退出不可撤销**，所以按钮是两段式的（见 <see cref="QuitConfirm"/>）：
+        /// 第一下只把字换成问句，第二下才真的退 —— 字必须跟着变，否则第二下会显得像「按钮没反应」。
+        /// </summary>
+        public static string QuitButtonLabel(bool confirming) => confirming ? "确认退出游戏？" : "退出游戏";
+
+        /// <summary>
+        /// 「退出游戏」按钮的两段式确认状态。**纯逻辑**：不碰 GUI、不碰 Unity 的退出 API，
+        /// 所以 EditMode 测试能直接演练一串点击（见 HudQuitTests），不需要真的开 Play。
+        ///
+        /// 为什么要有确认：这个按钮和「重开」「下一关」挤在同一块面板里，误点一下整局就没了；
+        /// 为什么不是弹窗：IMGUI 弹窗要自己管焦点和层级，两段式按钮零成本得到同样的保护。
+        /// 超时自己取消，免得按钮一直挂着「确认」态，下一个人点它就退了。
+        /// </summary>
+        public struct QuitConfirm
+        {
+            /// <summary>点了第一下之后，多少秒内再点才算「确认」。</summary>
+            public const float ConfirmSeconds = 4f;
+
+            float _armedUntil;
+
+            /// <summary>现在是不是「等确认」状态。</summary>
+            public bool Armed(float now) => now < _armedUntil;
+
+            /// <summary>
+            /// 点一下按钮。返回 **true = 玩家确认了，调用方去真的退出**；
+            /// false = 只是刚进入确认态（第一下）。
+            /// </summary>
+            public bool Click(float now)
+            {
+                if (!Armed(now))
+                {
+                    _armedUntil = now + ConfirmSeconds;
+                    return false;
+                }
+
+                Disarm();
+                return true;
+            }
+
+            /// <summary>取消确认态（自己超时、或者玩家去点了别的按钮）。</summary>
+            public void Disarm() => _armedUntil = float.NegativeInfinity;
         }
 
         void DrawBar(Rect rect, float fill, string text, Color? color = null)
@@ -239,13 +406,21 @@ namespace TapGJ.View
 
         void DrawBanner()
         {
-            var banner = _runner.Banner;
+            var banner = _session.Banner;
             if (string.IsNullOrEmpty(banner)) return;
 
             var rect = new Rect(Screen.width * 0.5f - 260f, Screen.height * 0.5f - 70f, 520f, 140f);
             GUI.Box(rect, GUIContent.none);
             var big = new GUIStyle(_title) { fontSize = 34, alignment = TextAnchor.MiddleCenter };
             GUI.Label(rect, banner, big);
+
+            // 赢了之后顺手说清下一步：右边那个「下一关」就是继续玩的地方
+            if (Engine.Phase == GamePhase.Victory && _session.HasNextLevel)
+            {
+                var hint = new GUIStyle(_label) { alignment = TextAnchor.MiddleCenter };
+                GUI.Label(new Rect(rect.x, rect.yMax + 6f, rect.width, 24f),
+                    $"点右侧「{NextLevelButtonLabel(_session)}」继续", hint);
+            }
         }
     }
 }
