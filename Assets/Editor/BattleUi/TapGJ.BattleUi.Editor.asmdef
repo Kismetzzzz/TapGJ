@@ -1,0 +1,7 @@
+{
+    "name": "TapGJ.BattleUi.Editor",
+    "rootNamespace": "TapGJ.EditorTools",
+    "references": ["TapGJ.Runtime", "UnityEngine.UI"],
+    "includePlatforms": ["Editor"],
+    "autoReferenced": true
+}

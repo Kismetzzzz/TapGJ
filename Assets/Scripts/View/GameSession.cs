@@ -201,7 +201,7 @@ namespace TapGJ.View
             _lastPhase = GamePhase.NotStarted;
 
             board.SnapAll();
-            hand.Sync();
+            hand.Sync(!InstantPlayback);
 
             LevelStarted?.Invoke(Engine);
             Note($"开局 seed={seed} ｜ {Engine.Rules.BoardWidth}x{Engine.Rules.BoardHeight} ｜ 每种元素 {Engine.Rules.CreepsPerElement} 个 ｜ "
@@ -421,7 +421,7 @@ namespace TapGJ.View
             board.InteractionEnabled = false;
             yield return board.PlayStep(step, InstantPlayback ? 0f : StepDuration);
             board.Sync();
-            hand.Sync();
+            hand.Sync(!InstantPlayback);
             _animations--;
         }
 
@@ -572,7 +572,7 @@ namespace TapGJ.View
             yield return PlayStepRoutine(record);
             FlushLog();
             board.Sync();
-            hand.Sync();
+            hand.Sync(!InstantPlayback);
         }
 
         /// <summary>结束出牌阶段 → 进入弃牌阶段。</summary>
@@ -605,7 +605,7 @@ namespace TapGJ.View
             SelectedCardId = -1;
             FlushLog();
             board.Sync();
-            hand.Sync();
+            hand.Sync(!InstantPlayback);
             return true;
         }
 

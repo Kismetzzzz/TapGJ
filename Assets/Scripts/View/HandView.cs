@@ -87,7 +87,7 @@ namespace TapGJ.View
         }
 
         /// <summary>把手牌显示对象与逻辑层对齐（多退少补），顺序也跟逻辑层一致。</summary>
-        public void Sync()
+        public void Sync(bool animateRemoval = true)
         {
             if (Engine == null) return;
 
@@ -95,6 +95,9 @@ namespace TapGJ.View
             {
                 if (Engine.FindCard(_cards[i].CardId) == null)
                 {
+                    if (Application.isPlaying && animateRemoval)
+                        CardDissolveEffect.Play(_cards[i].gameObject, ElementDefs.Tint(_cards[i].Element));
+                    _cards[i].gameObject.SetActive(false);
                     BoardView.Kill(_cards[i].gameObject);
                     _cards.RemoveAt(i);
                 }
