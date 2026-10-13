@@ -226,6 +226,30 @@ namespace TapGJ.Core
         public bool FusionRequiresAdjacency = true;
 
         /// <summary>
+        /// 允不允许**场上同时存在多个复合元素**。
+        ///
+        /// · <c>false</c>（默认）：融合牌要求场上**一个复合元素都没有** —— 想再合一个得先用分解牌拆掉。
+        ///   这是设计原文「如果开局场上不存在复合元素则必须通过融合牌来获得复合元素」的反面读法。
+        /// · <c>true</c>：融合牌只要求**场上的复合元素里没有同一种**的
+        ///   （寒钢已经有了就不能再合寒钢，但可以再合一个熔岩）。
+        ///
+        /// ⚠ 两种模式下**都没有数量上限** —— 唯一的限制就是这条前置条件本身。
+        /// 另外 <see cref="InitialComposites"/> 摆几个都不受它管（开局想摆 4 个也行）。
+        /// </summary>
+        public bool AllowMultipleComposites;
+
+        /// <summary>
+        /// 复合元素「产生」时，两种组成元素的**产出顺序**：
+        ///
+        /// · <c>true</c>（默认）**随机交错** —— 两种元素按随机顺序交替产出，
+        ///   不会出现「先把木铺满最近的一圈、再铺火」这种明显的一坨一坨。
+        /// · <c>false</c> **按配方顺序依次产完** —— 图2 表格那句「生产：木+4、火+4」的字面读法。
+        ///
+        /// 两种都**用引擎自己的随机源**，所以同一个种子完全可复现（不是真随机）。
+        /// </summary>
+        public bool CompositeRandomProductionOrder = true;
+
+        /// <summary>
         /// 复合元素在玩家行动阶段合出来时，**当回合立刻产生一次**（图2 的要求），
         /// 之后每回合开始再产生一次。关掉的话只能等下一回合。
         /// </summary>
@@ -543,6 +567,16 @@ namespace TapGJ.Core
                 into.Add("勾了复合元素总开关，但既没选任何秘术牌（或权重全为 0）、开局也没摆初始复合元素 → "
                          + "场上永远不会有复合元素，这个开关等于白勾。"
                          + "要么至少留一张融合牌（玩家自己合），要么在 initialComposites 里摆几个。");
+
+            // 「只允许一个复合元素」+ 开局就摆了多个 → 玩家只能靠分解牌一个个腾位置。
+            // 这不是死局，但配的人多半没意识到，所以说一句。
+            if (!AllowMultipleComposites && InitialComposites != null && InitialComposites.Length > 1
+                && HasSpecialCard(CardKind.FusionCard))
+            {
+                into.Add($"开局摆了 {InitialComposites.Length} 个复合元素，但 AllowMultipleComposites 没开 → "
+                         + "玩家想再用融合牌得先用分解牌把场上的都拆掉。"
+                         + "如果你就是想让它同时存在多个，把这个开关打开（打开后只限制「不能合出同一种」）。");
+            }
 
             // 融合牌：元素池里凑不出任何一对能合成的元素 → 抽到手里也永远用不出去。
             if (wantsFusion && !FusionRecipes.AnyPairAvailable(ElementPool))
