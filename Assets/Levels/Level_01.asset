@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4baacca015d143941812e41b49f10709, type: 3}
+  m_Name: Level_01
+  m_EditorClassIdentifier: 
+  levelId: level_01
+  displayName: "\u7B2C 1 \u5173"
+  description: 
+  previewImage: {fileID: 0}
+  sceneName: Game
+  levelPrefab: {fileID: 4423394444281899732, guid: 959cce0f0d35fb249b8660679e275887, type: 3}
+  useFixedSeed: 0
+  fixedSeed: 20240607
+  rules:
+    BoardWidth: 8
+    BoardHeight: 8
+    ElementPool: 31
+    CardPool: 31
+    CreepsPerElement: 4
+    MaxMoveSteps: 3
+    InitialHandSize: 5
+    HandLimit: 5
+    MaxDiscardsPerRound: 5
+    MaxCardsPerRound: 0
+    BottleCapacity: 5
+    RoundLimit: 15
+    Goal:
+      Kind: 0
+      Target: 0
+      TargetCount: 0
+      Rounds: 0
+    CardEffect: 0
+  layoutText: 
+  fixedInitialHand: 

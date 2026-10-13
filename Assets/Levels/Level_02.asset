@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4baacca015d143941812e41b49f10709, type: 3}
+  m_Name: Level_02
+  m_EditorClassIdentifier: 
+  levelId: level_02
+  displayName: "\u7B2C 2 \u5173"
+  description: 
+  previewImage: {fileID: 0}
+  sceneName: Game
+  levelPrefab: {fileID: 3050799763355669968, guid: 35e84266e4b898746aa2859982e39874, type: 3}
+  useFixedSeed: 0
+  fixedSeed: 20240607
+  rules:
+    BoardWidth: 8
+    BoardHeight: 8
+    ElementPool: 31
+    CardPool: 31
+    CreepsPerElement: 4
+    MaxMoveSteps: 3
+    InitialHandSize: 5
+    HandLimit: 5
+    MaxDiscardsPerRound: 5
+    MaxCardsPerRound: 0
+    BottleCapacity: 5
+    RoundLimit: 15
+    Goal:
+      Kind: 6
+      Target: 0
+      TargetCount: 0
+      Rounds: 0
+    CardEffect: 0
+    EmptyCellCard: 0
+    UseCompositeElements: 0
+    SpecialCardPool: 0
+    ElementCardWeight: 10
+    FusionCardWeight: 10
+    DecomposeCardWeight: 5
+    CompositeRange: 1
+    CompositeIngredientsPerRound: 4
+    FusionRequiresAdjacency: 1
+    CompositeProducesOnCreation: 1
+    DecomposeGrantsElementCards: 1
+    InitialComposites: []
+  layoutText: "..\u6C34.....\r\n...\u6C34....\r\n.\u91D1\u91D1.....\r\n...\u706B....\r\n..\u706B.....\r\n........\r\n........\r\n........"
+  fixedInitialHand: 
+  initialComposites: []

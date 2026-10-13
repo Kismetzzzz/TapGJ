@@ -79,6 +79,11 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
+# ---------------------------------------------------------------- DSH 沙箱的工作产物（本机噪声，不进仓库）
+# 沙箱为了修 ACL 会在这里留备份 JSON / 还原脚本 / 报告，每个文件 45 KB 上下，
+# 跟工程内容没有任何关系，而且每台机器的 ACL 备份都不同。
+/.dsh-acl-reports/
+
 # ---------------------------------------------------------------- 离线编译校验（临时脚手架，不进仓库）
 # 这个环境里 Unity 无头 -runTests 会因为许可命名管道不通直接以 199 退出，
 # 所以用 Unity 自带 Roslyn + Library/Bee 里的 .rsp 自己编一遍来验证「编译过不过」。
