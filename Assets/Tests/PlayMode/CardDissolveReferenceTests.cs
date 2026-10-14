@@ -116,13 +116,13 @@ namespace TapGJ.Tests
                     referenceCamera.Render();
                     ReadAndSave(referenceTarget, pixels, Path.Combine(outputDirectory, "author-" + time.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + ".png"));
 
-                    // 保留原包后处理；仅统一相机取景、背景与卡图朝向，隔离显示适配的影响。
+                    // 保留原包相机朝向与后处理；仅统一取景、背景及替换卡图的 UV。
                     referenceCamera.orthographic = true;
                     referenceCamera.orthographicSize = 9.7f * 1.3f * .5f;
                     referenceCamera.transform.localPosition = new Vector3(0, 20, 0);
-                    referenceCamera.transform.localRotation = Quaternion.Euler(90, 0, 0);
+                    referenceCamera.transform.localRotation = cameraRotation;
                     referenceCamera.backgroundColor = Color.clear;
-                    cardMaterial.SetVector("_MainTex_ST", new Vector4(1, -1, 0, 1));
+                    cardMaterial.SetVector("_MainTex_ST", new Vector4(-1, 1, 1, 0));
                     referenceCamera.Render();
                     var referencePixels = ReadAndSave(referenceTarget, pixels, Path.Combine(outputDirectory, "reference-" + time.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + ".png"));
                     renderCandidate.Invoke(effect, null);
@@ -168,7 +168,7 @@ namespace TapGJ.Tests
                     Assert.AreEqual(referenceSparks.particleCount, effect.SparkParticles.particleCount);
                 }
                 File.WriteAllText(Path.Combine(outputDirectory, "comparison.json"), JsonUtility.ToJson(new CaptureReport
-                { note = "author 为当前导入状态的原包相机；reference 只统一取景、背景和卡图朝向；candidate 为接入版；repaired-bloom 仅在测试实例接回包内 Camera Profile 1。误差比较 repaired-bloom 与 candidate；bloomDifference 是有无泛光的差异。相同种子与时间；颜色统一转换成 sRGB 后比较，原文件未修改。", importedProfileResolved = importedProfileResolved, importedPostMaterialResolved = importedPostMaterialResolved, originalCameraHdr = referenceCamera.allowHDR, frames = results.ToArray() }, true));
+                { note = "author 为当前导入状态的原包相机；reference 保留原包相机朝向，只统一取景、背景并适配卡图 UV；candidate 为接入版；repaired-bloom 仅在测试实例接回包内 Camera Profile 1。误差比较 repaired-bloom 与 candidate；bloomDifference 是有无泛光的差异。相同种子与时间；颜色统一转换成 sRGB 后比较，原文件未修改。", importedProfileResolved = importedProfileResolved, importedPostMaterialResolved = importedPostMaterialResolved, originalCameraHdr = referenceCamera.allowHDR, frames = results.ToArray() }, true));
                 Assert.AreEqual(times.Length, results.Count);
                 foreach (var result in results)
                     Assert.Less(result.activeMeanError, .01f, "相同粒子、时间与取景时，接入版应与原包补齐泛光后的画面一致：" + result.time);

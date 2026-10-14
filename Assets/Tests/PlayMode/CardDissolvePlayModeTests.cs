@@ -1,6 +1,7 @@
 using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using TapGJ.Core;
 using TapGJ.View;
@@ -186,14 +187,15 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
-        public IEnumerator 替换主贴图_保留上下方向()
+        public IEnumerator 替换主贴图_保留上下左右方向_溶解从下往上()
         {
             yield return SceneManager.LoadSceneAsync("Assets/Scenes/BattleUI.unity");
             var texture = new Texture2D(32, 32, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Point;
             var colors = new Color[32 * 32];
             for (int y = 0; y < 32; y++)
-                for (int x = 0; x < 32; x++) colors[y * 32 + x] = y >= 16 ? Color.red : Color.blue;
+                for (int x = 0; x < 32; x++)
+                    colors[y * 32 + x] = y >= 16 ? (x < 16 ? Color.red : Color.green) : Color.blue;
             texture.SetPixels(colors);
             texture.Apply();
             var sprite = Sprite.Create(texture, new Rect(0, 0, 32, 32), Vector2.one * .5f);
@@ -205,15 +207,39 @@ namespace TapGJ.Tests
             var output = (RenderTexture)effect.OutputTexture;
             var previous = RenderTexture.active;
             var pixels = new Texture2D(output.width, output.height, TextureFormat.RGBA32, false);
+            var gradient = new Texture2D(1, 32, TextureFormat.RGBA32, false, true);
             try
             {
                 RenderTexture.active = output;
                 pixels.ReadPixels(new Rect(0, 0, output.width, output.height), 0, 0);
                 pixels.Apply();
-                var top = pixels.GetPixel(output.width / 2, output.height * 7 / 10);
-                var bottom = pixels.GetPixel(output.width / 2, output.height * 3 / 10);
+                var top = pixels.GetPixel(output.width * 3 / 10, output.height * 7 / 10);
+                var bottom = pixels.GetPixel(output.width * 3 / 10, output.height * 3 / 10);
+                var right = pixels.GetPixel(output.width * 7 / 10, output.height * 7 / 10);
                 Assert.Greater(top.r, top.b + .4f, "贴图上半部分应仍位于特效上方");
                 Assert.Greater(bottom.b, bottom.r + .4f, "贴图下半部分应仍位于特效下方");
+                Assert.Greater(right.g, right.r + .4f, "贴图右半部分不能被水平镜像");
+
+                // 使用固定纵向梯度隔离原包噪声和火星，直接检查溶解方向。
+                gradient.wrapMode = TextureWrapMode.Clamp;
+                for (int y = 0; y < gradient.height; y++)
+                    gradient.SetPixel(0, y, Color.white * (y / (float)(gradient.height - 1)));
+                gradient.Apply();
+                var material = effect.CardParticles.GetComponent<ParticleSystemRenderer>().sharedMaterial;
+                material.SetTexture("_DissloveTex", gradient);
+                material.SetVector("_DissloveTex_ST", new Vector4(1, 1, 0, 0));
+                material.SetFloat("_IfDissolveOffsetC", 0);
+                material.SetFloat("_CustomdataDis", 0);
+                material.SetFloat("_DIssloveFactor", .5f);
+                typeof(CardDissolveEffect).GetMethod("RenderEffect", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(effect, null);
+                var opacityCamera = effect.CardParticles.transform.parent.GetComponentsInChildren<Camera>().Single(c => !c.allowHDR);
+                RenderTexture.active = opacityCamera.targetTexture;
+                pixels.ReadPixels(new Rect(0, 0, output.width, output.height), 0, 0);
+                pixels.Apply();
+                Assert.Less(pixels.GetPixel(output.width / 2, output.height * 3 / 10).a, .05f,
+                    "溶解到中途时下半部应先消失");
+                Assert.Greater(pixels.GetPixel(output.width / 2, output.height * 7 / 10).a, .8f,
+                    "溶解到中途时上半部应仍可见");
             }
             finally
             {
@@ -221,6 +247,7 @@ namespace TapGJ.Tests
                 Object.Destroy(pixels);
                 Object.Destroy(sprite);
                 Object.Destroy(texture);
+                Object.Destroy(gradient);
             }
         }
 

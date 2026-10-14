@@ -30,6 +30,8 @@ namespace TapGJ.View
         [Header("外观")]
         [Tooltip("卡牌预制体。留空 = 用代码生成的朴素外观（测试与快速迭代用）；拖了就用美术的预制体")]
         public CardView CardPrefab;
+        [Tooltip("使用界面手牌时关闭，避免重复生成世界空间手牌。")]
+        public bool ShowCards = true;
 
         [Header("编辑器预览")]
         [Tooltip("没进 Play 时，Scene 视图里画几张占位牌（只是预览，不进运行时）")]
@@ -89,7 +91,7 @@ namespace TapGJ.View
         /// <summary>把手牌显示对象与逻辑层对齐（多退少补），顺序也跟逻辑层一致。</summary>
         public void Sync(bool animateRemoval = true)
         {
-            if (Engine == null) return;
+            if (Engine == null || !ShowCards) return;
 
             for (int i = _cards.Count - 1; i >= 0; i--)
             {

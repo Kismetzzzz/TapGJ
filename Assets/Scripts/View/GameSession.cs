@@ -59,6 +59,7 @@ namespace TapGJ.View
 
         /// <summary>正在播动画 / 过场，此时不接受操作。</summary>
         public bool Busy => _animations > 0;
+        public bool Paused { get; set; }
 
         /// <summary>本回合是否处于快进状态（判定阶段自动恢复）。</summary>
         public bool FastForwarding { get; private set; }
@@ -273,16 +274,23 @@ namespace TapGJ.View
         void Update()
         {
             if (Engine == null) return;
+            if (Paused)
+            {
+                input.InteractionEnabled = false;
+                board.InteractionEnabled = false;
+                return;
+            }
 
-            bool playing = !Busy;
+            bool playing = !Busy && !Paused;
             bool canPlay = playing && Engine.Phase == GamePhase.PlayerAction;
+            bool canSelect = playing && (canPlay || Engine.Phase == GamePhase.Discard);
 
             input.InteractionEnabled = playing;
             board.InteractionEnabled = canPlay;
 
             // 离开玩家行动阶段时把选中态清掉：否则「选了融合牌但没点元素1 就结束回合」之后，
             // 下一回合会带着一张选中的牌开局（手牌对象还在，但玩家会以为是自己点的）。
-            if (!canPlay && (_selectedCardId != -1 || FusionStage != FusionPick.First || !FusionFirstCell.IsNone))
+            if (!canSelect && (_selectedCardId != -1 || FusionStage != FusionPick.First || !FusionFirstCell.IsNone))
                 CancelSelection();
 
             // 右键 / Esc = 「返回普通出牌状态」：取消选中的牌、清掉元素1 和高亮。
@@ -366,6 +374,7 @@ namespace TapGJ.View
                 // ---------- 准备阶段：一只一只小怪推进并播放 ----------
                 while (Engine.Phase == GamePhase.Preparation)
                 {
+                    while (Paused) yield return null;
                     var step = Engine.AdvancePreparation();
                     if (step == null) continue; // 本回合小怪都走完了，Phase 已切到玩家行动
                     yield return PlayStepRoutine(step);
@@ -397,6 +406,7 @@ namespace TapGJ.View
                 while (Engine.PendingStepCount > 0)
                     yield return PlayStepRoutine(Engine.DequeueStep());
 
+                while (Paused) yield return null;
                 Engine.ResolveJudgment();
                 FlushLog();
                 board.Sync();
@@ -427,9 +437,28 @@ namespace TapGJ.View
 
         // ---------------------------------------------------------------- 玩家操作
 
+        /// <summary>界面手牌按真实 ID 选择；弃牌仍由独立的弃牌按钮确认。</summary>
+        public bool SelectHandCard(int cardId)
+        {
+            if (Engine == null || Busy || Paused || Engine.IsOver
+                || (Engine.Phase != GamePhase.PlayerAction && Engine.Phase != GamePhase.Discard)
+                || Engine.FindCard(cardId) == null) return false;
+            SelectedCardId = SelectedCardId == cardId ? -1 : cardId;
+            return true;
+        }
+
+        /// <summary>界面棋盘与原有输入共用出牌流程。</summary>
+        public void PlaySelectedCardAt(Pos pos)
+        {
+            if (Engine == null || Busy || Paused || Engine.IsOver
+                || pos.X < 0 || pos.Y < 0 || pos.X >= Engine.Board.Width || pos.Y >= Engine.Board.Height
+                || Engine.Board.IsBlocked(pos)) return;
+            OnCellClicked(pos);
+        }
+
         void OnCellClicked(Pos pos)
         {
-            if (Engine == null || Engine.Phase != GamePhase.PlayerAction) return;
+            if (Engine == null || Busy || Paused || Engine.Phase != GamePhase.PlayerAction) return;
 
             var card = Engine.FindCard(SelectedCardId);
             if (card == null)
@@ -578,7 +607,8 @@ namespace TapGJ.View
         /// <summary>结束出牌阶段 → 进入弃牌阶段。</summary>
         public void EndPlayerRound()
         {
-            if (Engine == null || Engine.Phase != GamePhase.PlayerAction) return;
+            if (Engine == null || Busy || Paused || Engine.Phase != GamePhase.PlayerAction) return;
+            CancelSelection();
             Engine.EndPlayerPhase();
             FlushLog();
         }
@@ -586,7 +616,7 @@ namespace TapGJ.View
         /// <summary>结束弃牌阶段 → 进入判定阶段。</summary>
         public void EndDiscardRound()
         {
-            if (Engine == null || Engine.Phase != GamePhase.Discard) return;
+            if (Engine == null || Busy || Paused || Engine.Phase != GamePhase.Discard) return;
             Engine.EndDiscardPhase();
             FlushLog();
         }
@@ -594,7 +624,7 @@ namespace TapGJ.View
         /// <summary>弃牌阶段点手牌即为弃掉。返回是否成功。</summary>
         public bool TryDiscard(int cardId)
         {
-            if (Engine == null || Engine.Phase != GamePhase.Discard) return false;
+            if (Engine == null || Busy || Paused || Engine.Phase != GamePhase.Discard) return false;
 
             if (!Engine.TryDiscardCard(cardId))
             {

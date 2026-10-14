@@ -37,6 +37,8 @@ namespace TapGJ.View
         public int PreviewHeight = 8;
 
         public GameEngine Engine;
+        [Tooltip("让背景中的棋盘透出；墙与合法目标高亮仍保留。")]
+        public bool TransparentCells;
 
         readonly List<CellView> _cells = new List<CellView>();
         readonly Dictionary<int, CellView> _cellByKey = new Dictionary<int, CellView>();
@@ -130,7 +132,10 @@ namespace TapGJ.View
         {
             bool showCoords = CellSize > 0.55f;
             foreach (var cell in _cells)
+            {
                 cell.ApplyScale(showCoords);
+                cell.SetBackgroundVisible(!TransparentCells || Engine.Board.IsBlocked(cell.Pos));
+            }
         }
 
         /// <summary>
@@ -787,6 +792,12 @@ namespace TapGJ.View
         const float CoordGlyphScale = 0.045f;
 
         public SpriteRenderer Highlight => _highlight;
+
+        public void SetBackgroundVisible(bool visible)
+        {
+            if (_background != null) _background.enabled = visible;
+            if (_coord != null) _coord.gameObject.SetActive(visible);
+        }
 
         public void Build(Pos pos, Font font, float cellSize, bool blocked)
         {

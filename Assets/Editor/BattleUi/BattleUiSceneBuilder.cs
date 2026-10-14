@@ -108,12 +108,10 @@ namespace TapGJ.EditorTools
                 selections[i].blocksRaycasts = selections[i].interactable = false;
             }
 
-            var hand = Rect(controls, "Hand", 342, 810, 1240, 300);
+            var hand = Rect(controls, "Hand", 342, 738, 1240, 340);
             var cards = new BattleUiCard[5];
             var cardPrefab = EnsureCardPrefab();
-            Element[] sampleElements = { Element.Fire, Element.Earth, Element.Water, Element.Wood, Element.Fire };
-            float[] angles = { 10, 5, 0, -5, -10 };
-            float[] positionsY = { 48, 14, 0, 14, 48 };
+            Element[] sampleElements = { Element.Fire, Element.Earth, Element.Water, Element.Wood, Element.Metal };
             for (int i = 0; i < cards.Length; i++)
             {
                 var card = (GameObject)PrefabUtility.InstantiatePrefab(cardPrefab, scene);
@@ -121,8 +119,6 @@ namespace TapGJ.EditorTools
                 card.transform.SetParent(hand, false);
                 var rect = (RectTransform)card.transform;
                 rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0, 1);
-                rect.anchoredPosition = new Vector2(i * 252, -positionsY[i]);
-                rect.localRotation = Quaternion.Euler(0, 0, angles[i]);
                 cards[i] = card.GetComponent<BattleUiCard>();
                 StyleCard(cards[i], sampleElements[i]);
             }
@@ -160,6 +156,8 @@ namespace TapGJ.EditorTools
             BindArray(data, "elementButtons", elements); BindArray(data, "elementSelections", selections);
             BindArray(data, "cards", cards);
             data.ApplyModifiedPropertiesWithoutUndo();
+            controller.ArrangeHand();
+            foreach (var card in cards) PrefabUtility.RecordPrefabInstancePropertyModifications(card.transform);
             var layout = canvas.AddComponent<BattleUiLayout>();
             data = new SerializedObject(layout);
             Bind(data, "canvasRect", canvas.GetComponent<RectTransform>());
@@ -177,12 +175,13 @@ namespace TapGJ.EditorTools
 
         static BattleCardArt EnsureCardArt()
         {
-            string[] names = { "Wood", "Water", "Fire", "Earth" };
+            string[] names = { "Metal", "Wood", "Water", "Fire", "Earth" };
             foreach (string name in names) ImportSprite(ArtPath + "/Cards/" + name + ".jpg", 4096, true);
             var art = AssetDatabase.LoadAssetAtPath<BattleCardArt>(CardArtPath);
             if (art != null) return art;
             Directory.CreateDirectory("Assets/UI/Data");
             art = ScriptableObject.CreateInstance<BattleCardArt>();
+            art.metal = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Metal.jpg");
             art.wood = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Wood.jpg");
             art.water = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Water.jpg");
             art.fire = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Fire.jpg");
@@ -244,6 +243,7 @@ namespace TapGJ.EditorTools
 
         static void StyleCard(BattleUiCard card, Element element)
         {
+            ((RectTransform)card.transform).sizeDelta = card.ArtworkSize;
             var data = new SerializedObject(card);
             data.FindProperty("element").enumValueIndex = (int)element;
             data.ApplyModifiedPropertiesWithoutUndo();

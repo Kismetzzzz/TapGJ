@@ -75,6 +75,7 @@ namespace TapGJ.View
                     renderer.sortingOrder = body.sortingOrder;
                 }
             }
+            output.layer = source.layer;
             var effect = output.AddComponent<CardDissolveEffect>();
             try { effect.Configure(source, profile, cardTemplate.gameObject, sparkTemplate.gameObject, size, tint); }
             catch (System.Exception error)
@@ -119,8 +120,8 @@ namespace TapGJ.View
             var cardRenderer = _card.GetComponent<ParticleSystemRenderer>();
             var cardMaterial = CopyMaterial(cardRenderer.sharedMaterial);
             cardMaterial.SetTexture("_MainTex", texture);
-            // 原粒子卡面与 Canvas 的上下方向相反，替换纹理时一起转换 UV。
-            cardMaterial.SetVector("_MainTex_ST", new Vector4(uv.z - uv.x, uv.y - uv.w, uv.x, uv.w));
+            // 原包相机下卡面 UV 水平反向；只校正卡图，保留溶解与火星的原始方向。
+            cardMaterial.SetVector("_MainTex_ST", new Vector4(uv.x - uv.z, uv.w - uv.y, uv.z, uv.y));
             cardMaterial.SetColor("_MainColor", faceColor);
             cardRenderer.sharedMaterial = cardMaterial;
             var sparkRenderer = _sparks.GetComponent<ParticleSystemRenderer>();
@@ -158,7 +159,8 @@ namespace TapGJ.View
             _opacity = new RenderTexture(outputWidth, height, 24, RenderTextureFormat.ARGB32)
             { name = "CardDissolveOpacity", antiAliasing = 1 };
             _opacity.Create();
-            _camera = MakeCamera(_stage.transform, new Vector3(0, 20, 0), Quaternion.Euler(90, 0, 0),
+            // 沿用原包 Camera01 的观察朝向，保留溶解与火星从下往上的运动。
+            _camera = MakeCamera(_stage.transform, new Vector3(0, 20, 0), Quaternion.Euler(90, 180, 0),
                 originalHeight * Padding * .5f, _output);
             _camera.allowHDR = true;
             _opacityCamera = MakeCamera(_stage.transform, _camera.transform.localPosition, _camera.transform.localRotation,
