@@ -125,6 +125,8 @@ namespace TapGJ.Levels
             var setup = BuildSetup(CurrentLevel, rules);
             var engine = new GameEngine(rules, CurrentSeed);
             engine.AttachRules(_rules);
+            // 回合事件池：只有在关卡勾了 useEvents 时才挂 —— 没勾的关卡拿到的引擎和加事件系统之前逐位一致。
+            engine.AttachEventPool(CurrentLevel.useEvents ? CurrentLevel.roundEvents : null);
             engine.Start(setup);
 
             // 「下一关」也在这一步刷新：CurrentLevel 刚变过，现在算出来的一定是对的那一关。

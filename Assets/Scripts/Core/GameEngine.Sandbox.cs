@@ -222,5 +222,16 @@ namespace TapGJ.Core
 
         /// <summary>每个元素**被相生变成别的元素**的次数（键是变之前的那个元素）。</summary>
         public int ConvertedOf(Element e) => _converted.TryGetValue(e, out var n) ? n : 0;
+
+        // ---------------------------------------------------------------- 回合事件
+
+        /// <summary>
+        /// 把「下一次事件」钉到某一回合 —— 测试想精确验证某条事件而不等 3~6 回合的间隔时用它。
+        /// 传 0 = 本局不再触发事件。
+        /// </summary>
+        public void ForceNextEventRoundForTest(int round) => _nextEventRound = round;
+
+        /// <summary>本局已经抽到过的事件 Id（不放回抽取的账本；测试用来验证「没重复」）。</summary>
+        public int DrawnEventCount => _drawnEventIds.Count;
     }
 }

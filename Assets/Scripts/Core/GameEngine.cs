@@ -11,16 +11,25 @@ namespace TapGJ.Core
     {
         public Element Element { get; }
         readonly int[] _counts = new int[ElementDefs.Count];
-        public int Capacity { get; }
+
+        /// <summary>
+        /// 容量。**不是只读的**：回合事件（「玉翁敛息」）会临时把它改小、判定阶段再改回来。
+        /// 读「本关的基准容量」请读 <see cref="Rules.BottleCapacity"/>，读「本回合实际生效的容量」读这个 ——
+        /// HUD 画进度条必须读这个，否则事件一改容量它就会骗人。
+        /// </summary>
+        public int Capacity { get; private set; }
 
         public int TotalCardsGranted { get; private set; }
 
         internal Bottle(int capacity)
         {
-            Capacity = capacity;
+            Capacity = capacity < 1 ? 1 : capacity;
         }
 
         public int Count(Element e) => _counts[(int)e];
+
+        /// <summary>改容量（事件用）。只改数字，不结账 —— 要「先结账再改」用引擎的 ApplyBottleCapacity。</summary>
+        internal void SetCapacity(int capacity) => Capacity = capacity < 1 ? 1 : capacity;
 
         /// <summary>计数 +1，返回是否满瓶产出卡牌。</summary>
         internal bool Add(Element e)
@@ -30,6 +39,23 @@ namespace TapGJ.Core
             _counts[(int)e] = 0;
             TotalCardsGranted++;
             return true;
+        }
+
+        /// <summary>
+        /// 「结账」：按 <paramref name="capacity"/> 把瓶里攒够的份数换成卡牌，返回产出张数，余数留在瓶里。
+        /// 4/3 → 1 张 + 余 1。这是玉翁敛息事件触发那一刻的行为（见 GameEngine.ApplyBottleCapacity）。
+        /// </summary>
+        internal int DrainAt(Element e, int capacity)
+        {
+            if (capacity < 1) return 0;
+
+            int i = (int)e;
+            if (_counts[i] < capacity) return 0;
+
+            int cards = _counts[i] / capacity;
+            _counts[i] %= capacity;
+            TotalCardsGranted += cards;
+            return cards;
         }
 
         public string DebugLine()
@@ -192,6 +218,7 @@ namespace TapGJ.Core
             TotalTransformed = 0;
             TotalSummoned = 0;
             SpawnBlockedCount = 0;
+            ResetEventState();
 
             if (setup == null)
             {
@@ -228,6 +255,10 @@ namespace TapGJ.Core
             // 关卡机制在第 1 回合开始之前先跑 OnLevelStart（这时棋盘和手牌都已经就位）。
             FireLevelStart();
             BeginRound();
+
+            // 第一次事件从第 1 回合之后开始排（默认落在第 4~7 回合）。必须放在 BeginRound 之后：
+            // BeginRound 里第 1 回合的「轮到事件了吗」检查要看到 _nextEventRound == 0（不触发）。
+            ScheduleFirstEventIfNeeded();
         }
 
         /// <summary>按关卡布置铺盘：墙、固定元素、起手牌（没给起手牌就随机抽）。</summary>
@@ -329,7 +360,12 @@ namespace TapGJ.Core
             _movedThisRound.Clear(); // 新回合：所有存活的小怪重新获得一次移动机会
             _compositeProducedThisRound.Clear(); // 复合元素每回合产生一次
             _compositeProducedCountThisRound = 0;
+            SuppressCreepMovement = false; // 静滞结界只在它自己那一回合有效
             PushEvent(new GameEvent { Type = GameEventType.Message, Text = $"—— 第 {Round} 回合：准备阶段 ——" });
+
+            // 回合事件先于关卡机制：事件是「本回合的环境」，环境变了之后关卡机制再照常运作。
+            // 两者都在小怪移动之前 —— 所以「静滞结界」真能定住本回合所有小怪（包括机制刚生成的）。
+            if (_nextEventRound > 0 && Round == _nextEventRound) FireRoundEvent();
 
             FireRoundStart(); // 机制可以在这里生成元素 / 加墙，新生成的小怪本回合就会走
         }
@@ -371,6 +407,14 @@ namespace TapGJ.Core
 
             if (HasPendingCompositeProduction())
                 return AdvanceCompositeProduction();
+
+            // 静滞结界：本回合小怪全部定住 —— 不移动就不会相遇、不会反应。
+            // 复合元素的「产生」不看这个开关（它是产出元素，不是元素之间的相互作用），所以放在上面。
+            if (SuppressCreepMovement)
+            {
+                FinishPreparationAndDraw();
+                return null;
+            }
 
             var creep = NextIdleCreep();
             if (creep == null)
@@ -1372,6 +1416,9 @@ namespace TapGJ.Core
         public bool ResolveJudgment()
         {
             if (Phase != GamePhase.Judgment) return false;
+
+            // 「本回合」到这里结束：先让事件撤销它的临时效果（例如瓶子容量改回本关的值），再判胜负。
+            RevertRoundEvents();
 
             if (CheckWinCondition(out var reason))
             {

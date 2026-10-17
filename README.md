@@ -20,6 +20,7 @@ Unity 2D 原型，用来验证「8×8 棋盘 + 五行元素反应 + 元素牌」
 游戏开始 → 第 1 回合
   ├─ 准备阶段：小怪随机移动 0~3 格；相遇时按表结算 —— 相生（输家变成赢家元素）或相克（输家直接消失），
   │             同元素相遇则禁止移动（玩家不能操作）
+  │             （勾了「回合事件」的关卡：每 3~6 回合会先来一条事件，见第九节）
   ├─ 抽牌阶段：自动把手牌补到上限 5 张（本来就满 5 张则一张都不抽），玩家不需要操作
   ├─ 玩家行动阶段：小怪静止、不可主动相互作用。玩家出元素牌有两个用途（图1 第 1、2 条）：
   │              · 打在**元素格**上 → 与那只小怪按图2 发生反应
@@ -249,7 +250,7 @@ Game.unity
 - 它让「某元素 ≥ N」「全场只剩水」这类目标更容易（想补水就补）
 - 它让「清空全场」「某元素 ≤ N」这类目标更麻烦（多了一种把元素放回去的手段）
 - 批量模拟里的贪心玩家（`GreedyPlayer`）**不会主动召唤**，所以第四节那些胜率数字**不受这条规则影响**；
-  召唤好不好玩只能靠人工试玩（见第九节 C）
+  召唤好不好玩只能靠人工试玩（见第十节 C）
 - **关卡校验也跟着改了**：像「必须都在场」那种「布局里没有它 → 永远赢不了」的判断，现在会先问
   `Rules.CardSourceFor`（这张牌能不能把该元素放到场上：空格召唤 / 相生）；
   只有**连出牌都造不出来**才算死局 —— 原来只看字符画布局，`level_02` 因此报过假问题
@@ -331,7 +332,7 @@ HUD 的进度条不认种类，只消费 `GameEngine.GetGoalProgress()`（描述
 > 提醒：贪心策略很笨，人类玩家（会规划相生链、会留牌）胜率应该更高。
 > 这张表是用来**比不同上限之间的相对难度**，不是绝对平衡目标。
 >
-> 当前默认仍是 `0 = 不限`（见第十节的已知限制）。
+> 当前默认仍是 `0 = 不限`（见第十一节的已知限制）。
 
 ---
 
@@ -489,6 +490,8 @@ Assets/
 │  │  ├─ GameEngine.Composites.cs ★ 融合牌 / 分解牌 / 复合元素的产生效果
 │  │  ├─ GoalSpec.cs              胜利目标 = 种类 + 参数（7 种，含 Custom）
 │  │  ├─ ILevelRule.cs            ★ 关卡机制接口 + EncounterInfo（相遇快照）
+│  │  ├─ IRoundEvent.cs          ★ 回合事件接口（和 ILevelRule 的分工见第九节）
+│  │  ├─ GameEngine.Events.cs    ★ 回合事件的调度（独立随机流 / 不放回 / 预告）+ 事件注入 API
 │  │  ├─ LevelSetup.cs            一关的初始布置（纯数据）
 │  │  ├─ BoardLayoutParser.cs     字符画 → LevelSetup（含校验）
 │  │  ├─ GameEngine.LevelRules.cs 挂钩子 / 发通知 / 注入 API（SpawnAt、BlockCell、QueueNotice…）
@@ -502,6 +505,14 @@ Assets/
 │  │     ├─ LevelRuleBehaviour.cs 机制基类：ILevelRule 的空实现，只覆盖关心的钩子
 │  │     ├─ SpawnOnRoundRule.cs   示例：每 N 回合生成元素
 │  │     └─ ReactionCountRule.cs  示例：累计 N 次相生转换即胜利（自定义目标）
+│  ├─ Events/                     ★ 回合事件（每条事件 = 一个 ScriptableObject 子类 + 一个资产）
+│  │  ├─ RoundEventDefinition.cs  事件基类：Id / 显示名 / 说明 / IsApplicable / Apply / Revert
+│  │  ├─ Event_GiveElementCards.cs   元素馈赠（给 N 张元素牌）
+│  │  ├─ Event_GiveSpecialCards.cs   秘术馈赠（融合 + 分解各一张）
+│  │  ├─ Event_BottleCapacity.cs     玉翁敛息（本回合瓶子容量，先结账再降容）
+│  │  ├─ Event_SuppressCreepMovement.cs 静滞结界（本回合小怪不移动）
+│  │  ├─ Event_ConvertCells.cs       流漫溢（随机散落 N 格变成某元素，五行共用这一个类）
+│  │  └─ EventCatalog.cs          所有事件的清单（浏览 + 查重复 Id）
 │  ├─ Flow/                       场景流与进度（主界面同学的对接面）
 │  │  ├─ GameLaunchContext.cs     跨场景传「要进哪一关」
 │  │  ├─ SceneFlow.cs             进关 / 回主界面 / 重进本关 / **退出游戏**（编辑器里 = 结束 Play）
@@ -519,11 +530,12 @@ Assets/
 │  ├─ RulesInspectorWindow.cs     菜单 TapGJ ▸ 规则与批量模拟（反应表 / 跑批 / 玩法说明）
 │  ├─ GameSessionInspector.cs     GameSession 面板：标出规则来自关卡还是场景兜底（兜底那份会置灰）
 │  ├─ LevelDefinitionInspector.cs ★ 关卡面板：摘要 + 实时配置校验 + 「Play 这一关」
-│  └─ SceneScaffold.cs            菜单 TapGJ ▸ 搭骨架 / 新建 Game 场景 / 新建关卡 / 校验场景 / 校验所有关卡
+│  └─ SceneScaffold.cs            菜单 TapGJ ▸ 搭骨架 / 新建 Game 场景 / 新建关卡 / 校验场景 / 校验所有关卡 / 校验所有事件
 └─ Tests/EditMode/
    ├─ CoreRulesTests.cs           规则层测试（开局、相生相克、瓶子、出牌、胜负、40 局跑批）
    ├─ CompositeElementTests.cs    ★ 复合元素 + 秘术牌（配方表、融合/分解、产生效果、抽牌权重、校验）
    ├─ CompositeViewTests.cs       ★ 复合元素的表现层与两段式选点高亮
+   ├─ RoundEventTests.cs          ★ 回合事件（调度可复现、不放回、每条事件的语义、关卡校验）
    ├─ BoardViewTests.cs           表现层测试（64 格、Sync 对账、锚点布局、手牌排布、卡牌预制体）
    ├─ SceneWiringTests.cs         场景接线校验 + 「接线清单里的字段名还有效」
    ├─ HudQuitTests.cs             ★ 「退出游戏」按钮：两段式确认、超时作废、入口仍在 SceneFlow 上
@@ -612,9 +624,11 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 **要接特效，挂点选 `BoardView.PlayStep`，不要用 `GameSession.EventRaised`。**
 后者是在 `FlushLog()` 里发出的，而 `FlushLog()` 是在这一步**播完之后**才被调用 —— 拿它触发特效会「先炸后动」。
 `PlayStep` 里的 `switch (e.Type)` 同时知道事件类型、元素、格子坐标和播放时长，才是对的挂点。
-`GameEventType` 共 12 种（`Move` / `Bump` / `Transform` / `Vanish` / `Spawn` / `SpawnBlocked` /
-`BottleFill` / `GainCard` / `DrawCard` / `DiscardCard` / `Message` / `Win` / `Lose`），
+`GameEventType` 共 16 种（`Move` / `Bump` / `Transform` / `Vanish` / `Spawn` / `SpawnBlocked` /
+`BottleFill` / `GainCard` / `DrawCard` / `DiscardCard` / `CompositeSpawn` / `CompositeVanish` /
+`RoundEvent` / `Message` / `Win` / `Lose`），
 可以照着列一份美术需求清单；其中相生 `Transform` 只有 5 种有向转换、相克 `Vanish` 5 种。
+`RoundEvent` 是回合事件的播报（见第九节），美术上应该做成一张「事件卡」而不是一行字。
 
 ⚠ **渲染管线是 Built-in**（没有 URP/HDRP，也没装 Shader Graph / VFX Graph）：
 特效只能用 **ParticleSystem(Shuriken) + 内置 shader**。美术从 URP 工程带来的材质在这里**会全是洋红**。
@@ -676,6 +690,8 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
    - `rules.Goal`：**胜利目标**（7 种，见第四节；`Custom` = 交给机制组件判定）
    - `fixedInitialHand`：固定起手牌（留空 = 随机 `InitialHandSize` 张）
    - `useFixedSeed` / `fixedSeed`：谜题关固定种子（勾上就忽略菜单传来的种子）
+   - `useEvents` / `roundEvents`：**这一关要不要随机回合事件、用哪几条**（见第九节；
+     间隔在 `rules.EventIntervalMin/Max`，短关卡记得调小）
 3. 在 `Level_N.prefab` 里摆局部美术（背景/装饰）——玩法数据在 SO，视觉在预制体。
 4. **要可编程机制就给它 Add Component**（继承 `LevelRuleBehaviour`，见第五节）——
    挂在预制体根物体或子物体上都行，运行时会被自动收集。挂完这个预制体就
@@ -705,6 +721,7 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 | `TapGJ ▸ 新建关卡（定义 + 预制体 + 加入目录）` | 生成 Level_N 的 SO + 预制体，并加入目录 |
 | `TapGJ ▸ 校验当前场景` | 逐条列出 `✘ 物体.字段：该拖什么进来` |
 | `TapGJ ▸ 校验所有关卡（目录 + 全部关卡资产）` | 逐关列出配置问题 + `levelId` 重复检查 |
+| `TapGJ ▸ 校验所有事件（目录 + 全部事件资产）` | 事件 Id 重复、没填说明、目录空槽位（「某条事件在本关适不适用」由关卡校验报） |
 | `TapGJ ▸ 打印当前对局状态（仅 Play 时）` | Play 时把阶段/回合/场上元素/瓶子/手牌打到 Console |
 | `TapGJ ▸ 规则与批量模拟` | 反应表、批量跑批、玩法说明（模拟器里可以直接调秘术牌池与抽牌权重） |
 
@@ -795,7 +812,7 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 
 ⚠ **复合元素占着的格子既不参与反应、也不能被覆盖**：取格时直接跳过。
 两个复合元素相邻时这一点尤其要紧 —— 否则「同元素换格」会把元素放到隔壁复合元素那一格上，
-`Board.Put` 直接抛异常（这个崩溃修过一次，现在有 `相邻复合元素_*` 三条用例钉着，见第九节）。
+`Board.Put` 直接抛异常（这个崩溃修过一次，现在有 `相邻复合元素_*` 三条用例钉着，见第十节）。
 
 > 「两个复合元素相邻，生成元素会不会反应？」——分两半：
 > **不会**和复合元素本身反应（它是惰性的、不参与任何反应），
@@ -883,9 +900,152 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 
 ---
 
-## 九、怎么验证
+## 九、回合事件（每隔几回合来一次的扰动）
 
-**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：当前 **204 项全部通过**，含
+「事件」是**本局随机、只作用于当回合**的扰动。它和「关卡机制」分工明确：
+
+| 想改什么 | 用什么 | 谁写 |
+|---|---|---|
+| 这一关**固定**的规则（每局都一样） | `ILevelRule` 组件（挂关卡预制体，见第五节） | 写代码的人 |
+| 这一局**随机**的扰动（每局不同） | `IRoundEvent` 资产（本节） | 配资产；只有加**新效果类型**才写代码 |
+
+### 触发规则
+
+- **第 1 回合不触发**，之后每隔 `Rules.EventIntervalMin ~ EventIntervalMax` 回合（默认 **3~6**）触发一条
+- 第一次落在 `1 + [min,max]` 回合（默认第 **4~7** 回合）；每次触发后**重新随机**间隔
+- 间隔 **每关可调** —— 6 回合的短关卡建议在 `Rules` 里写 `2~3`（否则一局都碰不上，校验会报出来）
+- **不放回**：同一局里一条事件最多出现一次；池子抽空后**重洗**（不会「后面几回合没事件」）
+- **均匀概率**：不做权重（真要调平衡时再加）
+- 触发点：`BeginRound()` 里、**关卡机制的 `OnRoundStart` 之前**、小怪移动之前
+  → 所以「静滞结界」真能定住本回合所有小怪（包括机制刚生成的那些）
+
+### 为什么调度在 Core 里，而且用独立随机流
+
+「第几回合来、来哪条」由引擎决定（否则测试与「同种子复现」都谈不上），而且用的是
+**从 `Seed` 派生出来的独立随机流**（`GameEngine.EventStreamSeed`），不是玩法那条 `_rng`：
+
+> 如果用共用的 `_rng`，玩家多打一张牌（出生格要随机）就会把后面的事件时间表整个挤歪，
+> HUD 上那句「下一次：第 8 回合」立刻变成谎话。独立流保证**同种子 = 同一套事件时间表**，
+> 与玩家怎么打无关 —— 预告和复现都靠它。
+
+### 配置：全局目录 + 每关池子
+
+| 放哪 | 字段 | 含义 |
+|---|---|---|
+| 事件资产 | `RoundEventDefinition` 的子类 + `CreateAssetMenu` | 一条事件 = 一个资产（名字 / 说明 / 参数） |
+| `EventCatalog.asset`（全局） | `events[]` | 所有事件的清单：浏览用 + 查重复 Id。**运行期不参与**，关卡直接引用事件资产 |
+| 关卡定义 | `useEvents` | **总开关**。默认不勾 = 这一关没有事件，行为与加这套系统之前逐位一致 |
+| 关卡定义 | `roundEvents[]` | 本关启用的事件池（只从这里面抽） |
+| `Rules` | `EventIntervalMin/Max` | 节奏。两个 int 放 `Rules` 是因为它要进批量跑批；事件资产是 `UnityEngine.Object`，放不进纯 C# |
+
+### 现成的 5 个事件类（图上那 9 条 = 5 个类 + 若干资产）
+
+| 事件名 | 类 | 参数 | 语义 |
+|---|---|---|---|
+| 元素馈赠 | `Event_GiveElementCards` | `count = 3` | 从 `Rules.CardPool` 均匀抽 N 张元素牌塞进手牌，**允许顶破手牌上限** |
+| 秘术馈赠 | `Event_GiveSpecialCards` | `countPerKind = 1` | 融合 + 分解各一张；**只在两种都启用的关卡里适用** |
+| 玉翁敛息 | `Event_BottleCapacity` | `capacity = 3` | 本回合瓶子容量降到 3，**触发瞬间先把已达标的瓶子结账产牌**，判定阶段恢复 |
+| 静滞结界 | `Event_SuppressCreepMovement` | — | 本回合准备阶段**跳过小怪移动**（复合元素的产出照旧） |
+| 金/木/水/火/土流漫溢 | `Event_ConvertCells` ×5 个资产 | `element`、`cellCount = 9` | 随机散落 9 格变成该元素：**空格就添加**、已有元素就地转换；墙 / 复合元素跳过 |
+
+### 每条事件的边界（都是刻意定的）
+
+- **元素馈赠**：允许手牌超过 `HandLimit`（和「瓶子满自动产牌」同一个口径）。
+  副作用是**弃牌阶段终于有事可做** —— 第一节记的那个「弃牌阶段空转」问题被这条事件激活了。
+- **秘术馈赠**：引擎里「秘术牌能不能打出去」由 `Rules.HasSpecialCard(kind)` 决定，
+  所以在只开了融合牌的关卡里白送分解牌 = 一张死牌 → 这条事件**只在融合+分解都启用时适用**
+  （`IsApplicable` 挡住；配错的话关卡校验会直接报）。
+- **玉翁敛息**：先结账再降容（4/3 → 1 张牌 + 余 1），观感是「葫芦把憋着的气吐出来」，
+  而不是「上限变了但什么也没发生」。本关容量本来就等于目标值时它等于没做事 → 当成「不适用」跳过。
+- **静滞结界**：实现就是「准备阶段直接跳过移动」—— 不走 = 不会相遇 = 不会相生/相克。
+  比「照常走但相遇不结算」干净（后者还要重新定义「异元素相遇算不算挡路」）。
+  **复合元素的每回合产出照旧**（它是产出元素，不是元素之间的相互作用）；玩家出牌照样能引发反应。
+- **流漫溢**：**最多凭空 +9 个元素**，是这套里最强的一条。目标元素不在本关 `ElementPool` 里时
+  整条**不适用** —— 否则会打破「棋盘上永远只出现池内元素」那条硬不变量（那条不变量一条测试都没改）。
+
+### 生命周期
+
+```
+BeginRound
+  ├─ 回合数 +1、本回合状态清零（含 SuppressCreepMovement = false）
+  ├─ 轮到事件 → 抽一条 → IsApplicable 不适用就换下一条（不算抽过）→ Apply
+  ├─ 关卡机制 OnRoundStart
+  └─ 准备阶段推进（复合元素产出 → 小怪移动 / 或被静滞定住）
+抽牌 → 玩家行动 → 弃牌
+判定阶段
+  └─ RevertRoundEvents()：撤销临时效果（瓶子容量改回 Rules.BottleCapacity），再判胜负
+```
+
+一次事件产生的所有变化**排成一个 `StepRecord`**（`IsRoundEvent = true`，第一条事件的类型是
+`GameEventType.RoundEvent`），所以表现层会照常按顺序播，不会「先炸后动」。
+
+### 事件能改什么（注入 API）
+
+| API | 作用 |
+|---|---|
+| `engine.GiveElementCards(n)` | 从牌池均匀给 n 张元素牌（允许超上限） |
+| `engine.GiveSpecialCards(n)` | 每种**本关启用**的秘术牌各给 n 张 |
+| `engine.ApplyBottleCapacity(c)` / `RestoreBottleCapacity()` | 本回合改瓶子容量（前者先结账）/ 改回本关的值 |
+| `engine.SetSuppressCreepMovement(bool)` | 本回合小怪不移动 |
+| `engine.ConvertCellsToElement(element, n)` | 随机散落 n 格 → 该元素（空则添加、有则就地转换） |
+
+⚠ 这几条**都不喂小瓶子**（转换 / 生成不是「元素消失」），也都不绕过 `ElementPool` 硬约束。
+
+### 写一条新事件
+
+```csharp
+[CreateAssetMenu(fileName = "Event_某某", menuName = "TapGJ/事件/某某")]
+public sealed class Event_MyThing : RoundEventDefinition
+{
+    [SerializeField, Min(1)] int count = 2;
+
+    public override bool IsApplicable(GameEngine engine, out string reason)
+    {
+        if (engine.Rules.PoolCards.Length > 0) { reason = null; return true; }
+        reason = "本关牌池里一张元素牌都没有";
+        return false;
+    }
+
+    public override void Apply(GameEngine engine) => engine.GiveElementCards(count);
+}
+```
+
+- 想做**同一条事件的变体**（给 5 张木牌、转 9 格火）= 复制资产改参数，**不用写代码**
+- 想加**新的效果类型**才写类：继承 `RoundEventDefinition`，实现 `Apply`；需要撤销就再实现 `Revert`
+- 加完记得把它拖进 `EventCatalog`（只是清单，不影响运行），再放进要用它的关卡的 `roundEvents`
+
+### 关卡校验会报什么
+
+`LevelDefinition.CollectAuthoringIssues` 里多了一块（Inspector 实时刷新、「校验所有关卡」、进关时三处共用）：
+
+- 勾了 `useEvents` 但 `roundEvents` 是空的（白勾）
+- 配了 `roundEvents` 但没勾 `useEvents`（永远不会触发）
+- 事件池里有空槽位 / 同一条事件放了两次（去重按 `Id`，重了等于只有一条）
+- **回合上限撞不上第一次事件**（`1 + EventIntervalMin > RoundLimit` → 永远不会有事件；
+  `1 + EventIntervalMax > RoundLimit` → 有些局可能一个都碰不到）
+- **某条事件在本关不适用**（目标元素是池外的 / 没开复合元素 / 本关容量本来就一样 …）
+
+「适不适用」问的是事件自己的 `IsApplicable` —— 运行期抽取用的是同一个方法，
+所以 Inspector 里报的「会被跳过」和 Play 时跳过的**必然是同一批**。
+（为了让它判断得准，校验时会真的**在内存里开一局**：不然「场上一个小怪都没有」这类判断在空棋盘上永远成立。）
+
+另外菜单 **TapGJ ▸ 校验所有事件（目录 + 全部事件资产）** 单独扫一遍所有事件资产：
+Id 重复、没填说明、目录里有空槽位。
+
+### HUD
+
+- 右侧面板多了 **「本回合事件：<名字>：<说明>　下一次：第 N 回合」**（本关没开事件时整块不显示）
+- 触发时日志里有一条 `—— 回合事件：静滞结界 —— 本回合元素不会自主相互作用`
+- 瓶子进度条读的是 `Engine.Bottle.Capacity`（**本回合实际生效的容量**），不是 `Rules.BottleCapacity`（基准值）——
+  事件改容量时只有前者会变，读错就会显示 4/5 而实际 3 就爆
+
+---
+
+## 十、怎么验证
+
+**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：当前 **224 项**，含
+（原有 204 项 + 本次新增的 20 条回合事件用例；⚠ 新增那 20 条是在无头许可管道不通的环境里
+用「Roslyn 编译 + 一份只跑 Core 的临时 harness」验过的，**第一次正式 Run All 请在编辑器里跑一遍**）
 - 反应表：5 对相生逐对钉死（输家变成赢家）+ 5 对相克逐对钉死（输家消失）+ 双向一致性
 - **每个元素必须 2 胜 2 负** —— 专防「某一对被写反」（金×火 就曾经反过一次，让金变成 3 胜 1 负）
 - 碰撞结果：相生 → 输家就地换元素、元素总数不变、主动方停下；相克 → 输家被销毁、主动方占格并继续走
@@ -997,6 +1157,21 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
   - 配置校验：开了融合牌却凑不出配方 / 开了分解牌却拿不到复合元素 / 权重为 0 / 初始复合元素越界，
     以及一条干净配置必须**零问题**
   - **面板摘要**：`CompositeFeatureText` 对「关」和「开（融合牌、分解牌、权重 …、开局 N 个）」都逐字钉住
+- **回合事件**（`RoundEventTests`，见第九节）：
+  - **没挂事件池 = 与加这套系统之前逐位一致**（`EventsEnabled` 假、`NextEventRound` 为 0、跑 5 回合零事件）
+  - 调度：**第 1 回合不触发**、第一次落在第 `1+[min,max]` 回合（默认 4~7）、每次触发后重新排间隔、
+    **同种子可复现**（同一次事件回合 + 同一条触发序列）
+  - **不放回**（前两次必然不同）、**抽空后重洗**（第三次可以重复）；**不适用的事件被跳过且不算抽过**
+  - 顺序：**事件先于关卡机制的 `OnRoundStart`**（机制收到钩子时 `ActiveEvent` 已经就位）
+  - 事件排成**一个 `IsRoundEvent` 步骤**，第一条事件是 `GameEventType.RoundEvent`（表现层不会漏播）
+  - 元素馈赠：给 3 张、**张张都来自本关牌池**；秘术馈赠：融合+分解各一张，
+    **没开复合元素 / 只开融合时不适用**（否则那张牌是死牌）
+  - 玉翁敛息：**先结账再降容**（5 个 4/5 瓶子 → 5 张牌 + 各余 1）、**判定阶段自动恢复且不结账**、
+    本关容量本来就一样时**不适用**
+  - 静滞结界：准备阶段**一只小怪都不动**（无相生/无相克），**但不挡复合元素的每回合产出**
+  - 流漫溢：**空格添加 / 已有元素就地转换（uid 不变）/ 墙格与复合元素格跳过 / 都不喂小瓶子**；
+    **目标元素是池外元素时整条不适用**（引擎 API 自己也挡住，不变量一条没破）
+  - 关卡校验：勾了开关但池子空、回合上限撞不上第一次事件 —— 都要报出来
 - **表现层对象所有权的不变量**（详见第六节）：
   - 小怪对象数在整个回合流程里每走一步都等于 `Engine.CreepCount`（移动 / 相生 / 相克全覆盖）
   - 复合元素之后这条不变量扩成 **`Engine.CreepCount + Engine.CompositeCount`**
@@ -1031,10 +1206,10 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
   -runTests -testPlatform EditMode -testResults <xml> -logFile <log>
 ```
-可以验证：编译零警告、**204 项测试**、接线校验逻辑、骨架搭建与「新建关卡」的建资产流程
+可以验证：编译零警告、**224 项测试**、接线校验逻辑、骨架搭建与「新建关卡」的建资产流程
 （测试直接调 `SceneScaffold.BuildSkeleton` / `CreateLevelAsset`）、
 字符画解析与目标判定、关卡机制的全部钩子与注入 API、元素池/牌池的硬约束与配置校验、
-复合元素的全部规则与秘术牌的两段式选点。
+复合元素的全部规则与秘术牌的两段式选点、回合事件的调度与每个事件的语义。
 **验证不了**：画面、手感、玩法是否好玩 —— `-batchmode` 进不了 Play，这部分只能你来看。
 
 > ⚠ 无头跑测试需要连 Unity 许可服务的**命名管道**。受限环境里这条链路上不去，会直接以 **199** 退出，
@@ -1043,6 +1218,14 @@ Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
 > 上一次编译留下的 `.rsp`（带全部引用与宏）自己把三个程序集编一遍，至少能验证「编译过不过」；
 > 纯逻辑用例（不碰 `GameObject` 的那些）还能用一个反射版 NUnit 宿主跑起来。
 > 表现层用例在没有 Unity 运行时的环境里跑不了（`GameObject` / `Transform` 都是引擎的 native 调用）。
+>
+> **实测（加回合事件那一次）**：`csc.exe` 直接跑会因为缺 `System.Text.Encoding.CodePages` 起不来，
+> 用 `MonoBleedingEdge/bin/mono.exe <csc.exe>` 跑就没问题；`.rsp` 里已有 `-out:` 指向 Bee 的产物目录，
+> 复制一份把 `-out:` / `-refout:` / `TapGJ.*.ref.dll` 全换成临时目录，再在命令行**追加新增的 .cs**，
+> 就能按 Runtime → Editor → Tests 的顺序编过去。新增的回合事件用例里有一部分只碰 Core
+> （调度 / 瓶子 / 静滞 / 转换），那部分我用一份临时 harness（引用编出来的 `TapGJ.Runtime.dll` +
+> `UnityEngine.CoreModule.dll`，`MONO_PATH` 指到 Unity 的 managed 目录）真跑了一遍，37 项全过；
+> 碰 `ScriptableObject` / `SerializedObject` 的那几条只能在编辑器里跑。
 
 两条踩过的坑：
 
@@ -1055,7 +1238,7 @@ Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
 
 ---
 
-## 十、已知限制
+## 十一、已知限制
 
 ### 内容 / 玩法
 
@@ -1092,6 +1275,26 @@ Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
   要加机制版的话照 `SpawnAt` 写一个 `SpawnCompositeAt` 即可
 - 关卡预制体本身还是空壳挂点：机制组件有了，但**内置的美术/关卡逻辑一个都没有**
 - 主界面场景还没做：游戏侧已经把接口冻结成 `LevelCatalog` / `SceneFlow` / `ProgressStore` 三个入口
+
+### 回合事件
+
+- **强度完全没校准**，这是最需要试玩的一条：
+  - 「元素馈赠 3 张」+「玉翁敛息结账」撞在同一回合 ≈ 白送 **5 张牌**（≈ 多打一个整回合），短关卡里尤其猛；
+  - 「流漫溢」最多**凭空 +9 个元素**，对「某元素 ≤ N / 清空全场」这类目标是**灾难**，
+    对「某元素 ≥ N」是神助 —— 但它是随机的，玩家没法防。
+  数值都在资产参数里（`count` / `cellCount` / `capacity`），改完不用重新编译。
+- **转换事件 × 清空类目标** = 纯运气背刺：目标「火 ≤ 0」的关卡抽到「赤焰漫燎」基本就废了。
+  现在唯一的对策是**按关裁剪池子**（那一关的 `roundEvents` 里别放它），校验**不会**替你判断这种组合。
+- **静滞结界 × 相生计数机制**：那回合进度条白给（不是死局，但玩家会以为卡了）。同样只能靠池子裁剪。
+- **事件没有美术表达**：`BoardView.PlayStep` 里**没有** `GameEventType.RoundEvent` 的 case，
+  所以触发时只有日志一行 + 面板一行，棋盘上不会弹「事件卡」。要接美术就照第六节那个挂点加 case。
+- **事件池不支持权重**（均匀等概率），也**不支持同一回合来两条**（`ActiveEvents` 是列表，但调度只抽一条）。
+  加权重的话照 `Rules.DrawWeightOf` 那套写即可。
+- **批量跑批 / 平衡探针不含事件**：`BalanceProbeTests` 与 `PlayLimitTuningTests` 都不挂事件池，
+  所以第四节那些胜率数字是「没有事件」的世界。要看事件对胜率的影响，得先给跑批加一个开关再重跑。
+- **事件不记档**：没有「事件图鉴」也没有「这局见过哪些事件」，重开就全清零（和关卡进度的口径一致）。
+- `EventCatalog` 只是清单：关卡校验**不检查**「关卡池里的事件是否在目录里」，
+  所以目录漏收一条事件不会报错（不影响运行，只影响你浏览时的完整感）。
 
 ### 表现层 / 美术
 

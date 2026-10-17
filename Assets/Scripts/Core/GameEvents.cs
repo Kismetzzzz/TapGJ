@@ -47,6 +47,8 @@ namespace TapGJ.Core
         CompositeSpawn,
         /// <summary>复合元素从棋盘上消失（分解 / 被机制移除）。</summary>
         CompositeVanish,
+        /// <summary>回合事件触发（播报用；具体效果由后续的 Transform / Spawn / GainCard 事件表达）。</summary>
+        RoundEvent,
         Message,
         Win,
         Lose,
@@ -101,12 +103,15 @@ namespace TapGJ.Core
         public bool IsDecompose;
         /// <summary>这一步是「复合元素产生元素」（回合开始 / 融合当回合）。</summary>
         public bool IsCompositeEffect;
+        /// <summary>这一步是「回合事件」（回合开始、关卡机制之前的那一步：播报 + 事件带来的变化）。</summary>
+        public bool IsRoundEvent;
         public bool CreepWentAway;
 
         public bool HasVisualMovement => Path.Count > 1;
 
         public override string ToString()
         {
+            if (IsRoundEvent) return $"[回合事件]{Events.Count} 条";
             if (IsDrawPhase) return $"[抽牌]{Events.Count} 张";
             if (IsSummon) return $"[召唤]{ElementDefs.Name(Element)} @{To}";
             if (IsFusion) return $"[融合牌]@{To}";

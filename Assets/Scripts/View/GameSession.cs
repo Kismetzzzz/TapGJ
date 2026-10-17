@@ -364,16 +364,18 @@ namespace TapGJ.View
             while (!Engine.IsOver)
             {
                 // ---------- 准备阶段：一只一只小怪推进并播放 ----------
+                // ⚠ 步骤一律**从队列里取着播**：AdvancePreparation 返回的 record 同时也进了队列
+                //   （关卡机制、回合事件排的步骤也都在同一个队列里），两边都播会把每一步播两遍。
                 while (Engine.Phase == GamePhase.Preparation)
                 {
-                    var step = Engine.AdvancePreparation();
-                    if (step == null) continue; // 本回合小怪都走完了，Phase 已切到玩家行动
-                    yield return PlayStepRoutine(step);
-                    FlushLog(); // 每走一只就刷新日志，方便盯规则
+                    Engine.AdvancePreparation();
+                    while (Engine.PendingStepCount > 0)
+                        yield return PlayStepRoutine(Engine.DequeueStep());
+                    FlushLog(); // 每推进一步就刷新日志，方便盯规则
                     if (StepPause > 0f && !InstantPlayback) yield return new WaitForSeconds(StepPause);
                 }
 
-                // 抽牌阶段排下的补牌步骤
+                // 抽牌阶段排下的补牌步骤（最后一只小怪走完时和它的步骤一起排进来）
                 while (Engine.PendingStepCount > 0)
                     yield return PlayStepRoutine(Engine.DequeueStep());
 
