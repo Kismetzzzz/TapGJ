@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using TapGJ.Flow;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -153,18 +154,21 @@ namespace TapGJ.View
             chapterTitleLabel.text = CardTitle(chapter.title, "未命名章节") + " · 关卡选择";
             chapterMarkerLabel.text = (index + 1).ToString("00");
             ClearCards(_levelButtons);
+            bool hasPlayableLevel = false;
             if (chapter.levels != null)
                 for (int i = 0; i < chapter.levels.Length; i++)
                 {
                     if (chapter.levels[i] == null) continue;
                     int levelIndex = i;
                     var level = chapter.levels[i];
+                    hasPlayableLevel |= level.definition != null;
                     var button = CreateCard(levelCardTemplate, levelsScroll.content, "Level" + (i + 1).ToString("00") + "Button",
-                        CardTitle(level.title, "未命名关卡"), level.goal, "待开放", i);
+                        CardTitle(level.title, "未命名关卡"), level.goal, level.definition != null ? "开始挑战 →" : "待开放", i);
                     button.onClick.AddListener(() => PreviewLevel(levelIndex));
                     _levelButtons.Add(button);
                 }
-            chapterStatusLabel.text = _levelButtons.Count > 0 ? "选择关卡查看目标；关卡内容待开放。" : "本章暂无关卡。";
+            chapterStatusLabel.text = _levelButtons.Count == 0 ? "本章暂无关卡。" : hasPlayableLevel
+                ? "选择关卡开始挑战；待开放关卡可查看目标。" : "选择关卡查看目标；关卡内容待开放。";
             ConfigureCardNavigation(_levelButtons, closeChapterButton);
             ShowPage(chapterPanel, _levelButtons.Count > 0 ? _levelButtons[0].gameObject : closeChapterButton.gameObject);
         }
@@ -178,6 +182,24 @@ namespace TapGJ.View
             if (chapter == null || chapter.levels == null || levelIndex < 0 || levelIndex >= chapter.levels.Length
                 || chapter.levels[levelIndex] == null) return;
             var level = chapter.levels[levelIndex];
+            if (level.definition != null)
+            {
+                var definition = level.definition;
+                if (string.IsNullOrWhiteSpace(definition.sceneName)
+                    || !Application.CanStreamedLevelBeLoaded(definition.sceneName))
+                {
+                    chapterStatusLabel.text = "关卡暂不可用，请选择其他关卡。";
+                    Debug.LogError($"[TapGJ] 关卡「{definition.levelId}」的场景未加入 Build Settings：{definition.sceneName}", this);
+                    return;
+                }
+
+                Audio.SaveSettings();
+                _loading = true;
+                menuGroup.interactable = false;
+                chapterStatusLabel.text = "正在进入关卡…";
+                SceneFlow.LoadLevel(definition);
+                return;
+            }
             string heading = CardTitle(chapter.title, "未命名章节") + " · "
                 + CardTitle(level.title, "未命名关卡") + "待开放。";
             chapterStatusLabel.text = GoalStatus(heading, level.goal);

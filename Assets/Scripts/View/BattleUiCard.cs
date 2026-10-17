@@ -132,13 +132,14 @@ namespace TapGJ.View
         }
 
         /// <summary>玩法确认消耗成功后调用；视觉副本独立播完，原槽位立即停止交互。</summary>
-        public void PlayDissolve()
+        public CardDissolveEffect PlayDissolve()
         {
-            if (!gameObject.activeInHierarchy) return;
+            if (!gameObject.activeInHierarchy) return null;
             selectedRing.alpha = 0;
-            CardDissolveEffect.Play(artwork.gameObject, ElementDefs.Tint(element));
+            var effect = CardDissolveEffect.Play(artwork.gameObject, ElementDefs.Tint(element));
             SetSelected(false);
             gameObject.SetActive(false);
+            return effect;
         }
     }
 }

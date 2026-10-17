@@ -588,13 +588,10 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 出牌_关掉召唤之后空格仍然打不出去()
+        public void 出牌_旧配置拒绝空格也能召唤并消耗手牌()
         {
-            // 图1 第 2 条（打在空格上 = 在该格召唤）默认是开的，这条用例把它关掉，
-            // 钉住「加这条规则之前」的行为：空格不是合法目标，出牌被拒绝且不消耗手牌。
-            // 默认开着时的行为在 CardSummonTests 里。
             var rules = BaseRules();
-            rules.EmptyCellCard = EmptyCellCardMode.Reject;
+            UnityEngine.JsonUtility.FromJsonOverwrite("{\"EmptyCellCard\":1}", rules);
 
             var engine = new GameEngine(rules, 5);
             engine.ClearBoard();
@@ -608,10 +605,10 @@ namespace TapGJ.Tests
 
             var record = engine.TryPlayCard(engine.Hand[0].Id, new Pos(0, 0)); // 空格
 
-            Assert.IsNull(record);
-            StringAssert.Contains("没有元素", engine.FailReason);
-            Assert.AreEqual(1, engine.Hand.Count, "被拒绝时不该消耗手牌");
-            Assert.IsTrue(engine.Board.IsEmpty(new Pos(0, 0)), "空格上不该凭空冒出元素");
+            Assert.IsNotNull(record, engine.FailReason);
+            Assert.IsTrue(record.IsSummon);
+            Assert.AreEqual(0, engine.Hand.Count, "召唤成功后消耗手牌");
+            Assert.AreEqual(Element.Water, engine.Board.At(new Pos(0, 0)).Element);
         }
 
         // ------------------------------------------------------------ 回合与胜负

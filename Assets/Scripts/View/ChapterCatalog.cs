@@ -1,4 +1,5 @@
 using System;
+using TapGJ.Levels;
 using UnityEngine;
 
 namespace TapGJ.View
@@ -11,6 +12,8 @@ namespace TapGJ.View
         {
             public string title;
             [TextArea(2, 8)] public string goal;
+            [Tooltip("拖入对应的关卡定义资产（Level_XX.asset）；留空时显示待开放。")]
+            public LevelDefinition definition;
         }
 
         [Serializable]

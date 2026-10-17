@@ -35,7 +35,7 @@ namespace TapGJ.Core
         Spawn,
         /// <summary>反应本应生成，但周围没有空格。</summary>
         SpawnBlocked,
-        /// <summary>小瓶子计数 +1。</summary>
+        /// <summary>元素收集进度增加，可一次增加多点。</summary>
         BottleFill,
         /// <summary>瓶子满，产出一张元素牌。</summary>
         GainCard,
@@ -50,6 +50,8 @@ namespace TapGJ.Core
         Message,
         Win,
         Lose,
+        /// <summary>当前集齐门槛与剩余点数发生变化。</summary>
+        BottleCapacityChanged,
     }
 
     public sealed class GameEvent
@@ -64,6 +66,12 @@ namespace TapGJ.Core
         public int Round;
         /// <summary>该事件在本回合的第几个小怪步骤里产生（表现层按此分组播放）。</summary>
         public int StepIndex;
+        /// <summary>资源进度的变化量与结算快照，表现层不从最终状态反推中间进度。</summary>
+        public int Amount;
+        public int BottleCount;
+        public int BottleCapacity;
+        /// <summary>本次获得的真实手牌 ID；0 表示该事件没有关联手牌。</summary>
+        public int CardId;
 
         public override string ToString()
         {

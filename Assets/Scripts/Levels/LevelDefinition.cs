@@ -207,7 +207,7 @@ namespace TapGJ.Levels
             sb.Append($"　元素 {elements.Names()}");
             sb.Append($"　牌池 {cards.Names()}");
             sb.Append($"　复合元素 {CompositeFeatureText(rules)}");
-            sb.Append($"　空格出牌 {EmptyCellCardText(rules)}");
+            sb.Append("　空格出牌 召唤");
             sb.Append($"　回合上限 {rules.RoundLimit}");
             sb.Append($"　目标 {rules.Goal.Describe()}");
 
@@ -245,14 +245,5 @@ namespace TapGJ.Levels
             return "开（" + string.Join("、", parts) + "）";
         }
 
-        /// <summary>
-        /// 面板上那一小段「元素牌打在空格上」的文字（图1 第 2 条）。
-        /// 默认是「召唤」，所以摘要里写出来能让设计师一眼看到这一关的玩法开关状态。
-        /// </summary>
-        public static string EmptyCellCardText(Rules rules)
-        {
-            if (rules == null) return "召唤";
-            return rules.EmptyCellCard == EmptyCellCardMode.Summon ? "召唤" : "拒绝（旧玩法）";
-        }
     }
 }

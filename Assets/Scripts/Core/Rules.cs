@@ -26,22 +26,6 @@ namespace TapGJ.Core
     }
 
     /// <summary>
-    /// 元素牌打在**空格**上的处理方式。图1 玩家行动阶段的第 2 条写得明确：
-    /// 「玩家可以对空的棋盘格使用卡牌，可以在该格召唤该元素小怪」。
-    ///
-    /// ⚠ <see cref="Summon"/> 故意是 0：加这个字段之前存下来的关卡 / 场景资产反序列化出来就是 0，
-    /// 于是**旧资产自动拿到图1 的新规则**，不需要挨个改资产。想回到「空格打不出去」就选 <see cref="Reject"/>。
-    /// </summary>
-    public enum EmptyCellCardMode
-    {
-        /// <summary>默认：元素牌打在空格上 → 在该格召唤 1 个牌面元素的小怪（图1 第 2 条）。</summary>
-        Summon = 0,
-
-        /// <summary>旧行为：空格不是合法目标，这次出牌被拒绝（不消耗手牌）。</summary>
-        Reject = 1,
-    }
-
-    /// <summary>
     /// 秘术牌（融合牌 / 分解牌）的集合（位掩码）。
     /// Inspector 会渲染成多选下拉框，和 <see cref="ElementMask"/> 一样是给关卡作者的开关。
     /// </summary>
@@ -133,7 +117,7 @@ namespace TapGJ.Core
         /// </summary>
         public int MaxCardsPerRound = 0;
 
-        /// <summary>元素小瓶子容量，满瓶换算成 1 张对应元素牌。</summary>
+        /// <summary>默认元素收集门槛，集齐产出 1 张对应元素牌；当回合事件可临时覆盖。</summary>
         public int BottleCapacity = 5;
 
         /// <summary>回合上限，超过即失败。</summary>
@@ -147,20 +131,6 @@ namespace TapGJ.Core
 
         /// <summary>元素牌的作用方式（图1 未定义清楚，见 CardEffectMode 注释）。</summary>
         public CardEffectMode CardEffect = CardEffectMode.CardAsVirtualElement;
-
-        /// <summary>
-        /// 元素牌打在**空格**上怎么办。图1 第 2 条：「玩家可以对空的棋盘格使用卡牌，
-        /// 可以在该格召唤该元素小怪」—— 默认 <see cref="EmptyCellCardMode.Summon"/> 就是照它实现的。
-        ///
-        /// 选了召唤之后，一张元素牌有两个用途（两个都占每回合出牌上限、都消耗这张牌）：
-        ///   · 打在元素格上 → 图2 的反应（原有玩法）
-        ///   · 打在空格上   → 在该格召唤 1 个牌面元素的小怪（新玩法）
-        /// 墙格、复合元素占着的格子都不是空格，两种都用不了。
-        ///
-        /// 想回到「只能反应」的老玩法就把这一项选成 <see cref="EmptyCellCardMode.Reject"/>
-        /// （配置校验不管这一项：它是玩法选择，不是死局）。
-        /// </summary>
-        public EmptyCellCardMode EmptyCellCard = EmptyCellCardMode.Summon;
 
         // ------------------------------------------------------------ 秘术牌 / 复合元素
 
@@ -388,35 +358,14 @@ namespace TapGJ.Core
         /// 只按布局判会误报（`EqualElementCountsRule` 的「必须都在场」就踩过：
         /// 布局里没写木，但玩家打一张木牌就能造出木）。所以这类检查一律走这里问一次。
         ///
-        /// 两条路（前提都是这张牌真的抽得到：<see cref="CardPool"/> 里有它、<see cref="ElementCardWeight"/> &gt; 0）：
-        ///   · **空格召唤**（<see cref="EmptyCellCard"/> = Summon）：牌面元素就是它，打在空格上直接多一只
-        ///   · **相生**：把它作为**赢家**打在场上已有的某种元素上 —— 目标就地变成它，旁边再生成一只。
-        ///     反过来（它是相生里输的那一方 / 相克里输的那一方）时，牌面元素**不会**出现在场上，不算。
-        ///
-        /// <paramref name="boardElements"/> 传「开局就在场上的元素」（布局里画了什么）：
-        /// 相生那一条要先有目标小怪才谈得上。
+        /// 只要这张元素牌能抽到，就能在空格召唤；不依赖开局有没有能相生的目标。
         /// </summary>
         public string CardSourceFor(Element element, IEnumerable<Element> boardElements)
         {
-            // 元素牌都发不出来（权重 0）或这张牌不在牌池里 → 两条路都不成立
+            // 元素牌都发不出来（权重 0）或这张牌不在牌池里 → 无法靠出牌生成
             if (ElementCardWeight <= 0 || !CardPool.Has(element)) return null;
 
-            if (EmptyCellCard == EmptyCellCardMode.Summon)
-                return $"可以打一张{ElementDefs.Name(element)}牌到空格上，把它召唤出来";
-
-            if (boardElements == null) return null;
-
-            var reactions = new ReactionTable();
-            foreach (var onBoard in boardElements)
-            {
-                if (onBoard == element) continue;
-
-                var def = reactions.Get(onBoard, element);
-                if (def.Rule == ReactionRule.Transform && def.Winner == element)
-                    return $"打一张{ElementDefs.Name(element)}牌到{ElementDefs.Name(onBoard)}元素上，会相生出它";
-            }
-
-            return null;
+            return $"可以打一张{ElementDefs.Name(element)}牌到空格上，把它召唤出来";
         }
 
         /// <summary>一种秘术牌的抽牌权重（负数按 0 处理）。</summary>

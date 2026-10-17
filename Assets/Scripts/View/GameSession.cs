@@ -65,6 +65,7 @@ namespace TapGJ.View
         public bool FastForwarding { get; private set; }
 
         public event System.Action<GameEvent> EventRaised;
+        public event System.Func<float> CardConsumed;
         public event System.Action<int> SelectionChanged;
         public event System.Action<GamePhase> PhaseChanged;
         public event System.Action<GameEngine> LevelStarted;
@@ -115,6 +116,7 @@ namespace TapGJ.View
         }
 
         Coroutine _turnLoop;
+        Coroutine _cardRoutine;
         int _animations;
         bool _begun;
         ILevelHost _levelHost;
@@ -187,7 +189,9 @@ namespace TapGJ.View
             Seed = seed;
 
             if (_turnLoop != null) StopCoroutine(_turnLoop);
+            if (_cardRoutine != null) StopCoroutine(_cardRoutine);
             _turnLoop = null;
+            _cardRoutine = null;
             _animations = 0;
             FastForwarding = false;
 
@@ -208,9 +212,8 @@ namespace TapGJ.View
             Note($"开局 seed={seed} ｜ {Engine.Rules.BoardWidth}x{Engine.Rules.BoardHeight} ｜ 每种元素 {Engine.Rules.CreepsPerElement} 个 ｜ "
                  + $"回合上限 {Engine.Rules.RoundLimit} ｜ 胜利条件：{Engine.WinConditionDescription()}");
             Note("操作：出牌阶段点下方手牌 → 再点棋盘目标格；弃牌阶段点手牌即为弃掉；每步都有按钮可推进。");
-            if (Engine.CanSummonOnEmptyCell)
-                Note("元素牌有两个用途：点绿色高亮的**元素格**发生反应，点绿色高亮的**空格**在该格召唤 1 个该元素的小怪"
-                     + "（两种都消耗这张牌、都占本回合出牌次数）。");
+            Note("元素牌有两个用途：点绿色高亮的**元素格**发生反应，点绿色高亮的**空格**在该格召唤 1 个该元素的小怪"
+                 + "（两种都消耗这张牌、都占本回合出牌次数）。");
 
             _turnLoop = StartCoroutine(TurnLoop());
         }
@@ -425,11 +428,12 @@ namespace TapGJ.View
             }
         }
 
-        IEnumerator PlayStepRoutine(StepRecord step)
+        IEnumerator PlayStepRoutine(StepRecord step, float cardEffectDuration = 0)
         {
             _animations++;
             board.InteractionEnabled = false;
-            yield return board.PlayStep(step, InstantPlayback ? 0f : StepDuration);
+            yield return board.PlayStep(step, InstantPlayback ? 0f : StepDuration,
+                InstantPlayback ? 0f : cardEffectDuration);
             board.Sync();
             hand.Sync(!InstantPlayback);
             _animations--;
@@ -485,7 +489,7 @@ namespace TapGJ.View
                 }
 
                 SelectedCardId = -1;
-                StartCoroutine(PlayCardRoutine(decomposeRecord));
+                _cardRoutine = StartCoroutine(PlayCardRoutine(decomposeRecord));
                 return;
             }
 
@@ -497,7 +501,7 @@ namespace TapGJ.View
             }
 
             SelectedCardId = -1;
-            StartCoroutine(PlayCardRoutine(record));
+            _cardRoutine = StartCoroutine(PlayCardRoutine(record));
         }
 
         /// <summary>
@@ -552,7 +556,7 @@ namespace TapGJ.View
             }
 
             SelectedCardId = -1;
-            StartCoroutine(PlayCardRoutine(record));
+            _cardRoutine = StartCoroutine(PlayCardRoutine(record));
         }
 
         void OnCardClicked(int cardId)
@@ -580,9 +584,7 @@ namespace TapGJ.View
                     else
                     {
                         Note($"选中 {card.Label} → 点绿色高亮的元素格发生反应"
-                             + (Engine.CanSummonOnEmptyCell
-                                 ? $"；点绿色高亮的空格则在该格召唤 1 个{ElementDefs.Name(card.Element)}元素（点右键取消）"
-                                 : "（点右键取消）"));
+                             + $"；点绿色高亮的空格则在该格召唤 1 个{ElementDefs.Name(card.Element)}元素（点右键取消）");
                     }
                     break;
 
@@ -598,10 +600,32 @@ namespace TapGJ.View
 
         IEnumerator PlayCardRoutine(StepRecord record)
         {
-            yield return PlayStepRoutine(record);
-            FlushLog();
-            board.Sync();
-            hand.Sync(!InstantPlayback);
+            _animations++;
+            board.InteractionEnabled = false;
+            try
+            {
+                float dissolveDuration = PlayCardConsumption();
+                // 棋子过渡与卡牌消散同时开始，并共用实际消散时长。
+                yield return PlayStepRoutine(record, dissolveDuration);
+                while (Paused) yield return null;
+                FlushLog();
+                board.Sync();
+                hand.Sync(!InstantPlayback);
+            }
+            finally
+            {
+                _animations--;
+                _cardRoutine = null;
+            }
+        }
+
+        float PlayCardConsumption()
+        {
+            float duration = hand.Sync(!InstantPlayback);
+            if (CardConsumed != null)
+                foreach (System.Func<float> playback in CardConsumed.GetInvocationList())
+                    duration = Mathf.Max(duration, playback());
+            return duration;
         }
 
         /// <summary>结束出牌阶段 → 进入弃牌阶段。</summary>
@@ -633,6 +657,7 @@ namespace TapGJ.View
             }
 
             SelectedCardId = -1;
+            PlayCardConsumption();
             FlushLog();
             board.Sync();
             hand.Sync(!InstantPlayback);

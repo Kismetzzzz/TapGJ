@@ -5,13 +5,14 @@ namespace TapGJ.Core
 {
     /// <summary>
     /// 元素小瓶子：与五行元素一一对应，贯穿整个流程。
-    /// 场上每消失一个某元素的小怪，对应瓶子 +1；满瓶（上限 5）自动产出一张对应元素牌并清空。
+    /// 场上每消失一个某元素的小怪，对应进度 +1；集齐自动产出一张对应元素牌。
+    /// 默认门槛为 5，当回合事件可覆盖；兑换后保留余数。
     /// </summary>
     public sealed class Bottle
     {
         public Element Element { get; }
         readonly int[] _counts = new int[ElementDefs.Count];
-        public int Capacity { get; }
+        public int Capacity { get; private set; }
 
         public int TotalCardsGranted { get; private set; }
 
@@ -23,13 +24,27 @@ namespace TapGJ.Core
         public int Count(Element e) => _counts[(int)e];
 
         /// <summary>计数 +1，返回是否满瓶产出卡牌。</summary>
-        internal bool Add(Element e)
+        internal bool Add(Element e, int amount = 1)
         {
-            _counts[(int)e]++;
+            _counts[(int)e] += amount;
+            return Redeem(e);
+        }
+
+        internal bool Redeem(Element e)
+        {
             if (_counts[(int)e] < Capacity) return false;
-            _counts[(int)e] = 0;
+            _counts[(int)e] -= Capacity;
             TotalCardsGranted++;
             return true;
+        }
+
+        internal void SetCapacity(int capacity) => Capacity = capacity;
+
+        internal void Reset(int capacity)
+        {
+            Capacity = capacity;
+            Array.Clear(_counts, 0, _counts.Length);
+            TotalCardsGranted = 0;
         }
 
         public string DebugLine()
@@ -48,7 +63,7 @@ namespace TapGJ.Core
     ///   准备阶段  → 每只小怪随机方向走 0~3 格，遇不同元素发生反应，遇同元素禁止移动
     ///   玩家行动  → 小怪静止。玩家出元素牌有两个用途（图1 第 1、2 条）：
     ///               打在元素格上 → 按图2 发生反应；
-    ///               打在空格上   → 在该格召唤 1 个牌面元素的小怪（<see cref="EmptyCellCardMode"/> 可关）
+    ///               打在空格上   → 在该格召唤 1 个牌面元素的小怪（所有关卡固定开启）
     ///               玩家自行结束回合
     ///   判定阶段  → 判胜负，未达成则进入下一回合
     /// </summary>
@@ -164,6 +179,7 @@ namespace TapGJ.Core
         /// </summary>
         public void Start(LevelSetup setup)
         {
+            Bottle.Reset(Rules.BottleCapacity);
             Board.ClearAll();
             _creeps.Clear();
             _hand.Clear();
@@ -321,6 +337,7 @@ namespace TapGJ.Core
         {
             Round++;
             Phase = GamePhase.Preparation;
+            if (Bottle.Capacity != Rules.BottleCapacity) ChangeBottleCapacity(Rules.BottleCapacity);
             PlayerPhaseEnded = false;
             DiscardPhaseEnded = false;
             _discardsUsed = 0;
@@ -792,27 +809,7 @@ namespace TapGJ.Core
             _creeps.Remove(creep.Uid);
 
             // 场上消失一个元素 → 对应瓶子 +1；满瓶自动产出一张对应元素牌。
-            if (feedBottle && Bottle.Add(creep.Element))
-            {
-                record.Events.Add(new GameEvent
-                {
-                    Type = GameEventType.GainCard,
-                    Element = creep.Element,
-                    Text = $"{ElementDefs.Name(creep.Element)}瓶子满，获得 1 张{ElementDefs.Name(creep.Element)}牌",
-                });
-                DrawCard(creep.Element);
-            }
-
-            if (feedBottle)
-            {
-                record.Events.Add(new GameEvent
-                {
-                    Type = GameEventType.BottleFill,
-                    From = where,
-                    Element = creep.Element,
-                    Text = $"{ElementDefs.Name(creep.Element)}瓶 +1",
-                });
-            }
+            if (feedBottle) FillBottle(creep.Element, 1, record, where);
 
             TotalRemoved++;
             _removed[creep.Element] = RemovedOf(creep.Element) + 1;
@@ -932,12 +929,6 @@ namespace TapGJ.Core
         }
 
         /// <summary>
-        /// 本关允不允许把元素牌打在空格上召唤（图1 第 2 条，见 <see cref="EmptyCellCardMode"/>）。
-        /// 表现层用它决定「空格要不要一起高亮」。
-        /// </summary>
-        public bool CanSummonOnEmptyCell => Rules.EmptyCellCard == EmptyCellCardMode.Summon;
-
-        /// <summary>
         /// 图1 玩家行动阶段的第 2 条：「玩家可以对空的棋盘格使用卡牌，可以在该格召唤该元素小怪」。
         ///
         /// 和打在元素格上的区别（这几条是玩法约定）：
@@ -948,13 +939,6 @@ namespace TapGJ.Core
         /// </summary>
         StepRecord TrySummonCard(Card card, Pos cell)
         {
-            if (!CanSummonOnEmptyCell)
-            {
-                FailReason = $"该格没有元素小怪，无法发生反应"
-                             + $"（当前规则「{nameof(Rules.EmptyCellCard)} = {Rules.EmptyCellCard}」不允许在空格上召唤）";
-                return null;
-            }
-
             var record = new StepRecord
             {
                 Index = _stepIndex++,
@@ -1004,8 +988,6 @@ namespace TapGJ.Core
             foreach (var creep in Board.Creeps())
                 if (CanPlayCardOn(card, creep)) result.Add(creep.Pos);
 
-            if (!CanSummonOnEmptyCell) return result;
-
             for (int y = 0; y < Board.Height; y++)
                 for (int x = 0; x < Board.Width; x++)
                 {
@@ -1020,7 +1002,6 @@ namespace TapGJ.Core
         public bool CanSummonCardAt(Card card, Pos cell)
         {
             if (card == null || !card.IsElementCard) return false;
-            if (!CanSummonOnEmptyCell) return false;
             if (!Rules.ElementPool.Has(card.Element)) return false;
             return Board.IsEmpty(cell);
         }

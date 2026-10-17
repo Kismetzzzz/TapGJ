@@ -76,6 +76,50 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 旧配置_五种元素牌点击空格都生成对应小怪()
+        {
+            var session = Object.FindFirstObjectByType<GameSession>();
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var level = MakeLevel(5);
+            level.fixedInitialHand = ElementDefs.All;
+            JsonUtility.FromJsonOverwrite("{\"EmptyCellCard\":1}", level.rules);
+            Object.FindFirstObjectByType<LevelLoader>().LoadLevel(level, 123);
+            yield return WaitForAction();
+            int initialCount = session.Engine.CreepCount;
+
+            foreach (var element in ElementDefs.All)
+            {
+                var card = session.Engine.Hand.First(c => c.Element == element);
+                hud.Ui.SelectCard(session.Engine.Hand.ToList().IndexOf(card));
+                var cell = session.Engine.CellsForElementCard(card).First(session.Engine.Board.IsEmpty);
+                var board = session.Board;
+                float u = (cell.X * (board.CellSize + board.CellGap) + board.CellSize / 2) / board.BoardWidthWorld;
+                float v = (cell.Y * (board.CellSize + board.CellGap) + board.CellSize / 2) / board.BoardHeightWorld;
+                var local = hud.Viewport.BoardUvToLocal(new Vector2(u, v));
+                var click = new PointerEventData(EventSystem.current)
+                {
+                    button = PointerEventData.InputButton.Left,
+                    position = RectTransformUtility.WorldToScreenPoint(null, hud.Viewport.rectTransform.TransformPoint(local))
+                };
+
+                hud.Viewport.OnPointerClick(click);
+                yield return WaitForAction();
+
+                var creep = session.Engine.Board.At(cell);
+                Assert.IsNotNull(creep, $"{element}牌点击的空格应生成小怪");
+                Assert.AreEqual(element, creep.Element);
+                Assert.AreEqual(creep.Uid, session.Board.CreepViewAt(cell).Uid, "棋盘上应显示新生成的小怪");
+                Assert.IsNull(session.Engine.FindCard(card.Id));
+                AssertHandMatches(session, hud.Ui);
+            }
+
+            Assert.AreEqual(initialCount + 5, session.Engine.CreepCount);
+            Assert.AreEqual(5, session.Engine.TotalSummoned);
+            Assert.AreEqual(5, session.Engine.CardsPlayedThisRound);
+            Assert.AreEqual(0, session.Engine.Hand.Count);
+        }
+
+        [UnityTest]
         public IEnumerator 真实关卡_六张手牌出牌弃牌都按卡牌ID操作()
         {
             var loader = Object.FindFirstObjectByType<LevelLoader>();
@@ -203,6 +247,169 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 卡牌和棋子同步消散_播放时长一致_期间禁止重复操作()
+        {
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var session = hud.Session;
+            Object.FindFirstObjectByType<LevelLoader>().LoadLevel(MakeLevel(5), 123);
+            yield return WaitForAction();
+            session.AnimationsEnabled = true;
+            var target = new Pos(2, 1);
+            session.Engine.PlaceCreep(Element.Fire, target);
+            session.Board.Sync();
+            var creepView = session.Board.CreepViewAt(target);
+            var creepScale = creepView.transform.localScale;
+            var card = hud.Ui.Cards[0];
+            int consumed = 0;
+            session.CardConsumed += () => { consumed++; return 0; };
+            hud.Ui.SelectCard(0);
+            session.PlaySelectedCardAt(new Pos(-1, 0));
+            Assert.AreEqual(0, consumed, "失败的出牌不得触发消散");
+            Assert.IsTrue(card.gameObject.activeSelf);
+            Assert.AreEqual(0, hud.GetComponentsInChildren<CardDissolveEffect>().Length);
+
+            session.PlaySelectedCardAt(target);
+            Assert.AreEqual(1, consumed);
+            Assert.IsFalse(card.gameObject.activeSelf, "出牌成功时立即接管卡面，不等待界面的下一帧刷新");
+            var effect = hud.GetComponentsInChildren<CardDissolveEffect>().Single();
+            Assert.IsTrue(session.Busy, "卡牌消散期间即应锁定输入");
+            float startedAt = Time.unscaledTime;
+            yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration * .5f);
+            Assert.IsTrue(effect != null, "应按正常速度播放完整消散");
+            Assert.IsTrue(creepView != null);
+            Assert.That(creepView.Body.color.a, Is.InRange(.1f, .9f), "卡牌消散中途，棋子也应正在淡出");
+            Assert.Less(creepView.transform.localScale.x, creepScale.x);
+            Assert.AreEqual(creepView.Body.color.a, creepView.Label.color.a, 1f / 255, "棋子和文字应一起淡出");
+            Assert.IsTrue(session.Busy);
+            Assert.IsFalse(session.SelectHandCard(session.Engine.Hand[0].Id));
+            session.PlaySelectedCardAt(target);
+            session.EndPlayerRound();
+            Assert.AreEqual(1, consumed, "等待期间不得重复消耗卡牌");
+            Assert.AreEqual(GamePhase.PlayerAction, session.Engine.Phase);
+            yield return WaitForAction();
+            yield return null;
+            Assert.IsTrue(effect == null);
+            Assert.IsTrue(creepView == null, "卡牌消散结束时棋子也应消失");
+            Assert.Less(Time.unscaledTime - startedAt, CardDissolveEffect.Duration + .35f, "卡牌和棋子应并行播放");
+            Assert.IsNull(session.Engine.Board.At(target));
+            Assert.AreEqual(4, session.Engine.Hand.Count);
+            AssertHandMatches(session, hud.Ui);
+        }
+
+        [UnityTest]
+        public IEnumerator 卡牌消散同时_召唤棋子逐渐出现_结束时完整显示()
+        {
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var session = hud.Session;
+            Object.FindFirstObjectByType<LevelLoader>().LoadLevel(MakeLevel(5), 123);
+            yield return WaitForAction();
+            session.AnimationsEnabled = true;
+            var target = new Pos(2, 1);
+            int shownBefore = session.Board.CreepObjectCount;
+            hud.Ui.SelectCard(0);
+            session.PlaySelectedCardAt(target);
+            Assert.IsTrue(session.Busy);
+            float startedAt = Time.unscaledTime;
+            yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration * .5f);
+            Assert.AreEqual(shownBefore + 1, session.Board.CreepObjectCount);
+            var creep = session.Board.CreepViewAt(target);
+            Assert.IsNotNull(creep);
+            Assert.That(creep.Body.color.a, Is.InRange(.1f, .9f), "卡牌消散中途，棋子应正在淡入");
+            Assert.That(creep.transform.localScale.x,
+                Is.InRange(session.Board.CellSize * CreepView.BodyScale * .85f, session.Board.CellSize * CreepView.BodyScale));
+            Assert.AreEqual(creep.Body.color.a, creep.Label.color.a, 1f / 255);
+            Assert.AreEqual(1, hud.GetComponentsInChildren<CardDissolveEffect>().Length);
+            float opacityBeforePause = creep.Body.color.a;
+            hud.Ui.OpenSettings();
+            yield return new WaitForSecondsRealtime(.3f);
+            Assert.Greater(creep.Body.color.a, opacityBeforePause, "暂停时棋子应与原卡牌特效一起继续过渡");
+            hud.Ui.CloseSettings();
+            yield return WaitForAction();
+            Assert.Less(Time.unscaledTime - startedAt, CardDissolveEffect.Duration + .35f);
+            Assert.AreEqual(shownBefore + 1, session.Board.CreepObjectCount);
+            Assert.IsNotNull(session.Board.CreepViewAt(target));
+            Assert.AreEqual(1, creep.Body.color.a, .001f);
+            Assert.AreEqual(session.Board.CellSize * CreepView.BodyScale, creep.transform.localScale.x, .001f);
+            AssertHandMatches(session, hud.Ui);
+        }
+
+        [UnityTest]
+        public IEnumerator 融合和分解_多个棋子同时过渡_共用卡牌时长()
+        {
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var session = hud.Session;
+            var level = MakeLevel(5);
+            level.rules.UseCompositeElements = true;
+            level.rules.SpecialCardPool = SpecialCardMask.Fusion | SpecialCardMask.Decompose;
+            level.rules.CompositeProducesOnCreation = false;
+            Object.FindFirstObjectByType<LevelLoader>().LoadLevel(level, 123);
+            yield return WaitForAction();
+            session.Engine.ClearBoard();
+            var first = new Pos(1, 1);
+            var second = new Pos(2, 1);
+            session.Engine.PlaceCreep(Element.Metal, first);
+            session.Engine.PlaceCreep(Element.Water, second);
+            session.Board.Sync();
+            var firstView = session.Board.CreepViewAt(first);
+            var secondView = session.Board.CreepViewAt(second);
+            session.Engine.AddSpecialCardForTest(CardKind.FusionCard);
+            hud.Ui.SetHand(session.Engine.Hand);
+            session.AnimationsEnabled = true;
+            session.SelectHandCard(session.Engine.Hand.First(c => c.IsFusionCard).Id);
+            session.PlaySelectedCardAt(first);
+            session.PlaySelectedCardAt(second);
+            Assert.IsTrue(session.Busy);
+            float startedAt = Time.unscaledTime;
+            yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration * .5f);
+            var composite = session.Board.CompositeViewAt(first);
+            Assert.IsNotNull(composite);
+            Assert.That(firstView.Body.color.a, Is.InRange(.1f, .9f));
+            Assert.AreEqual(firstView.Body.color.a, secondView.Body.color.a, .001f, "两个原棋子应一起淡出");
+            Assert.That(composite.Body.color.a, Is.InRange(.1f, .9f), "复合棋子应同时淡入");
+            Assert.AreEqual(composite.Body.color.a * .55f, composite.Ring.color.a, .001f);
+            yield return WaitForAction();
+            Assert.Less(Time.unscaledTime - startedAt, CardDissolveEffect.Duration + .35f, "多个棋子不能排队拖长总时长");
+            Assert.IsTrue(firstView == null && secondView == null);
+            Assert.AreEqual(1, composite.Body.color.a, .001f);
+
+            session.Engine.AddSpecialCardForTest(CardKind.DecomposeCard);
+            hud.Ui.SetHand(session.Engine.Hand);
+            session.SelectHandCard(session.Engine.Hand.First(c => c.IsDecomposeCard).Id);
+            session.PlaySelectedCardAt(first);
+            startedAt = Time.unscaledTime;
+            yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration * .5f);
+            Assert.That(composite.Body.color.a, Is.InRange(.1f, .9f));
+            Assert.AreEqual(composite.Body.color.a, composite.Label.color.a, 1f / 255);
+            Assert.AreEqual(composite.Body.color.a * .55f, composite.Ring.color.a, .001f);
+            yield return WaitForAction();
+            Assert.Less(Time.unscaledTime - startedAt, CardDissolveEffect.Duration + .35f);
+            Assert.IsTrue(composite == null);
+            AssertHandMatches(session, hud.Ui);
+        }
+
+        [UnityTest]
+        public IEnumerator 同步特效期间重开_取消上一局的棋盘效果()
+        {
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var session = hud.Session;
+            Object.FindFirstObjectByType<LevelLoader>().LoadLevel(MakeLevel(5), 123);
+            yield return WaitForAction();
+            session.AnimationsEnabled = true;
+            hud.Ui.SelectCard(0);
+            session.PlaySelectedCardAt(new Pos(2, 1));
+            Assert.IsTrue(session.Busy);
+            yield return new WaitForSecondsRealtime(.1f);
+            hud.Restart();
+            yield return WaitForAction();
+            Assert.AreEqual(0, hud.GetComponentsInChildren<CardDissolveEffect>().Length);
+            yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration + .2f);
+            Assert.IsFalse(session.Busy);
+            Assert.AreEqual(1, session.Board.CreepObjectCount, "旧出牌不得在重开后继续生成棋子");
+            Assert.AreEqual(5, session.Engine.Hand.Count);
+            AssertHandMatches(session, hud.Ui);
+        }
+
+        [UnityTest]
         public IEnumerator 出牌补位_保留每张牌的对象并从原位消散()
         {
             var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
@@ -233,8 +440,14 @@ namespace TapGJ.Tests
                 Assert.Less(Vector2.Distance(positions[i], ((RectTransform)retained.transform).anchoredPosition), .01f,
                     "补位开始前应保留原位置，不能瞬移");
             }
-            yield return new WaitForSecondsRealtime(.5f);
+            float dissolveDuration = CardDissolveEffect.Duration;
+            yield return new WaitForSecondsRealtime(dissolveDuration * .5f);
             Assert.Less(Vector3.Distance(dissolvePosition, effect.transform.position), .01f, "补位不能带走正在消散的牌");
+            for (int i = 0; i < before.Length; i++)
+                if (i != 1)
+                    Assert.Less(Vector2.Distance(positions[i], ((RectTransform)before[i].transform).anchoredPosition), .01f,
+                        "消散结束前剩余手牌应保留原位置，不能补位压住消散中的牌");
+            yield return new WaitForSecondsRealtime(dissolveDuration * .5f + .3f);
             Assert.Greater(Vector2.Distance(positions[0], ((RectTransform)before[0].transform).anchoredPosition), 1,
                 "剩余牌应平滑补到新的居中位置");
             AssertHandMatches(session, hud.Ui);
@@ -253,6 +466,51 @@ namespace TapGJ.Tests
             hud.Ui.Cards[2].Button.onClick.Invoke();
             Assert.AreEqual(1, requests, "重启界面不能重复注册重排后的按钮事件");
             Assert.AreEqual(session.Engine.Hand[2].Id, session.SelectedCardId);
+        }
+
+        [UnityTest]
+        public IEnumerator 连续出牌_等最后一张消散结束再补位_重开不继承等待()
+        {
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var session = hud.Session;
+            Object.FindFirstObjectByType<LevelLoader>().LoadLevel(MakeLevel(5), 123);
+            yield return WaitForAction();
+            var retained = hud.Ui.Cards[4];
+            var rect = (RectTransform)retained.transform;
+            var position = rect.anchoredPosition;
+            for (int i = 0; i < 2; i++)
+            {
+                session.SelectHandCard(session.Engine.Hand[0].Id);
+                var cell = session.Engine.CellsForElementCard(session.SelectedCard).First(p => session.Engine.Board.At(p) == null);
+                Assert.IsNotNull(session.Engine.TryPlayCard(session.SelectedCard.Id, cell));
+                session.CancelSelection();
+                hud.Ui.SetHand(session.Engine.Hand);
+                if (i == 0) yield return new WaitForSecondsRealtime(.5f);
+            }
+            yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration - .3f);
+            Assert.Less(Vector2.Distance(position, rect.anchoredPosition), .01f,
+                "第一张已消散时仍需为第二张保留空位");
+            yield return new WaitForSecondsRealtime(.6f);
+            Assert.Greater(Vector2.Distance(position, rect.anchoredPosition), 1,
+                "最后一张消散后剩余牌应恢复居中排布");
+            AssertHandMatches(session, hud.Ui);
+
+            session.SelectHandCard(session.Engine.Hand[0].Id);
+            var nextCell = session.Engine.CellsForElementCard(session.SelectedCard).First(p => session.Engine.Board.At(p) == null);
+            Assert.IsNotNull(session.Engine.TryPlayCard(session.SelectedCard.Id, nextCell));
+            session.CancelSelection();
+            hud.Ui.SetHand(session.Engine.Hand);
+            yield return WaitForAction();
+            Assert.Greater(hud.GetComponentsInChildren<CardDissolveEffect>().Length, 0);
+            hud.Restart();
+            yield return WaitForAction();
+            Assert.AreEqual(0, hud.GetComponentsInChildren<CardDissolveEffect>(true).Length);
+            AssertHandMatches(session, hud.Ui);
+            var first = (RectTransform)hud.Ui.Cards[0].transform;
+            var last = (RectTransform)hud.Ui.Cards[4].transform;
+            Assert.AreEqual(((RectTransform)first.parent).rect.width,
+                first.anchoredPosition.x + last.anchoredPosition.x, .1f,
+                "重开应立即居中，不等待上一局的消散");
         }
 
         [UnityTest]

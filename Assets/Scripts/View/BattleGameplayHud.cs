@@ -24,6 +24,7 @@ namespace TapGJ.View
         [SerializeField] Button nextLevelButton;
         readonly List<string> _notes = new List<string>();
         GameSession _boundSession;
+        ElementAbacusView _abacus;
         float _elapsed, _savedTimeScale = 1, _noteUntil;
         bool _ownsPause;
         string _lastNote;
@@ -55,6 +56,7 @@ namespace TapGJ.View
             if (value == null) return;
             value.LevelStarted += OnLevelStarted;
             value.LevelFinished += OnLevelFinished;
+            value.CardConsumed += OnCardConsumed;
             if (value.Engine != null) OnLevelStarted(value.Engine);
         }
 
@@ -80,6 +82,7 @@ namespace TapGJ.View
             {
                 _boundSession.LevelStarted -= OnLevelStarted;
                 _boundSession.LevelFinished -= OnLevelFinished;
+                _boundSession.CardConsumed -= OnCardConsumed;
             }
             _boundSession = null;
         }
@@ -96,6 +99,8 @@ namespace TapGJ.View
             ui.ClearSelection();
             // 重开沿用相同 ID 时也要重新绑定手牌，避免上局的视觉状态残留。
             ui.ResetHand();
+            _abacus = ui.GetComponentInChildren<ElementAbacusView>(true);
+            if (_abacus != null) _abacus.Bind(engine);
             viewport.Setup(session);
             Refresh();
         }
@@ -109,6 +114,15 @@ namespace TapGJ.View
             ui.SetModalBlocked(true);
             ui.SetActionsEnabled(false);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(resultRestartButton.gameObject);
+        }
+
+        float OnCardConsumed() => ui.SetHand(VisibleHand());
+
+        IReadOnlyList<Card> VisibleHand()
+        {
+            if (_abacus == null) return session.Engine.Hand;
+            _abacus.Sync(session.Engine);
+            return _abacus.HandForDisplay(session.Engine.Hand);
         }
 
         void LateUpdate()
@@ -128,7 +142,7 @@ namespace TapGJ.View
         void Refresh()
         {
             var engine = session.Engine;
-            ui.SetHand(engine.Hand);
+            ui.SetHand(VisibleHand());
             ui.SetSelectedCardId(session.SelectedCardId);
             ui.SetGoalProgress(engine.GetGoalProgress());
             ui.SetRound(engine.Round, engine.Rules.RoundLimit);
@@ -158,13 +172,14 @@ namespace TapGJ.View
 
         void SelectElement(int index)
         {
-            foreach (var card in session.Engine.Hand)
-                if (card.IsElementCard && (int)card.Element == index)
+            foreach (var card in ui.Cards)
+                if (card.gameObject.activeSelf && card.Kind == CardKind.ElementCard && (int)card.Element == index)
                 {
-                    if (session.SelectedCardId != card.Id) session.SelectHandCard(card.Id);
+                    if (session.SelectedCardId != card.CardId) session.SelectHandCard(card.CardId);
                     Refresh();
                     return;
                 }
+            Refresh();
         }
 
         void Advance()

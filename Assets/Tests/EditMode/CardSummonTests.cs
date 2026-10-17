@@ -15,14 +15,14 @@ namespace TapGJ.Tests
     ///   · 它**不发生任何反应**：不转换、不生成、不喂小瓶子、不通知关卡机制（不是一次相遇）
     ///   · 但它是**一次正常出牌**：消耗这张牌、占每回合出牌上限
     ///   · 墙格 / 复合元素占着的格子 / 越界都不是空格，两种用法都用不了
-    ///   · 关掉这条规则的开关（<see cref="Rules.EmptyCellCard"/> = Reject）就是加它之前的行为
+    ///   · 旧配置中的拒绝空格字段不能关闭召唤
     /// </summary>
     public class CardSummonTests
     {
         // ------------------------------------------------------------ 工具
 
         /// <summary>只摆测试自己给的东西：小怪不动、起手牌自己画。</summary>
-        static Rules BaseRules(int size = 8, EmptyCellCardMode emptyCell = EmptyCellCardMode.Summon)
+        static Rules BaseRules(int size = 8)
             => new Rules
             {
                 BoardWidth = size,
@@ -30,7 +30,6 @@ namespace TapGJ.Tests
                 CreepsPerElement = 0,
                 InitialHandSize = 0,
                 MaxMoveSteps = 0,
-                EmptyCellCard = emptyCell,
             };
 
         /// <summary>
@@ -56,6 +55,31 @@ namespace TapGJ.Tests
         static Card WaterCardInHand(GameEngine engine) => engine.Hand.First(c => c.Element == Element.Water);
 
         // ------------------------------------------------------------ 召唤本身
+
+        [TestCase(Element.Metal)]
+        [TestCase(Element.Wood)]
+        [TestCase(Element.Water)]
+        [TestCase(Element.Fire)]
+        [TestCase(Element.Earth)]
+        public void 旧配置_拒绝空格的遗留字段不再阻止五种元素召唤(Element element)
+        {
+            var rules = BaseRules();
+            JsonUtility.FromJsonOverwrite("{\"EmptyCellCard\":1}", rules);
+            var engine = Rig(rules, new[] { element });
+            var card = engine.Hand[0];
+            var target = new Pos(5, 5);
+
+            CollectionAssert.Contains(engine.CellsForElementCard(card), target, "空格必须是合法目标");
+            Assert.IsTrue(engine.CanSummonCardAt(card, target));
+            var record = engine.TryPlayCard(card.Id, target);
+
+            Assert.IsNotNull(record, engine.FailReason);
+            Assert.IsTrue(record.IsSummon);
+            Assert.AreEqual(element, engine.Board.At(target).Element);
+            Assert.AreEqual(1, engine.TotalSummoned);
+            Assert.AreEqual(1, engine.CardsPlayedThisRound);
+            Assert.IsNull(engine.FindCard(card.Id), "召唤成功后消耗选中的牌");
+        }
 
         [Test]
         public void 召唤_元素牌打在空格上_在该格召唤牌面元素()
@@ -253,16 +277,18 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 高亮_关掉召唤之后空格不再亮()
+        public void 高亮_旧配置载入后元素格与空格一起亮()
         {
-            var engine = Rig(BaseRules(emptyCell: EmptyCellCardMode.Reject), new[] { Element.Water },
+            var rules = BaseRules();
+            JsonUtility.FromJsonOverwrite("{\"EmptyCellCard\":1}", rules);
+            var engine = Rig(rules, new[] { Element.Water },
                 (Element.Fire, new Pos(2, 2)));
 
             var cells = engine.CellsForElementCard(WaterCardInHand(engine));
 
-            CollectionAssert.AreEqual(new[] { new Pos(2, 2) }, cells, "只剩能发生反应的那一格");
-            Assert.IsFalse(engine.CanSummonOnEmptyCell);
-            Assert.IsFalse(engine.CanSummonCardAt(WaterCardInHand(engine), new Pos(5, 5)));
+            CollectionAssert.Contains(cells, new Pos(2, 2), "能发生反应的元素格仍然高亮");
+            CollectionAssert.Contains(cells, new Pos(5, 5), "空格也要高亮");
+            Assert.IsTrue(engine.CanSummonCardAt(WaterCardInHand(engine), new Pos(5, 5)));
         }
 
         [Test]
@@ -327,9 +353,9 @@ namespace TapGJ.Tests
 
                 StringAssert.Contains("空格出牌 召唤", level.Summary());
 
-                level.rules.EmptyCellCard = EmptyCellCardMode.Reject;
-                StringAssert.Contains("空格出牌 拒绝", level.Summary());
-                StringAssert.DoesNotContain("召唤", level.Summary(), "关掉之后摘要里不该再写「召唤」");
+                JsonUtility.FromJsonOverwrite("{\"EmptyCellCard\":1}", level.rules);
+                StringAssert.Contains("空格出牌 召唤", level.Summary());
+                StringAssert.DoesNotContain("拒绝", level.Summary());
             }
             finally
             {

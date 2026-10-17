@@ -39,7 +39,6 @@ MonoBehaviour:
       TargetCount: 0
       Rounds: 0
     CardEffect: 0
-    EmptyCellCard: 0
     UseCompositeElements: 1
     SpecialCardPool: -1
     ElementCardWeight: 10

@@ -255,8 +255,8 @@ namespace TapGJ.View
                 GUI.Label(new Rect(x, y, 22f, 20f), ElementDefs.Name(e), _label);
                 GUI.color = Color.white;
 
-                float fill = Engine.Rules.BottleCapacity == 0 ? 0f : (float)c / Engine.Rules.BottleCapacity;
-                DrawBar(new Rect(x + 26f, y + 3f, w - 60f, 14f), fill, $"{c}/{Engine.Rules.BottleCapacity}", color);
+                float fill = Engine.Bottle.Capacity == 0 ? 0f : (float)c / Engine.Bottle.Capacity;
+                DrawBar(new Rect(x + 26f, y + 3f, w - 60f, 14f), fill, $"{c}/{Engine.Bottle.Capacity}", color);
                 y += 21f;
             }
             y += 6f;
@@ -269,7 +269,7 @@ namespace TapGJ.View
                     var sel = _session.SelectedCard;
                     hint = sel == null
                         ? "点下方手牌区里的牌选中，再点棋盘上绿色高亮的目标格"
-                          + (Engine.CanSummonOnEmptyCell ? "（元素格=发生反应，空格=在该格召唤）" : "")
+                          + "（元素格=发生反应，空格=在该格召唤）"
                         : DescribeSelectedCard(sel);
                     if (Engine.Rules.MaxCardsPerRound > 0)
                         hint += $"\n本回合还可出 {Engine.PlaysRemaining} 张";
@@ -317,11 +317,8 @@ namespace TapGJ.View
             if (sel.IsDecomposeCard)
                 return "已选中 <b>分解牌</b> → 点绿色高亮的复合元素把它拆回两张元素牌（点右键返回）";
 
-            if (Engine.CanSummonOnEmptyCell)
-                return $"已选中 <b>{sel.Label}</b> → 点绿色高亮的<b>元素格</b>发生反应，"
-                       + $"或点绿色高亮的<b>空格</b>在该格召唤 1 个{ElementDefs.Name(sel.Element)}元素（点右键返回）";
-
-            return $"已选中 <b>{sel.Label}</b> → 点下方手牌区里的牌可换，或直接点棋盘目标格";
+            return $"已选中 <b>{sel.Label}</b> → 点绿色高亮的<b>元素格</b>发生反应，"
+                   + $"或点绿色高亮的<b>空格</b>在该格召唤 1 个{ElementDefs.Name(sel.Element)}元素（点右键返回）";
         }
 
         /// <summary>这张牌现在有几个合法目标（元素格 + 可召唤的空格）。</summary>

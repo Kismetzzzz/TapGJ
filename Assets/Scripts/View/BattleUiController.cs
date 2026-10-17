@@ -47,6 +47,7 @@ namespace TapGJ.View
         UnityAction[] _cardActions, _elementActions;
         GameObject _returnFocus;
         float _elapsed;
+        float _handLayoutReadyAt;
         bool _timerRunning = true, _actionsEnabled = true;
         bool _advanceEnabled = true, _discardEnabled = true;
         int _handCount = -1;
@@ -165,6 +166,7 @@ namespace TapGJ.View
         public void ResetHand()
         {
             _handCount = -1;
+            _handLayoutReadyAt = 0;
             foreach (var slot in cards) slot.ClearBinding();
             foreach (var effect in GetComponentsInChildren<CardDissolveEffect>(true)) BoardView.Kill(effect.gameObject);
         }
@@ -181,18 +183,17 @@ namespace TapGJ.View
         public void SetModalBlocked(bool blocked) => controls.interactable = controls.blocksRaycasts = !blocked;
 
         /// <summary>按真实手牌刷新；只给已经从对局移除的牌播放消散。</summary>
-        public void SetHand(IReadOnlyList<Card> hand)
+        public float SetHand(IReadOnlyList<Card> hand)
         {
             bool changed = _handCount != hand.Count;
             for (int i = 0; !changed && i < hand.Count; i++) changed = cards[i].CardId != hand[i].Id;
-            if (!changed) return;
+            if (!changed) return Mathf.Max(0, _handLayoutReadyAt - Time.unscaledTime);
             bool firstLayout = _handCount < 0;
             int selectedId = SelectedCardIndex < 0 ? -1 : cards[SelectedCardIndex].CardId;
             var live = new HashSet<int>();
             foreach (var card in hand) live.Add(card.Id);
             var retained = new Dictionary<int, BattleUiCard>();
             var available = new Queue<BattleUiCard>();
-            bool removed = false;
             foreach (var slot in cards)
             {
                 if (slot.CardId > 0 && live.Contains(slot.CardId)) retained.Add(slot.CardId, slot);
@@ -200,8 +201,8 @@ namespace TapGJ.View
                 {
                     if (slot.CardId > 0 && slot.gameObject.activeSelf)
                     {
-                        slot.PlayDissolve();
-                        removed = true;
+                        if (slot.PlayDissolve() != null)
+                            _handLayoutReadyAt = Time.unscaledTime + CardDissolveEffect.Duration;
                     }
                     slot.ClearBinding();
                     slot.SetSelected(false);
@@ -232,8 +233,10 @@ namespace TapGJ.View
             BindCardActions();
             SelectedCardIndex = -1;
             _handCount = hand.Count;
-            LayoutHand(hand.Count, firstLayout, removed ? .12f : 0);
+            // 消散中的卡牌仍占据原位置，结束后再让其他手牌补位。
+            LayoutHand(hand.Count, firstLayout, Mathf.Max(0, _handLayoutReadyAt - Time.unscaledTime));
             SetSelectedCardId(selectedId);
+            return Mathf.Max(0, _handLayoutReadyAt - Time.unscaledTime);
         }
 
         public void ArrangeHand() => LayoutHand(_handCount < 0 ? cards.Length : _handCount, true);
@@ -266,6 +269,8 @@ namespace TapGJ.View
                 cards[i].SetSelected(selected);
                 if (selected) SelectedCardIndex = i;
             }
+            SetElementSelection(SelectedCardIndex >= 0 && cards[SelectedCardIndex].Kind == CardKind.ElementCard
+                ? (int)cards[SelectedCardIndex].Element : -1);
             RefreshActions();
         }
         public void SetRound(int round)
@@ -294,6 +299,8 @@ namespace TapGJ.View
                 || !cards[index].gameObject.activeSelf) return;
             SelectedCardIndex = SelectedCardIndex == index ? -1 : index;
             for (int i = 0; i < cards.Length; i++) cards[i].SetSelected(i == SelectedCardIndex);
+            SetElementSelection(SelectedCardIndex >= 0 && cards[SelectedCardIndex].Kind == CardKind.ElementCard
+                ? (int)cards[SelectedCardIndex].Element : -1);
             selectionLabel.text = SelectedCardIndex < 0 ? "选择一张手牌" :
                 $"已选择 · {cards[SelectedCardIndex].Label}";
             RefreshActions();
@@ -305,6 +312,7 @@ namespace TapGJ.View
             bool wasSelected = SelectedCardIndex >= 0;
             SelectedCardIndex = -1;
             foreach (var card in cards) card.SetSelected(false);
+            SetElementSelection(-1);
             selectionLabel.text = "选择一张手牌";
             RefreshActions();
             if (wasSelected) cardSelected.Invoke(-1);
@@ -313,9 +321,14 @@ namespace TapGJ.View
         public void SelectElement(int index)
         {
             if (!_actionsEnabled || settingsPanel.activeSelf || index < 0 || index >= elementButtons.Length) return;
+            SetElementSelection(index);
+            elementSelected.Invoke(index);
+        }
+
+        void SetElementSelection(int index)
+        {
             SelectedElementIndex = index;
             for (int i = 0; i < elementSelections.Length; i++) elementSelections[i].alpha = i == index ? 1 : 0;
-            elementSelected.Invoke(index);
         }
 
         void RequestNextRound()

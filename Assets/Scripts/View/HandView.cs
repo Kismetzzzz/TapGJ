@@ -89,16 +89,18 @@ namespace TapGJ.View
         }
 
         /// <summary>把手牌显示对象与逻辑层对齐（多退少补），顺序也跟逻辑层一致。</summary>
-        public void Sync(bool animateRemoval = true)
+        public float Sync(bool animateRemoval = true)
         {
-            if (Engine == null || !ShowCards) return;
+            if (Engine == null || !ShowCards) return 0;
+            float dissolveDuration = 0;
 
             for (int i = _cards.Count - 1; i >= 0; i--)
             {
                 if (Engine.FindCard(_cards[i].CardId) == null)
                 {
-                    if (Application.isPlaying && animateRemoval)
-                        CardDissolveEffect.Play(_cards[i].gameObject, ElementDefs.Tint(_cards[i].Element));
+                    if (Application.isPlaying && animateRemoval
+                        && CardDissolveEffect.Play(_cards[i].gameObject, ElementDefs.Tint(_cards[i].Element)) != null)
+                        dissolveDuration = CardDissolveEffect.Duration;
                     _cards[i].gameObject.SetActive(false);
                     BoardView.Kill(_cards[i].gameObject);
                     _cards.RemoveAt(i);
@@ -130,6 +132,7 @@ namespace TapGJ.View
 
             _cards.Sort((a, b) => HandIndexOf(a.CardId).CompareTo(HandIndexOf(b.CardId)));
             Relayout();
+            return dissolveDuration;
         }
 
         /// <summary>对象名里用的牌名：元素牌是五行字，秘术牌是「融合」/「分解」。</summary>

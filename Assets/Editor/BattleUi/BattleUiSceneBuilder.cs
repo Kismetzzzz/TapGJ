@@ -22,7 +22,7 @@ namespace TapGJ.EditorTools
         static readonly Color Lavender = new Color(.72f, .76f, .87f, .96f);
         static readonly Color Border = new Color(.43f, .48f, .62f);
         static Font _font;
-        static Sprite _surface, _disc, _ring, _focus;
+        static Sprite _surface, _disc, _ring, _focus, _cardBorder;
 
         [MenuItem("TapGJ/打开独立局内 UI", false, 5)]
         public static void OpenOrCreate()
@@ -49,6 +49,7 @@ namespace TapGJ.EditorTools
             _disc = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Art/UiDisc.png");
             _ring = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Art/UiRing.png");
             _focus = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Art/UiFocus.png");
+            _cardBorder = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Art/UiCardBorder.png");
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var camera = new GameObject("Main Camera", typeof(Camera));
             camera.tag = "MainCamera";
@@ -93,20 +94,7 @@ namespace TapGJ.EditorTools
             var round = Label(controls, "RoundLabel", "第 01 回合 / 15", 760, 122, 400, 40, 23, Ink);
             round.alignment = TextAnchor.MiddleCenter;
 
-            var rail = Rect(controls, "ElementRail", 18, 424, 112, 594);
-            var elements = new Button[5];
-            var selections = new CanvasGroup[5];
-            for (int i = 0; i < 5; i++)
-            {
-                var element = (Element)i;
-                var button = MakeButton(rail, "Element_" + element, ElementDefs.Name(element), 10, i * 116,
-                    88, 88, new Color(.80f, .72f, .91f, .96f), 36, Ink, true);
-                elements[i] = button;
-                var selected = Picture(button.transform, "SelectedRing", -4, -4, 96, 96, Border, _ring);
-                selections[i] = selected.gameObject.AddComponent<CanvasGroup>();
-                selections[i].alpha = 0;
-                selections[i].blocksRaycasts = selections[i].interactable = false;
-            }
+            var abacus = ElementAbacusInstaller.Create(controls, out var elements, out var selections);
 
             var hand = Rect(controls, "Hand", 342, 738, 1240, 340);
             var cards = new BattleUiCard[5];
@@ -156,6 +144,7 @@ namespace TapGJ.EditorTools
             BindArray(data, "elementButtons", elements); BindArray(data, "elementSelections", selections);
             BindArray(data, "cards", cards);
             data.ApplyModifiedPropertiesWithoutUndo();
+            abacus.Setup(controller);
             controller.ArrangeHand();
             foreach (var card in cards) PrefabUtility.RecordPrefabInstancePropertyModifications(card.transform);
             var layout = canvas.AddComponent<BattleUiLayout>();
@@ -219,11 +208,11 @@ namespace TapGJ.EditorTools
             if (existing != null) return existing;
             var rect = Rect(null, "BattleCard", 0, 0, CardSize.x, CardSize.y);
             var artwork = Rect(rect, "Artwork", 0, 0, CardSize.x, CardSize.y);
-            var focus = Picture(artwork, "FocusRing", -4, -4, CardSize.x + 8, CardSize.y + 8, new Color(1f, .89f, .46f), _focus);
+            var focus = Picture(artwork, "FocusRing", -4, -4, CardSize.x + 8, CardSize.y + 8, new Color(1f, .89f, .46f), _cardBorder);
             var feedbackRing = focus.gameObject.AddComponent<CanvasGroup>();
             feedbackRing.alpha = 0;
             feedbackRing.blocksRaycasts = feedbackRing.interactable = false;
-            var selected = Picture(artwork, "SelectedRing", -5, -5, CardSize.x + 10, CardSize.y + 10, new Color(.22f, .51f, .52f), _focus);
+            var selected = Picture(artwork, "SelectedRing", -5, -5, CardSize.x + 10, CardSize.y + 10, new Color(.22f, .51f, .52f), _cardBorder);
             var selection = selected.gameObject.AddComponent<CanvasGroup>();
             selection.alpha = 0;
             selection.blocksRaycasts = selection.interactable = false;
@@ -309,7 +298,7 @@ namespace TapGJ.EditorTools
             var image = Rect(parent, name, x, y, w, h).gameObject.AddComponent<Image>();
             image.sprite = sprite;
             image.color = color;
-            image.type = sprite == _surface || sprite == _focus ? Image.Type.Sliced : Image.Type.Simple;
+            image.type = sprite == _surface || sprite == _focus || sprite == _cardBorder ? Image.Type.Sliced : Image.Type.Simple;
             image.raycastTarget = false;
             return image;
         }

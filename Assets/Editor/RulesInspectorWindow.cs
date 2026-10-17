@@ -228,15 +228,9 @@ namespace TapGJ.EditorTools
             EditorGUILayout.EndHorizontal();
 
             // 图1 玩家行动阶段的第 2 条：元素牌打在空格上 = 在该格召唤该元素的小怪。
-            // 默认（Summon = 0）就是为了让旧资产自动拿到这条规则，所以这里把「拒绝」写清楚是回到旧玩法。
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("元素牌打在空格上", GUILayout.Width(130f));
-            _rules.EmptyCellCard = (EmptyCellCardMode)EditorGUILayout.EnumPopup(_rules.EmptyCellCard, GUILayout.Width(200f));
-            EditorGUILayout.LabelField(
-                _rules.EmptyCellCard == EmptyCellCardMode.Summon
-                    ? "（图1 第 2 条：在该格召唤 1 个牌面元素的小怪）"
-                    : "（旧玩法：空格不是合法目标，出牌被拒绝）",
-                EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("在该格召唤 1 个牌面元素的小怪（所有关卡固定开启）", EditorStyles.miniLabel);
             EditorGUILayout.EndHorizontal();
 
             DrawSpecialCardControls();
@@ -422,16 +416,15 @@ namespace TapGJ.EditorTools
             sb.AppendLine($"平均回合数 {(games == 0 ? 0 : (float)totalRounds / games):F2}　"
                           + $"平均出牌 {(games == 0 ? 0f : (float)totalCards / games):F2} 张/局　"
                           + $"平均弃牌 {(games == 0 ? 0f : (float)totalDiscards / games):F2} 张/局　耗时 {sw.ElapsedMilliseconds} ms");
-            sb.AppendLine($"胜利条件：{rules.Goal.Describe()}　牌的作用：{rules.CardEffect}　空格出牌：{rules.EmptyCellCard}　玩家出牌：{(playerPlays ? "是" : "否")}");
+            sb.AppendLine($"胜利条件：{rules.Goal.Describe()}　牌的作用：{rules.CardEffect}　空格出牌：召唤　玩家出牌：{(playerPlays ? "是" : "否")}");
             sb.AppendLine($"秘术牌：{rules.SpecialCardPool}（权重 元素{rules.ElementCardWeight}/融合{rules.FusionCardWeight}/分解{rules.DecomposeCardWeight}）"
                           + $"　复合元素每回合生产 {rules.CompositeProducedPerRound} 个（范围 {rules.CompositeRange}）");
             sb.AppendLine($"融合 {totalFusions} 次（{(games == 0 ? 0f : (float)totalFusions / games):F2}/局）　"
                           + $"分解 {totalDecompositions} 次（{(games == 0 ? 0f : (float)totalDecompositions / games):F2}/局）　"
                           + $"复合元素产出 {totalCompositeSpawns} 个　场上最多同时 {maxComposites} 个");
 
-            if (rules.EmptyCellCard == EmptyCellCardMode.Summon)
-                sb.AppendLine("空格出牌 = 召唤：批量模拟里的贪心玩家不会主动召唤（多一只元素对它要减少种类的目标没好处），"
-                              + "所以「召唤 N 个」恒为 0 —— 这条规则只能靠人工试玩验证。");
+            sb.AppendLine("空格出牌 = 召唤：批量模拟里的贪心玩家不会主动召唤（多一只元素对它要减少种类的目标没好处），"
+                          + "所以「召唤 N 个」恒为 0 —— 这条规则需用交互测试或人工试玩验证。");
 
             sb.AppendLine();
             sb.AppendLine("回合数分布：");

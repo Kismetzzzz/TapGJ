@@ -476,9 +476,14 @@ namespace TapGJ.View
         /// 引擎里记的是这一步**结算完**的状态，Sync 要是在动画中间插手，
         /// 就会把小怪瞬间拽到终点 / 把刚消失的又画出来。
         /// </summary>
-        public IEnumerator<object> PlayStep(StepRecord step, float stepDuration)
+        public IEnumerator<object> PlayStep(StepRecord step, float stepDuration, float cardEffectDuration = 0)
         {
             if (step == null) yield break;
+            if (cardEffectDuration > 0)
+            {
+                yield return PlayCardEffects(step, cardEffectDuration);
+                yield break;
+            }
 
             bool pathPlayed = false;
             for (int i = 0; i < step.Events.Count; i++)
@@ -528,6 +533,89 @@ namespace TapGJ.View
             }
 
             _frozen.Clear(); // 兜底：一个步骤播完，动画期一定结束
+        }
+
+        IEnumerator<object> PlayCardEffects(StepRecord step, float duration)
+        {
+            var transitions = new List<(CreepView view, bool vanish)>();
+            _live.Clear();
+            foreach (var creep in Engine.Creeps) _live.Add(creep.Uid);
+            foreach (var composite in Engine.Composites) _live.Add(composite.Uid);
+            // 融合消耗素材时没有独立的消失事件，直接与现存表现对象对账。
+            foreach (var entry in _creeps)
+                if (!_live.Contains(entry.Key) && entry.Value != null)
+                {
+                    var view = entry.Value.GetComponent<CreepView>();
+                    if (view == null) continue;
+                    _frozen.Add(view.Uid);
+                    transitions.Add((view, true));
+                    ApplyCardAppearance(view, 1);
+                }
+            foreach (var e in step.Events)
+            {
+                CreepView view = null;
+                bool vanish = e.Type == GameEventType.Vanish || e.Type == GameEventType.CompositeVanish;
+                if (vanish) view = CreepViewOf(e.Uid);
+                else if (e.Type == GameEventType.Spawn || e.Type == GameEventType.Transform)
+                {
+                    var creep = FindCreep(e.Uid);
+                    if (creep == null) continue;
+                    view = EnsureCreepView(creep.Uid);
+                    view.ShowCreep(creep);
+                    view.transform.localPosition = CellLocalPos(creep.Pos);
+                }
+                else if (e.Type == GameEventType.CompositeSpawn)
+                {
+                    var composite = FindComposite(e.Uid);
+                    if (composite == null) continue;
+                    view = EnsureCreepView(composite.Uid);
+                    view.ShowComposite(composite);
+                    view.transform.localPosition = CellLocalPos(composite.Pos);
+                }
+                if (view == null || !_frozen.Add(view.Uid)) continue;
+                transitions.Add((view, vanish));
+                ApplyCardAppearance(view, vanish ? 1 : 0);
+            }
+
+            // 多个棋子共用一条时间线，和卡牌一样使用不受暂停缩放影响的时间。
+            float elapsed = 0;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.SmoothStep(0, 1, Mathf.Clamp01(elapsed / duration));
+                foreach (var transition in transitions)
+                    if (transition.view != null)
+                        ApplyCardAppearance(transition.view, transition.vanish ? 1 - t : t);
+                yield return null;
+            }
+            foreach (var transition in transitions)
+            {
+                if (transition.view == null) continue;
+                if (transition.vanish)
+                {
+                    _creeps.Remove(transition.view.Uid);
+                    Kill(transition.view.gameObject);
+                }
+                else ApplyCardAppearance(transition.view, 1);
+            }
+            _frozen.Clear();
+        }
+
+        void ApplyCardAppearance(CreepView view, float opacity)
+        {
+            view.transform.localScale = Vector3.one * (CellSize * CreepView.BodyScale * Mathf.Lerp(.85f, 1, opacity));
+            var color = view.Body.color;
+            color.a = opacity;
+            view.Body.color = color;
+            color = view.Label.color;
+            color.a = opacity;
+            view.Label.color = color;
+            if (view.Ring != null)
+            {
+                color = view.Ring.color;
+                color.a = .55f * opacity;
+                view.Ring.color = color;
+            }
         }
 
         static bool NeedsFreeze(GameEventType type)

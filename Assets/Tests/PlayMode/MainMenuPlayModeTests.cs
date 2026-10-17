@@ -1,6 +1,9 @@
 using System.Collections;
 using System.Linq;
 using NUnit.Framework;
+using TapGJ.Core;
+using TapGJ.Flow;
+using TapGJ.Levels;
 using TapGJ.View;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -22,6 +25,7 @@ namespace TapGJ.Tests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            GameLaunchContext.Clear();
             _hadMusic = PlayerPrefs.HasKey(MusicKey);
             _hadEffects = PlayerPrefs.HasKey(EffectsKey);
             _previousMusic = PlayerPrefs.GetFloat(MusicKey);
@@ -43,6 +47,7 @@ namespace TapGJ.Tests
             if (menu != null) menu.enabled = false; // 先保存测试值，再恢复用户偏好。
             if (GameAudio.Instance != null) Object.Destroy(GameAudio.Instance.gameObject);
             yield return null;
+            GameLaunchContext.Clear();
             Restore(MusicKey, _hadMusic, _previousMusic);
             Restore(EffectsKey, _hadEffects, _previousEffects);
             PlayerPrefs.Save();
@@ -98,6 +103,125 @@ namespace TapGJ.Tests
             Assert.IsTrue(Find("Menu").gameObject.activeSelf);
             Assert.AreEqual(Button("Menu/StartButton").gameObject, EventSystem.current.currentSelectedGameObject);
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator 绑定关卡_混合列表按点击项加载_未绑定继续待开放()
+        {
+            var controller = Object.FindFirstObjectByType<MainMenuController>();
+            var catalog = controller.Catalog;
+            var original = catalog.chapters;
+            var selected = ScriptableObject.CreateInstance<LevelDefinition>();
+            var other = ScriptableObject.CreateInstance<LevelDefinition>();
+            selected.levelId = "menu_selection_test";
+            selected.displayName = "选关验证";
+            selected.useFixedSeed = true;
+            selected.fixedSeed = 271828;
+            selected.layoutText = "....\n.金..\n....";
+            selected.rules = new Rules
+            {
+                BoardWidth = 4, BoardHeight = 3, CreepsPerElement = 0, MaxMoveSteps = 1,
+                RoundLimit = 9, Goal = GoalSpec.Survive(3)
+            };
+            try
+            {
+                catalog.chapters = new[]
+                {
+                    null,
+                    new ChapterCatalog.Chapter
+                    {
+                        title = "测试章节",
+                        levels = new[]
+                        {
+                            new ChapterCatalog.Level { title = "未绑定", goal = "待实现目标" },
+                            null,
+                            new ChapterCatalog.Level { title = "另一关", definition = other },
+                            new ChapterCatalog.Level { title = "指定关卡", definition = selected }
+                        }
+                    }
+                };
+                controller.OpenLevels();
+                Button("LevelsPanel/Chapter02Button").onClick.Invoke();
+                Assert.AreEqual("待开放", Button("ChapterPanel/Level01Button").transform.Find("Availability").GetComponent<Text>().text);
+                Assert.AreEqual("开始挑战 →", Button("ChapterPanel/Level04Button").transform.Find("Availability").GetComponent<Text>().text);
+                Assert.IsFalse(Find("ChapterPanel/StatusLabel").GetComponent<Text>().text.Contains("关卡内容待开放"));
+
+                Button("ChapterPanel/Level01Button").onClick.Invoke();
+                Assert.AreEqual("测试章节 · 未绑定待开放。\n目标：待实现目标", Find("ChapterPanel/StatusLabel").GetComponent<Text>().text);
+                Assert.AreEqual("MainMenu", SceneManager.GetActiveScene().name);
+                Assert.IsFalse(GameLaunchContext.HasLevel);
+
+                Button("ChapterPanel/Level04Button").onClick.Invoke();
+                controller.PreviewLevel(2); // 重复点击不能把已请求的关卡换掉。
+                yield return WaitForScene("Game");
+                var loader = Object.FindFirstObjectByType<LevelLoader>();
+                Assert.AreSame(selected, loader.CurrentLevel, "必须进入点击项绑定的资产，不能使用目录第一关或场景调试关卡");
+                Assert.AreSame(selected, GameLaunchContext.Level);
+                Assert.AreEqual(271828, loader.CurrentSeed);
+                var session = Object.FindFirstObjectByType<GameSession>();
+                Assert.AreEqual(4, session.Engine.Rules.BoardWidth);
+                Assert.AreEqual(3, session.Engine.Rules.BoardHeight);
+                Assert.AreEqual(9, session.Engine.Rules.RoundLimit);
+                Assert.AreEqual(0.7f, GameAudio.Instance.MusicVolume, 0.001f);
+                Assert.AreEqual(0.6f, GameAudio.Instance.EffectsVolume, 0.001f);
+
+                SceneFlow.LoadMenu();
+                yield return WaitForScene("MainMenu");
+                Assert.IsFalse(GameLaunchContext.HasLevel);
+                Assert.IsNull(Object.FindFirstObjectByType<GameSession>());
+            }
+            finally
+            {
+                catalog.chapters = original;
+                Object.Destroy(selected);
+                Object.Destroy(other);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator 绑定关卡_场景缺失或留空时保留菜单操作()
+        {
+            var controller = Object.FindFirstObjectByType<MainMenuController>();
+            var catalog = controller.Catalog;
+            var original = catalog.chapters;
+            var level = ScriptableObject.CreateInstance<LevelDefinition>();
+            level.levelId = "menu_missing_scene_test";
+            try
+            {
+                catalog.chapters = new[]
+                {
+                    new ChapterCatalog.Chapter
+                    {
+                        title = "测试章节",
+                        levels = new[]
+                        {
+                            new ChapterCatalog.Level { title = "错误场景", definition = level },
+                            new ChapterCatalog.Level { title = "未绑定", goal = "待实现目标" }
+                        }
+                    }
+                };
+                controller.OpenLevels();
+                Button("LevelsPanel/Chapter01Button").onClick.Invoke();
+                foreach (string sceneName in new[] { "Missing_Menu_Test_Scene", "", " " })
+                {
+                    level.sceneName = sceneName;
+                    LogAssert.Expect(LogType.Error, $"[TapGJ] 关卡「{level.levelId}」的场景未加入 Build Settings：{sceneName}");
+                    Button("ChapterPanel/Level01Button").onClick.Invoke();
+                    Assert.AreEqual("关卡暂不可用，请选择其他关卡。", Find("ChapterPanel/StatusLabel").GetComponent<Text>().text);
+                    Assert.AreEqual("MainMenu", SceneManager.GetActiveScene().name);
+                    Assert.IsFalse(GameLaunchContext.HasLevel);
+                    Button("ChapterPanel/Level02Button").onClick.Invoke();
+                    StringAssert.Contains("未绑定待开放", Find("ChapterPanel/StatusLabel").GetComponent<Text>().text);
+                }
+                controller.Back();
+                Assert.IsTrue(Find("LevelsPanel").gameObject.activeSelf);
+                yield return null;
+            }
+            finally
+            {
+                catalog.chapters = original;
+                Object.Destroy(level);
+            }
         }
 
         [UnityTest]

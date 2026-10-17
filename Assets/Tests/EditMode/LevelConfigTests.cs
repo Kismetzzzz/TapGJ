@@ -401,7 +401,7 @@ namespace TapGJ.Tests
         const ElementMask MetalWater = ElementMask.Metal | ElementMask.Water;
 
         static LevelDefinition NewLevel(ElementMask pool, string layout, bool requireAllPool,
-            ElementMask? cardPool = null, EmptyCellCardMode emptyCell = EmptyCellCardMode.Summon)
+            ElementMask? cardPool = null)
         {
             var level = ScriptableObject.CreateInstance<LevelDefinition>();
             level.levelId = "validator_test";
@@ -415,7 +415,6 @@ namespace TapGJ.Tests
                 RoundLimit = 15,
                 ElementPool = pool,
                 CardPool = cardPool ?? pool,
-                EmptyCellCard = emptyCell,
                 Goal = GoalSpec.Custom(),
             };
             level.layoutText = layout;
@@ -493,12 +492,11 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 勾了必须都在场_相生能造出来的元素也不再误报()
+        public void 勾了必须都在场_旧配置不会禁止召唤缺少的元素()
         {
-            // 关掉空格召唤，只剩相生这条路：木牌打水怪是「水生木」，木是赢家 → 场上会多出木。
             var pool = MetalWater | ElementMask.Wood;
-            var level = NewLevel(pool, "金..\n...\n..水", requireAllPool: true,
-                emptyCell: EmptyCellCardMode.Reject);
+            var level = NewLevel(pool, "金..\n...\n..水", requireAllPool: true);
+            JsonUtility.FromJsonOverwrite("{\"EmptyCellCard\":1}", level.rules);
             try
             {
                 Assert.IsEmpty(Collect(level), string.Join(" / ", Collect(level)));
@@ -507,41 +505,33 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 勾了必须都在场_相生方向不对时牌面元素照样造不出来()
+        public void 勾了必须都在场_不能靠相生生成的元素仍能召唤()
         {
-            // 牌池 = 金 + 木，布局 = 三只水，关掉召唤：
-            //   · 金牌打水怪是「金生水」—— 金是**输**的那一方，场上只会多出水，金永远出不来 → 该报
-            //   · 木牌打水怪是「水生木」—— 木是赢家，木能出来 → 不该报
+            // 金牌打水怪只能生成水，但金与木都能直接在空格召唤。
             var pool = MetalWater | ElementMask.Wood;
             var level = NewLevel(pool, "水..\n...\n..水", requireAllPool: true,
-                cardPool: ElementMask.Metal | ElementMask.Wood, emptyCell: EmptyCellCardMode.Reject);
+                cardPool: ElementMask.Metal | ElementMask.Wood);
             try
             {
-                var text = string.Join(" / ", Collect(level));
-                StringAssert.Contains("金", text);
-                StringAssert.Contains("永远赢不了", text);
-                StringAssert.DoesNotContain("木", text, "木能靠相生（水生木）出来，不该被算成死局：" + text);
+                Assert.IsEmpty(Collect(level), string.Join(" / ", Collect(level)));
             }
             finally { Dispose(level); }
         }
 
         [Test]
-        public void 出牌能不能造出某种元素_召唤与相生两条路都要认得出来()
+        public void 出牌能不能造出某种元素_有牌即可召唤()
         {
             // 这条检查（「这种元素永远不会出现吗」）的底层判断，单拎出来钉一遍。
             var pool = MetalWater | ElementMask.Wood;
-            var rules = new Rules { ElementPool = pool, CardPool = pool }; // 默认 EmptyCellCard = Summon
+            var rules = new Rules { ElementPool = pool, CardPool = pool };
             var waterOnBoard = new[] { Element.Water };
 
             StringAssert.Contains("召唤", rules.CardSourceFor(Element.Wood, waterOnBoard));
 
-            rules.EmptyCellCard = EmptyCellCardMode.Reject;
-            StringAssert.Contains("相生", rules.CardSourceFor(Element.Wood, waterOnBoard),
-                "木牌打水怪是水生木，木是赢家 → 木能出来");
-            Assert.IsNull(rules.CardSourceFor(Element.Metal, waterOnBoard),
-                "金生水里金是输的那一方，场上只会多出水，金出不来");
-            Assert.IsNull(rules.CardSourceFor(Element.Wood, new Element[0]),
-                "场上没有能相生它的元素，又关掉了召唤 → 造不出来");
+            JsonUtility.FromJsonOverwrite("{\"EmptyCellCard\":1}", rules);
+            StringAssert.Contains("召唤", rules.CardSourceFor(Element.Metal, waterOnBoard));
+            StringAssert.Contains("召唤", rules.CardSourceFor(Element.Wood, new Element[0]),
+                "没有相生目标也能在空格召唤");
 
             // 牌都发不出来（木牌不在牌池里）时两条路都不成立
             rules.CardPool = MetalWater;
