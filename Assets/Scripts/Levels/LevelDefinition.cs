@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using TapGJ.Core;
+using TapGJ.Events;
 using UnityEngine;
 
 namespace TapGJ.Levels
@@ -47,6 +48,15 @@ namespace TapGJ.Levels
         [Tooltip("开局就摆在棋盘上的复合元素（留空 = 开局没有复合元素，" +
                  "此时只能靠融合牌现场合一个出来）。占格冲突 / 坐标越界的条目会被跳过并记一条日志")]
         public CompositePlacement[] initialComposites = new CompositePlacement[0];
+
+        [Header("回合事件")]
+        [Tooltip("勾上：这一关会每隔 rules.EventIntervalMin~Max 回合随机触发一条事件（第 1 回合不触发）。" +
+                 "不勾：完全没有事件，行为和加事件系统之前一致")]
+        public bool useEvents;
+
+        [Tooltip("本关启用的事件池：只从这里面抽。留空（同时勾了上面的开关）= 一个事件都不会有，" +
+                 "Inspector 会报出来。想按关裁剪就少放几条，想全用就把目录里的都拖进来")]
+        public RoundEventDefinition[] roundEvents = new RoundEventDefinition[0];
 
         // ---------------------------------------------------------------- 校验
 
@@ -114,6 +124,7 @@ namespace TapGJ.Levels
             }
 
             CollectCompositeIssues(effective, into);
+            CollectEventIssues(effective, into);
 
             // 自定义目标必须有机制组件，否则这一关永远不会胜利
             if (effective.Goal.Kind == GoalKind.Custom)
@@ -178,6 +189,103 @@ namespace TapGJ.Levels
             }
         }
 
+        /// <summary>
+        /// 回合事件这一块的检查：开关与池子配没配一致、每条事件在本关适不适用、回合上限够不够撞上第一次事件。
+        ///
+        /// 「适不适用」直接问事件自己的 <see cref="RoundEventDefinition.IsApplicable"/> ——
+        /// 也就是运行期抽取时用的同一套判断，所以 Inspector 里报的「会被跳过」和 Play 时跳过的**必然是同一批**。
+        /// 为了让它判断得准，这里会真的开一局（引擎只在内存里跑，不碰场景），否则「场上一个小怪都没有」
+        /// 这类判断在空棋盘上永远成立、每条都误报。
+        /// </summary>
+        void CollectEventIssues(Rules effective, List<string> into)
+        {
+            bool hasPool = roundEvents != null && roundEvents.Length > 0;
+
+            if (!useEvents)
+            {
+                if (hasPool)
+                    into.Add($"配了 {roundEvents.Length} 条回合事件，但 useEvents 没勾 → 它们永远不会触发。"
+                             + "要玩就勾上；确定不要就顺手清掉，免得以后误以为它们生效了。");
+                return;
+            }
+
+            if (!hasPool)
+            {
+                into.Add("勾了回合事件开关（useEvents），但事件池是空的 → 这一关一个事件都不会有。"
+                         + "要么把事件资产拖进 roundEvents，要么把开关关掉。");
+                return;
+            }
+
+            var seenIds = new HashSet<string>();
+            foreach (var ev in roundEvents)
+            {
+                if (ev == null)
+                {
+                    into.Add("事件池里有空槽位。");
+                    continue;
+                }
+
+                if (!seenIds.Add(ev.Id))
+                    into.Add($"事件池里「{ev.DisplayName}」出现了两次（同一个 Id「{ev.Id}」）—— "
+                             + "「本局不重复」是按 Id 记的，重了等于只有一条。");
+            }
+
+            int min = System.Math.Max(1, effective.EventIntervalMin);
+            int max = System.Math.Max(min, effective.EventIntervalMax);
+            int earliest = 1 + min;
+            int latest = 1 + max;
+
+            if (earliest > effective.RoundLimit)
+            {
+                into.Add($"回合上限 {effective.RoundLimit}，而事件最早也要第 {earliest} 回合才触发"
+                         + $"（第 1 回合不触发 + 间隔 {min}~{max}）→ 这一关永远不会有事件。"
+                         + "要么把回合上限调大，要么把 rules.EventIntervalMin/Max 调小（短关卡建议 2~3）。");
+            }
+            else if (latest > effective.RoundLimit)
+            {
+                into.Add($"回合上限 {effective.RoundLimit}，但事件最晚可能第 {latest} 回合才第一次触发 → "
+                         + "有些局可能一个事件都碰不到。想让节奏更稳就把 EventIntervalMax 调小。");
+            }
+
+            var probe = BuildProbeEngine(effective);
+            if (probe == null) return;
+
+            foreach (var ev in roundEvents)
+            {
+                if (ev == null) continue;
+                if (ev.IsApplicable(probe, out var reason)) continue;
+
+                into.Add($"事件「{ev.DisplayName}」在本关不适用：{reason} → 抽到会被跳过（换下一条、不算抽过）。");
+            }
+        }
+
+        /// <summary>
+        /// 开一局**只在内存里**的引擎，专门用来问「事件在本关适不适用」。
+        /// 用和真正进关同一套解析路径（字符画布局 / 随机铺盘），所以棋盘状态和实际开局一致。
+        /// 失败返回 null（此时上面已经报过配置错误了，不必重复报）。
+        /// </summary>
+        GameEngine BuildProbeEngine(Rules effective)
+        {
+            try
+            {
+                LevelSetup setup = null;
+                if (!string.IsNullOrWhiteSpace(layoutText))
+                {
+                    if (!BoardLayoutParser.TryParse(layoutText, effective.BoardWidth, effective.BoardHeight,
+                            effective.ElementPool, out setup, out _))
+                        setup = null;
+                }
+
+                var engine = new GameEngine(effective, 1);
+                engine.Start(setup);
+                return engine;
+            }
+            catch (System.Exception)
+            {
+                return null;
+            }
+        }
+
         /// <summary>预制体（含子物体）上有没有启用的 ILevelRule。挂载顺序 = 执行顺序。</summary>
         public static bool HasEnabledRule(GameObject prefab)
         {
@@ -208,6 +316,9 @@ namespace TapGJ.Levels
             sb.Append($"　牌池 {cards.Names()}");
             sb.Append($"　复合元素 {CompositeFeatureText(rules)}");
             sb.Append("　空格出牌 召唤");
+            sb.Append(useEvents
+                ? $"　事件 {(roundEvents == null ? 0 : roundEvents.Length)} 条（每 {rules.EventIntervalMin}~{rules.EventIntervalMax} 回合）"
+                : "　事件 关");
             sb.Append($"　回合上限 {rules.RoundLimit}");
             sb.Append($"　目标 {rules.Goal.Describe()}");
 

@@ -190,6 +190,32 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 回合事件降低门槛_飞牌后保留余数_恢复更新门槛()
+        {
+            var engine = _hud.Session.Engine;
+            engine.AddBottleCharge(Element.Water, 4);
+            yield return WaitForAbacus();
+
+            Assert.AreEqual(1, engine.ApplyBottleCapacity(3));
+            yield return null;
+            yield return null;
+            Assert.AreEqual(6, engine.Hand.Count);
+            Assert.AreEqual(5, _hud.Ui.Cards.Count(card => card.gameObject.activeSelf), "事件新牌在飞牌结束后显示");
+            yield return WaitForAbacus();
+            Assert.AreEqual(1, Abacus.CompletedRewards);
+            Assert.AreEqual(1, Abacus.DisplayedCount(Element.Water));
+            Assert.AreEqual(6, _hud.Ui.Cards.Count(card => card.gameObject.activeSelf));
+            var counter = _hud.transform.Find("Composition/Controls/ElementRail/Frame/Element_Water/Progress").GetComponent<Text>();
+            Assert.AreEqual("1/3", counter.text);
+
+            engine.RestoreBottleCapacity();
+            yield return WaitForAbacus();
+            Assert.AreEqual("1/5", counter.text);
+            Assert.AreEqual(1, Abacus.CompletedRewards, "恢复门槛不能再次飞牌");
+            Assert.AreEqual(6, engine.Hand.Count);
+        }
+
+        [UnityTest]
         public IEnumerator 算盘_缺少对应手牌时不误选且暂停会阻止操作()
         {
             var rail = _hud.transform.Find("Composition/Controls/ElementRail");

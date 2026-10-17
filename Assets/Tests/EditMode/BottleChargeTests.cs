@@ -61,6 +61,26 @@ namespace TapGJ.Tests
         }
 
         [Test]
+        public void 恢复较低门槛不发牌_下次充能正确结算已有进度()
+        {
+            var engine = Engine();
+            Assert.AreEqual(0, engine.ApplyBottleCapacity(10));
+            engine.AddBottleCharge(Element.Water, 8);
+            engine.RestoreBottleCapacity();
+            Assert.IsEmpty(engine.Hand);
+            Assert.AreEqual(8, engine.Bottle.Count(Element.Water));
+            Assert.AreEqual(5, engine.Bottle.Capacity);
+
+            engine.AddBottleCharge(Element.Water, 1);
+            Assert.AreEqual(1, engine.Hand.Count);
+            Assert.AreEqual(4, engine.Bottle.Count(Element.Water));
+            Assert.AreEqual(1, engine.Bottle.TotalCardsGranted);
+            var reward = engine.History.SelectMany(step => step.Events)
+                .Single(e => e.Type == GameEventType.GainCard);
+            Assert.AreEqual(engine.Hand[0].Id, reward.CardId);
+        }
+
+        [Test]
         public void 无效事件参数不能改变进度_重新开局清空进度()
         {
             var engine = Engine();

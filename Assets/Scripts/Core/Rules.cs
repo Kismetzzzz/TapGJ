@@ -120,6 +120,17 @@ namespace TapGJ.Core
         /// <summary>默认元素收集门槛，集齐产出 1 张对应元素牌；当回合事件可临时覆盖。</summary>
         public int BottleCapacity = 5;
 
+        // ------------------------------------------------------------ 回合事件
+        // 「每隔 min~max 回合随机来一条本关启用的事件」（第 1 回合不触发，第一次落在 1+[min,max] 回合）。
+        // 两个数值留在这里（而不是 LevelDefinition）是因为 Rules 是纯 C#、能被批量跑批与测试直接用；
+        // 「本关启用哪些事件」是一组资产引用，只能放在 LevelDefinition 上。
+
+        /// <summary>事件间隔下限（回合）。默认 3。</summary>
+        public int EventIntervalMin = 3;
+
+        /// <summary>事件间隔上限（回合）。默认 6 —— 15 回合的一局大概能碰到 2~3 次。</summary>
+        public int EventIntervalMax = 6;
+
         /// <summary>回合上限，超过即失败。</summary>
         public int RoundLimit = 15;
 
@@ -400,6 +411,9 @@ namespace TapGJ.Core
             if (MaxDiscardsPerRound < 0) throw new ArgumentException("MaxDiscardsPerRound 不能为负");
             if (MaxCardsPerRound < 0) throw new ArgumentException("MaxCardsPerRound 不能为负");
             if (BottleCapacity < 1) throw new ArgumentException("BottleCapacity 至少为 1");
+            if (EventIntervalMin < 1) throw new ArgumentException("EventIntervalMin 至少为 1");
+            if (EventIntervalMax < EventIntervalMin)
+                throw new ArgumentException("EventIntervalMax 不能小于 EventIntervalMin");
             if (RoundLimit < 1) throw new ArgumentException("RoundLimit 至少为 1");
             if (CompositeRange < 1) throw new ArgumentException("CompositeRange 至少为 1");
             if (CompositeIngredientsPerRound < 1) throw new ArgumentException("CompositeIngredientsPerRound 至少为 1");

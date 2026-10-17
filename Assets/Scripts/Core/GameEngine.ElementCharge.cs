@@ -12,9 +12,9 @@ namespace TapGJ.Core
             if (!Rules.ElementPool.Has(element)) throw new ArgumentException("本关不可收集该元素", nameof(element));
             if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
             if (amount == 0) return;
-            var record = new StepRecord { Element = element };
+            var record = _eventRecord ?? new StepRecord { Element = element };
             FillBottle(element, amount, record, Pos.None);
-            QueueStep(record);
+            if (_eventRecord == null) QueueStep(record);
         }
 
         /// <summary>事件临时修改本回合集齐门槛；下回合恢复关卡配置，不丢失已收集的点数。</summary>
@@ -24,16 +24,19 @@ namespace TapGJ.Core
             if (capacity != Bottle.Capacity) ChangeBottleCapacity(capacity);
         }
 
-        void ChangeBottleCapacity(int capacity)
+        int ChangeBottleCapacity(int capacity, bool redeem = true)
         {
             Bottle.SetCapacity(capacity);
-            var record = new StepRecord();
+            var record = _eventRecord ?? new StepRecord();
+            int firstChange = record.Events.Count;
+            int cards = 0;
             foreach (var element in ElementDefs.All)
             {
-                while (Bottle.Redeem(element))
+                while (redeem && Bottle.Redeem(element))
                 {
                     record.Events.Add(BottleFillEvent(element, 0, capacity, Pos.None));
                     GrantBottleCard(element, record);
+                    cards++;
                 }
                 record.Events.Add(new GameEvent
                 {
@@ -44,14 +47,17 @@ namespace TapGJ.Core
                     Text = $"{ElementDefs.Name(element)}元素集齐门槛改为 {capacity}",
                 });
             }
-            QueueStep(record);
+            for (int i = firstChange; i < record.Events.Count; i++) PushEvent(record.Events[i]);
+            if (_eventRecord == null) QueueStep(record);
+            return cards;
         }
 
         void FillBottle(Element element, int amount, StepRecord record, Pos where)
         {
             while (amount > 0)
             {
-                int part = Math.Min(amount, Bottle.Capacity - Bottle.Count(element));
+                // 恢复较低的基准门槛时先保留进度，下次充能再结清已有份数。
+                int part = Math.Min(amount, Math.Max(0, Bottle.Capacity - Bottle.Count(element)));
                 bool completed = Bottle.Add(element, part);
                 record.Events.Add(BottleFillEvent(element, part, completed ? Bottle.Capacity : Bottle.Count(element), where));
                 if (completed) GrantBottleCard(element, record);

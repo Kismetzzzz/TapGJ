@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TapGJ.Core;
+using TapGJ.Events;
 using TapGJ.Levels;
 using TapGJ.View;
 using UnityEditor;
@@ -414,6 +415,67 @@ namespace TapGJ.EditorTools
             var text = sb.ToString();
             Debug.Log("[TapGJ 关卡校验] " + text.Replace("\n", "\n[TapGJ] "));
             EditorUtility.DisplayDialog("TapGJ 关卡校验", text, "好");
+        }
+
+        // ---------------------------------------------------------------- 事件校验
+
+        /// <summary>
+        /// 扫一遍全部事件资产 + 事件目录：Id 重复、没填说明、目录里有空槽位。
+        /// 「某条事件在本关适不适用」在关卡校验里报（那需要一关的完整配置），这里只管事件自己。
+        /// </summary>
+        [MenuItem(MenuRoot + "校验所有事件（目录 + 全部事件资产）", false, 22)]
+        public static void ValidateAllEvents()
+        {
+            var sb = new System.Text.StringBuilder();
+            int bad = 0;
+
+            // 用 t:ScriptableObject 再按类型过滤：Unity 的 t: 过滤器对「抽象基类的子类」不可靠
+            var seen = new Dictionary<string, string>();
+            int total = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:ScriptableObject"))
+            {
+                var ev = AssetDatabase.LoadAssetAtPath<RoundEventDefinition>(AssetDatabase.GUIDToAssetPath(guid));
+                if (ev == null) continue;
+                total++;
+
+                if (seen.TryGetValue(ev.Id, out var first))
+                {
+                    bad++;
+                    sb.AppendLine($"\n✘ 事件 Id「{ev.Id}」重复：{first} 和 {ev.name}。"
+                                  + "「本局不重复」是按 Id 记的，重了等于只有一条。");
+                }
+                else
+                {
+                    seen[ev.Id] = ev.name;
+                }
+
+                if (string.IsNullOrWhiteSpace(ev.Description))
+                    sb.AppendLine($"\n⚠ {ev.name}（{ev.Id}）没填 description → HUD 上只会显示名字，玩家不知道它做了什么。");
+            }
+
+            sb.Insert(0, $"共 {total} 个事件资产。\n");
+
+            foreach (var guid in AssetDatabase.FindAssets("t:ScriptableObject"))
+            {
+                var catalog = AssetDatabase.LoadAssetAtPath<EventCatalog>(AssetDatabase.GUIDToAssetPath(guid));
+                if (catalog == null) continue;
+
+                var issues = new List<string>();
+                catalog.CollectIssues(issues);
+                if (issues.Count == 0) continue;
+
+                bad += issues.Count;
+                sb.AppendLine($"\n⚠ 目录 {catalog.name}");
+                foreach (var issue in issues) sb.AppendLine($"    · {issue}");
+            }
+
+            sb.AppendLine(bad == 0
+                ? "\n✔ 所有事件都没发现问题。"
+                : $"\n共 {bad} 处问题。");
+
+            var text = sb.ToString();
+            Debug.Log("[TapGJ 事件校验] " + text.Replace("\n", "\n[TapGJ] "));
+            EditorUtility.DisplayDialog("TapGJ 事件校验", text, "好");
         }
 
         // ---------------------------------------------------------------- 运行时探针
