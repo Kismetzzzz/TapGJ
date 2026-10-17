@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8b9c7158fdb4baf9f812c8bfb47b65a, type: 3}
+  m_Name: CardDissolve
+  m_EditorClassIdentifier:
+  prefab: {fileID: 5526723940941921475, guid: e090bb2f79790024ab2093289a66a3ad, type: 3}
+  compositeMaterial: {fileID: 2100000, guid: 07cfbdf29ff34dbcb7c5e49a0a74e16b, type: 2}
+  postProcessProfile: {fileID: 11400000, guid: 501a93555f85edf45a4ad0dd7e461f6b, type: 2}
+  postProcessResources: {fileID: 11400000, guid: d82512f9c8e5d4a4d938b575d47f88d4, type: 2}
+  tintByElement: 0

@@ -1,0 +1,15 @@
+{
+    "name": "TapGJ.Tests.PlayMode",
+    "rootNamespace": "TapGJ.Tests",
+    "references": ["TapGJ.Runtime", "UnityEngine.UI", "Unity.Postprocessing.Runtime"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": ["TestAssemblies"]
+}

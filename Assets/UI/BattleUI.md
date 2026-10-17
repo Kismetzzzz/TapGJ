@@ -1,0 +1,70 @@
+# 独立局内 UI
+
+双击 `Assets/Scenes/BattleUI.unity`，按 Play 可独立预览。也可通过菜单 **TapGJ → 打开独立局内 UI** 打开。场景已单独加入构建列表。
+
+背景使用提供的原图，保存于 `Assets/UI/Art/Battle/BattleBackground.jpg`，没有裁切或修改。界面以 1920×1080 为基准，背景、控件与棋盘容器整体等比适配安全区域；宽屏和竖屏会留边。
+
+所有界面都是已保存的 uGUI 对象，可在 Hierarchy 中直接调整：
+
+- `BattleUICanvas/Composition/Controls/TaskPanel`：任务目标、进度文字和进度条。
+- `Controls/TimerPanel`：计时；下方显示回合和选牌状态。
+- `Controls/ElementRail`：金、木、水、火、土五个按钮。
+- `Controls/Hand`：手牌居中排列，五张时卡面约为 171×277 参考像素，牌间保留约 30 像素间隔，倾斜不超过 3 度；选中的牌抬起并显示在最前面，卡面保持在棋盘下方。手牌较多时会自动缩小，避免相互重叠。
+- `Controls/NextRoundButton`、`DiscardButton`：下一回合、弃牌。
+- `Controls/SettingsButton`：打开设置遮罩，暂停预览计时；点击继续、遮罩或 Esc 关闭。
+- `Composition/BoardContent`：空的棋盘内容容器，位置对应背景上的棋盘。
+
+预览模式只演示 UI：选牌抬起并描边，再点取消；选择后才能弃牌；弃牌隐藏该槽位；下一回合更新回合数字。场景不创建对局控制器，也不执行棋盘规则。未连接玩法时任务进度为示例值。
+
+## 替换手牌
+
+卡面统一配置在 **`Assets/UI/Data/BattleCardArt.asset`**，所有手牌共用这一份。当前已接入提供的金、木、水、火、土五张完整卡面，原图保存于 `Assets/UI/Art/Battle/Cards/`；对应卡面留空时显示该元素的缺图占位。
+
+以后换图只需：
+
+1. 把新图片拖进 Project 面板中的 `Assets/UI/Art/Battle/Cards/`（建议与当前卡面接近的竖版比例）。
+2. 选中图片，将 **Texture Type** 设为 **Sprite (2D and UI)**，**Sprite Mode** 设为 **Single**，点击 **Apply**。
+3. 选中 `BattleCardArt.asset`，把图片拖到 Inspector 中对应的 **金 / 木 / 水 / 火 / 土** 槽位。
+
+当前五张图已开启缩小纹理过滤。替换为带细碎纹理的图片时，也可开启 **Generate Mip Maps**，减少小卡面上的噪点。
+
+所有同元素手牌会自动更新，包括编辑器预览与运行中的卡牌；无需逐张修改场景、Prefab 或代码。配置会随工程保存，重新打开仍有效。也可用同名新图片覆盖 `Cards/` 中对应 JPG，保留原 `.meta` 文件，引用会继续生效。
+
+`Assets/UI/Prefabs/BattleCard.prefab` 只负责共用尺寸、交互和选中效果：`Artwork/CardFace` 整张显示卡面并保留比例与原色，`FocusRing` 和 `SelectedRing` 是独立描边，`FallbackArtwork` 是缺图占位。新图的比例不同会在现有卡框内完整等比显示。需要统一调整手牌大小或描边时修改此预制体。
+
+预览仍是五张手牌，顺序为火、土、水、木、金，五种卡面都能看到。以后换图不会改变手牌元素、回合、选中状态或交互。
+
+中文字体包含常用汉字与 ASCII，来自 Noto Sans SC；许可见 `Assets/UI/Art/Battle/FontLicense.txt`。罕见字或扩展字符需要替换完整字体。
+
+## 快速更换 UI 字体
+
+菜单 **TapGJ → 打开 UI 字体配置** 会直接选中 `Assets/UI/Data/UiFontTheme.asset`。也可在 Project 中点击这一资产。
+
+- **界面正文**：按钮、任务说明和普通文字。改这一项即可整体换字体。
+- **大标题**：标题和面板标题；留空时跟随正文。
+- **数字**：计时器、排行和章节序号；留空时跟随正文。
+
+将新的 `.ttf` 或 `.otf` 文件拖入 `Assets/UI/Fonts/`，再拖到对应槽位即可。已提供 `WenKaiScreen.ttf`（霞鹜文楷屏幕阅读版）和 `MaShanZheng.ttf`（马善政毛笔楷体），许可证保存在同目录。
+
+主菜单、独立局内 UI 和四类 UI 预制体统一读取这份配置。编辑器预览和运行时会自动更新；隐藏面板打开、新卡片创建时也会使用最新字体。替换只修改字体，保留原有文字、字号、颜色和按钮交互。正文暂时留空时保留已有字体。
+
+新添的 uGUI Text 可添加 `UiFontBinding`，把相同配置拖入 **字体配置**，选择 **文字用途**，即可参与统一替换。卡面图片里绘制的字不属于 Text，需要通过卡面配置替换图片；旧对局原型的世界文字不在这套 UI 字体配置中。
+
+## 接入玩法
+
+`Assets/Scenes/Game.unity` 已使用 `Assets/UI/Prefabs/BattleGameplay.prefab` 运行真实关卡。打开 Game 场景，选中 Levels 下的关卡资产，点击 Inspector 中的“Play 这一关”即可试玩。原 BattleUI 场景仍用于单独预览美术。
+
+`BattleGameplayHud` 通过 `IGameHud` 连接 `GameSession`，从关卡读取目标、进度、回合上限和真实手牌。手牌数量随关卡变化；金木水火土使用共享卡面，融合牌和分解牌暂用带说明的文字卡面。选牌后点击高亮棋盘格出牌；出牌阶段按钮显示“结束出牌”，弃牌阶段显示“结束弃牌”。弃牌阶段先选牌，再点击“弃牌”，达到关卡上限后停止接受弃牌。
+
+玩法手牌按真实卡牌 ID 保留对应的界面对象。成功出牌或弃牌时，消散停留在该牌原先的选中位置；剩余手牌稍后平滑补到居中位置，卡面不会突然换到其他槽位。手牌数量增加时会缩小整组排布，选中卡面也保留在手牌区域内。
+
+五行按钮会选择手牌中对应元素的牌。设置面板暂停对局和计时，并提供重开与返回菜单。结算后显示胜负原因，可重开、返回菜单；通关时可进入下一关。菜单原有的“试玩当前对局”入口也会进入接入后的 Game 场景；章节中尚未实现的关卡项仍保持待开放。
+
+背景保留完整原图，不可见的逻辑棋盘负责布局。`BattleBoardViewport` 按背景实际格线逐行校准，元素、移动动画、复合元素、高亮和点击共用同一份映射；远处行距较小、近处行距较大，各列也可独立对齐手绘格线。格子中心会考虑 CellGap 的半个边距，棋盘接缝和斜边外的点击不触发出牌。当前保存的校准对应背景中的 8×8 格子，逻辑棋盘尺寸仍来自关卡；其他尺寸的关卡会铺满同一区域，需要相应背景才能逐格匹配。
+
+以后覆盖 `Assets/UI/Art/Battle/BattleBackground.jpg` 并保留 `.meta`，预览和玩法界面都会换图；也可在 BattleGameplay 预制体的 `Composition/Background` 更换 Sprite。背景的棋盘区域变化时，在 `Composition/BoardContent` 调整 RectTransform 位置与尺寸，然后调整 viewport 的 **背景格线校准**：九条横向格线按从下到上排列，Height 为容器底部到该线的高度比例，Columns 为这一行九条纵向格线从左到右的位置比例，数值均为 0–1。元素与点击自动使用更新后的数据。校准时可暂时关闭 BoardView 的 Transparent Cells 查看真实格子，完成后重新开启，让底板隐藏、背景透出。校准数据留空时仍支持原有 Top Inset 梯形布局。
+
+编辑器菜单 **TapGJ → 接入现有局内 UI** 可从 BattleUI 重新生成玩法预制体并接线。首次接入前的 Game 场景保存在 `Artifacts/BattleUiIntegration/Game-before-integration.unity`。重新接入会更新玩法 UI 的布局和接线，先保存当前场景。
+
+聚焦按钮后可用方向键切换、Enter/空格确认。装饰文字、卡面、描边与背景不拦截点击。设置遮罩会阻止背景鼠标与键盘操作，关闭后恢复原焦点。
+

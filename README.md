@@ -4,13 +4,40 @@ Unity 2D 原型，用来验证「8×8 棋盘 + 五行元素反应 + 元素牌」
 本文件记录**规则是怎么定的、哪些地方原表有歧义、怎么玩、怎么跑测试**。
 
 - 工程版本：Unity **2022.3.62f3**（`ProjectSettings/ProjectVersion.txt`）
-- 打开方式：Unity Hub 打开 `D:\LiquidCat\TapGJ` → 打开 `Assets/Scenes/Game.unity`（已在 Build Settings 里）→ 按 **Play**。
+- 打开方式：Unity Hub 打开本工程，双击 `Assets/Scenes/MainMenu.unity`，按 **Play** 从主菜单进入游戏；也可直接打开 `Assets/Scenes/Game.unity`（已在 Build Settings 里）按 **Play**。
   骨架已经搭好，不用自己摆物体；想自己搭见第七节。
 - ⚠ **`Game.unity` 是「补 Canvas + EventSystem」之前建的**，所以它现在还没有这两个物体 ——
   跑一次菜单 **TapGJ ▸ 在当前场景搭建/补齐骨架**（幂等，不会动已有物体）就会补上。
   做正式 uGUI 之前记得跑这一次，否则按钮点了没反应。
 - ⚠ 现在 `Assets/Levels/` 里**还没有关卡资产**，所以 Play 走的是 `GameSession` 上的「开发兜底规则」随机铺盘，
   Console 会报「没有可用的关卡」。想按关卡玩：先跑一次菜单 **TapGJ ▸ 新建关卡**（见第七节）。
+
+### 主菜单（uGUI）
+
+`MainMenu` 是 Build Settings 中的第一场景。入口、主菜单、章节页、关卡页和弹窗都保存为可编辑的 uGUI 对象；章节与关卡卡片按配置复制场景中的模板。
+
+- **点击进入游戏**：入口页显示公告横条，点击后进入主菜单。
+- **开始游戏**：进入章节选择，再进入对应章节的关卡选择。默认配置对应布局图，章节数量与每章关卡数量均可独立调整。
+- **关卡卡片**：显示配置中的序号、名称与目标，目前标明“待开放”。点击在页底显示状态和目标摘要；章节卡片显示当前配置的关卡数量。
+- **试玩当前原型**：章节页的独立入口，进入现有 `Game.unity` 游戏场景。
+- **用户 / 公告 / 设置**：入口与主菜单右上方纵向排列；用户打开个人成绩与登录区域，公告显示提示，设置保留音量控制。
+- **通关排行榜**：查看个人最快通关、排名、全服榜与好友榜；页面预留前 10 名，可滚轮或触摸滚动。目前未连接 TapTap 服务，显示未登录与空榜状态，登录和刷新按钮给出暂不可用提示。
+- **设置**：音乐、音效音量独立调整，设为 0 即静音；关闭面板时保存到 PlayerPrefs，进入游戏后保留。
+- **退出**：构建版退出应用；编辑器中结束 Play。
+
+弹窗阻止背景操作；点击遮罩、关闭或 Esc 恢复原页面和焦点。返回与 Esc 依次从关卡返回章节、从章节返回主菜单、从主菜单返回入口。方向键切换按钮，Enter / 空格确认；超出可见区域的卡片支持滚轮、拖动与键盘选中后自动滚动。
+
+**修改章节与关卡**：选中 `Assets/UI/Data/ChapterCatalog.asset`，在 Inspector 的 `Chapters` 数组增删章节，并修改每章的 `Title`、`Description`、`Levels`。`Levels` 内的 `Title` 与 `Goal` 分别是关卡名称和目标；各章可有不同数量的关卡，也支持空章节。不必改代码或复制页面。重新打开章节页时会读取最新配置；此配置仅用于 UI，尚未实现的玩法仍显示待开放。
+
+音频目前没有素材。将音乐片段拖到 `GameAudio/Music` 的 AudioSource（循环播放），音效通过 `GameAudio.Instance.PlayEffect(clip)` 播放，两者使用各自的音量。`GameAudio` 随场景保留，重复进入菜单时不会生成第二份。
+
+双击 `Assets/Scenes/MainMenu.unity` 打开菜单。页面、工具按钮、滑块与卡片模板是场景实体；运行时按章节配置复制卡片，名称与目标取自配置。`Game.unity` 已保存 `GameSession`、`Board` 等完整接线，从试玩入口切换过来也能启动对局。直接打开游戏场景仍可试玩。
+
+### 后续替换美术
+
+普通按钮、章节卡片和关卡卡片分别使用 `Assets/UI/Prefabs/MenuButton.prefab`、`ChapterCard.prefab` 和 `LevelCard.prefab`，三者独立保存。编辑对应 Prefab 的底图、字体、图标和选中描边，会统一更新这一类；卡片的场景模板继承其 Prefab 样式，数量与文案继续从 `ChapterCatalog.asset` 读取。Logo 和按钮图标有默认隐藏的 Image 插槽，面板、卡片和滑块底图支持九宫格。素材放到 `Assets/UI/Art/`，具体位置与替换步骤见 [主菜单美术替换说明](Assets/UI/README.md)。
+
+菜单当前采用深墨绿、玉色主按钮和暖金细线的占位样式；五行圆阵可通过入口和主菜单的 `ArtIllustration` 插槽替换。按钮的焦点描边是独立图层，替换正式底图时仍支持鼠标、触摸和键盘反馈。窄屏保持文字字号，通过页面宽度与横向滚动适配；卡片模板和配置数量独立。
 
 ---
 
@@ -522,6 +549,12 @@ Assets/
 │     ├─ ILevelHost.cs            重开时回调关卡加载器（否则重开会丢关卡与机制）
 │     ├─ IGameHud.cs              ★ HUD 接入口：主控只认它，不认识任何具体 HUD 类型
 │     ├─ ClickRouter.cs           输入分发：鼠标 → 手牌 / 格子（UI 遮挡走 EventSystem）
+│     ├─ MainMenuController.cs    主菜单：按钮、面板切换、场景加载、焦点管理
+│     ├─ ChapterCatalog.cs        可编辑的章节、关卡名称与目标配置
+│     ├─ LeaderboardPanel.cs      排行榜面板（暂未接 TapTap，显示未登录与空榜）
+│     ├─ MenuButtonFeedback.cs    独立焦点描边，保留美术样式
+│     ├─ MenuResponsiveLayout.cs  保持字号，调整窄屏页面与弹窗边距
+│     ├─ GameAudio.cs             独立音乐/音效声道、音量保存、跨场景保留
 │     ├─ BoardView.cs             ★ 棋盘：CellView（静态格子）+ CreepView（小怪）+ Sync 对账
 │     ├─ HandView.cs              手牌整排：每张牌一个可点击的 GameObject
 │     ├─ SceneValidator.cs        场景接线校验（逻辑是纯函数，测试可直接调用）
@@ -611,7 +644,7 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 
 ### 美术与特效的接入口
 
-表现层现在是 **100% 程序化生成、零美术资源依赖**：颜色来自 [ElementDefs.cs](Assets/Scripts/ElementDefs.cs) 的
+现有棋盘和原型手牌的基础外观仍由程序化生成：颜色来自 [ElementDefs.cs](Assets/Scripts/ElementDefs.cs) 的
 `Palette`，格子与卡牌的底图是运行时逐像素生成的（`BoardView.BoxSprite()`），元素字是 legacy `TextMesh`
 + Unity 内置字体，`sortingOrder` 只用 `0/1/2/3/5` 这几个硬编码值。
 
@@ -621,7 +654,7 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 格子与小怪还是纯代码生成，要做预制体的话照这个模式复制即可（`BoardView.EnsureCreepView` 里的
 `new GameObject` 换成 `Instantiate`，但**别动 `Sync()` 的对账语义和 `_frozen` 的冻结窗口**）。
 
-**要接特效，挂点选 `BoardView.PlayStep`，不要用 `GameSession.EventRaised`。**
+**棋盘反应特效的挂点选 `BoardView.PlayStep`。**
 后者是在 `FlushLog()` 里发出的，而 `FlushLog()` 是在这一步**播完之后**才被调用 —— 拿它触发特效会「先炸后动」。
 `PlayStep` 里的 `switch (e.Type)` 同时知道事件类型、元素、格子坐标和播放时长，才是对的挂点。
 `GameEventType` 共 16 种（`Move` / `Bump` / `Transform` / `Vanish` / `Spawn` / `SpawnBlocked` /
@@ -631,10 +664,9 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 `RoundEvent` 是回合事件的播报（见第九节），美术上应该做成一张「事件卡」而不是一行字。
 
 ⚠ **渲染管线是 Built-in**（没有 URP/HDRP，也没装 Shader Graph / VFX Graph）：
-特效只能用 **ParticleSystem(Shuriken) + 内置 shader**。美术从 URP 工程带来的材质在这里**会全是洋红**。
+场景粒子可用 **ParticleSystem(Shuriken) + 兼容当前管线的 shader**；Canvas 卡牌消散将原包粒子离屏渲染，再用支持 UI 遮罩的材质合成。美术从其他管线带来的材质需要适配。
 `Assets/sharder/` 下的 PandaShader 系列是 `UnityCG.cginc` 的 Built-in shader，能用。
-另外注意 `Assets/yuansupai/` 与 `Assets/sharder/` 里已经有美术/特效包导入，
-但**表现层代码没有引用其中任何一个**。
+`Assets/yuansupai/` 与 `Assets/sharder/` 已在本地导入，但这两个目录和目录 `.meta` **仍未提交**。卡牌成功使用或弃掉时，`HandView.Sync` 播放消散；独立局内 UI 使用 `BattleUiController.ConsumeCard`。运行资源直接引用原包预制体，实例化其中的卡面和火星粒子，保留原 shader 与溶解曲线。原相机的两处后处理引用失效，接入配置显式绑定包内泛光配置，在 HDR 离屏画面复现光晕；接入细节、画面对照及跨会话状态见 [卡牌消散接入](docs/卡牌消散接入.md)。
 
 ---
 
@@ -1043,9 +1075,10 @@ Id 重复、没填说明、目录里有空槽位。
 
 ## 十、怎么验证
 
-**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：当前 **224 项**，含
-（原有 204 项 + 本次新增的 20 条回合事件用例；⚠ 新增那 20 条是在无头许可管道不通的环境里
-用「Roslyn 编译 + 一份只跑 Core 的临时 harness」验过的，**第一次正式 Run All 请在编辑器里跑一遍**）
+**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：核心 **224 项**
+（原有 204 项 + 本次新增的 20 条回合事件用例），另有主菜单 `MainMenuTests`、战斗 UI 与 PlayMode 套件，含
+（⚠ 回合事件那 20 条是在无头许可管道不通的环境里用「Roslyn 编译 + 一份只跑 Core 的临时 harness」验过的，
+第一次正式 Run All 请在编辑器里跑一遍）
 - 反应表：5 对相生逐对钉死（输家变成赢家）+ 5 对相克逐对钉死（输家消失）+ 双向一致性
 - **每个元素必须 2 胜 2 负** —— 专防「某一对被写反」（金×火 就曾经反过一次，让金变成 3 胜 1 负）
 - 碰撞结果：相生 → 输家就地换元素、元素总数不变、主动方停下；相克 → 输家被销毁、主动方占格并继续走
@@ -1109,6 +1142,8 @@ Id 重复、没填说明、目录里有空槽位。
     ⚠ 这条原来只看字符画布局，`level_02` 因此报过假问题（布局里没木土、但两张牌都能造出来）
   - 关卡资产校验：布局行列错误、Custom 目标没挂机制、固定起手牌在牌池外、`levelId` 为空；
     干净的一关必须是**空问题列表**；校验过程**不改动资产**
+- **主菜单**（`MainMenuTests`）：菜单页面流程、章节与关卡配置、排行榜、构建设置接线
+- **主菜单 PlayMode**（4 项）：菜单面板、音量保存、两个游戏入口（主菜单试玩入口 / 直接打开游戏场景）以及替换美术后样式保留
 - 「每格最多一个元素」这个不变量（40 个种子 × 逐步检查，共约 600 回合）
 - 抽牌阶段：补到上限 5 张 / 已满不抽 / 超过上限不会被削掉
 - 弃牌阶段：弃牌减手牌、每回合弃牌上限、弃牌阶段不能出牌
@@ -1298,14 +1333,14 @@ Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
 
 ### 表现层 / 美术
 
-- 表现层是**程序员美术**（纯色方块 + 文字），`View` 层零美术资源依赖；
+- Game 场景默认卡面仍是**程序员美术**（纯色方块 + 文字），卡牌消散已依赖导入的美术资源；
   卡牌已经支持预制体（`HandView.CardPrefab`），格子/小怪的外观还只有代码生成。
   接特效/预制体的挂点与注意事项见第六节「美术与特效的接入口」。
 - 复合元素复用的是小怪的显示对象（多一层光环 + 专用配色），**还没有自己的预制体通道**；
   想接美术就照卡牌那条双路模式（`HandView.CardPrefab`）给 `BoardView` 也加一个
 - 秘术牌在牌面上只是换字换色（「融合」/「分解」，字形缩到 0.62），**没有专门的牌面美术**
-- `Assets/yuansupai/` 与 `Assets/sharder/` 里已经有美术/特效包导入，
-  但**表现层代码没有引用其中任何一个** —— 还没接。
+- `Assets/yuansupai/` 与 `Assets/sharder/` 已接入成功出牌、弃牌时的卡牌消散，
+  两个目录和目录 `.meta` 仍未提交；远端克隆不能直接取得这些资源。
 - 相生的表现只是「格子闪一下 + 颜色/元素字换成新的」，没有真正的形变动画
 - 准备阶段的动画是「逐只小怪依次播放」，节奏由 `GameSession.StepDuration` 控制（`FastForward()` 可跳过）
 

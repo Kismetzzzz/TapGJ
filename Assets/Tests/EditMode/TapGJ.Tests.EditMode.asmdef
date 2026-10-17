@@ -3,7 +3,8 @@
     "rootNamespace": "TapGJ.Tests",
     "references": [
         "TapGJ.Runtime",
-        "TapGJ.Editor"
+        "TapGJ.Editor",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"
