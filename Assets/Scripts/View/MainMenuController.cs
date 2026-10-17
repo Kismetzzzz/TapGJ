@@ -280,7 +280,7 @@ namespace TapGJ.View
 
         public void OpenLeaderboard()
         {
-            if (_loading) return;
+            if (_loading || !leaderboardButton.interactable) return;
             OpenPanel(leaderboardPanel.gameObject, leaderboardPanel.FirstSelectedButton.gameObject);
         }
 

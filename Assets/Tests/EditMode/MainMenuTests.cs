@@ -92,14 +92,22 @@ namespace TapGJ.Tests
                     var icon = button.transform.Find("Icon").GetComponent<Image>();
                     Assert.IsTrue(icon.preserveAspect);
                     Assert.IsFalse(icon.raycastTarget);
-                    Assert.IsFalse(icon.gameObject.activeSelf);
+                    bool lockedLeaderboard = button.name == "LeaderboardButton";
+                    Assert.AreEqual(lockedLeaderboard, icon.gameObject.activeSelf);
+                    if (lockedLeaderboard)
+                    {
+                        Assert.IsFalse(button.interactable);
+                        Assert.IsNotNull(icon.sprite);
+                        Assert.AreEqual("Assets/UI/Art/UiLock.png", AssetDatabase.GetAssetPath(icon.sprite));
+                        StringAssert.Contains("暂未开放", buttonLabel.text);
+                    }
                     var ring = button.transform.Find("FocusRing").GetComponent<CanvasGroup>();
                     Assert.IsNotNull(button.GetComponent<MenuButtonFeedback>());
                     Assert.IsFalse(ring.blocksRaycasts, "焦点装饰不能拦截按钮点击");
                     Assert.IsFalse(ring.GetComponent<Image>().raycastTarget);
-                    // 换底图/状态图/字体应由 Prefab 统一传递，场景仅覆盖位置、文字和主按钮颜色。
+                    // 底图、状态图和字体跟随 Prefab；入口可单独配置图标。
                     var modifications = PrefabUtility.GetPropertyModifications(button.gameObject);
-                    Assert.IsFalse(modifications.Any(m => m.propertyPath == "m_Sprite"
+                    Assert.IsFalse(modifications.Any(m => m.propertyPath == "m_Sprite" && m.target.name != "Icon"
                         || m.propertyPath.StartsWith("m_SpriteState.") || m.propertyPath == "m_Transition"
                         || m.propertyPath == "m_FontData.m_Font"), buttonPath + " 不应锁死换肤属性");
                 }

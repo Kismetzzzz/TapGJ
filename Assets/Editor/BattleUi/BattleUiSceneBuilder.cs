@@ -262,7 +262,7 @@ namespace TapGJ.EditorTools
             if (fallback == null)
             {
                 fallback = Rect(artwork, "FallbackArtwork", 0, 0, CardSize.x, CardSize.y);
-                Picture(fallback, "Frame", 0, 0, CardSize.x, CardSize.y, new Color(.78f, .73f, .62f), _surface).raycastTarget = true;
+                Picture(fallback, "Frame", 0, 0, CardSize.x, CardSize.y, new Color(.78f, .73f, .62f), null).raycastTarget = true;
                 Label(fallback, "ElementLabel", "金", 0, 34, CardSize.x, 70, 40, Ink).alignment = TextAnchor.MiddleCenter;
                 Label(fallback, "ArtHint", "卡面待补充", 0, 118, CardSize.x, 44, 24, Ink).alignment = TextAnchor.MiddleCenter;
             }

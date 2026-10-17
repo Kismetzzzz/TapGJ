@@ -414,9 +414,51 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 排行榜_暂时锁定_鼠标键盘和其他入口都不能进入()
+        {
+            var entry = Button("Menu/LeaderboardButton");
+            var panel = Find("LeaderboardPanel").gameObject;
+            var menu = Find("Navigation").GetComponent<CanvasGroup>();
+            var focus = EventSystem.current.currentSelectedGameObject;
+            Assert.IsFalse(entry.interactable);
+            Assert.AreEqual(Navigation.Mode.None, entry.navigation.mode);
+            var icon = entry.transform.Find("Icon").GetComponent<Image>();
+            Assert.IsTrue(icon.gameObject.activeInHierarchy);
+            Assert.IsNotNull(icon.sprite, "锁定入口必须显示锁图标");
+            Assert.IsFalse(icon.raycastTarget);
+            StringAssert.Contains("暂未开放", entry.transform.Find("Label").GetComponent<Text>().text);
+
+            ExecuteEvents.Execute(entry.gameObject, new PointerEventData(EventSystem.current)
+                { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+            ExecuteEvents.Execute(entry.gameObject, new BaseEventData(EventSystem.current), ExecuteEvents.submitHandler);
+            entry.onClick.Invoke();
+            Button("UtilityButtons/UserButton").onClick.Invoke();
+            Object.FindFirstObjectByType<MainMenuController>().OpenLeaderboard();
+            yield return null;
+            Assert.IsFalse(panel.activeSelf);
+            Assert.IsFalse(Find("ModalBackdrop").gameObject.activeSelf);
+            Assert.IsTrue(menu.interactable);
+            Assert.IsTrue(menu.blocksRaycasts);
+            Assert.AreSame(focus, EventSystem.current.currentSelectedGameObject);
+
+            var settings = Button("UtilityButtons/SettingsButton");
+            foreach (var direction in new[] { MoveDirection.Up, MoveDirection.Left })
+            {
+                EventSystem.current.SetSelectedGameObject(settings.gameObject);
+                ExecuteEvents.Execute(settings.gameObject,
+                    new AxisEventData(EventSystem.current) { moveDir = direction }, ExecuteEvents.moveHandler);
+                Assert.AreEqual(Button("Menu/StartButton").gameObject,
+                    EventSystem.current.currentSelectedGameObject, "键盘导航应跳过锁定入口");
+            }
+            settings.onClick.Invoke();
+            Assert.IsTrue(Find("SettingsPanel").gameObject.activeSelf);
+        }
+
+        [UnityTest]
         public IEnumerator 排行榜_打开关闭恢复焦点_无服务时不伪造登录和成绩()
         {
             var entry = Button("Menu/LeaderboardButton");
+            entry.interactable = true; // 开放后继续验证已有面板行为。
             var panel = Find("LeaderboardPanel").gameObject;
             var menu = Find("Navigation").GetComponent<CanvasGroup>();
             EventSystem.current.SetSelectedGameObject(entry.gameObject);
@@ -453,6 +495,7 @@ namespace TapGJ.Tests
         [UnityTest]
         public IEnumerator 排行榜_绑定前十名_切换榜单清空旧数据_反复打开不重复回调()
         {
+            Button("Menu/LeaderboardButton").interactable = true;
             var panel = Find("LeaderboardPanel").GetComponent<LeaderboardPanel>();
             int loginRequests = 0;
             panel.LoginRequested += () => loginRequests++;

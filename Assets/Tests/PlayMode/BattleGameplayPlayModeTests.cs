@@ -584,6 +584,9 @@ namespace TapGJ.Tests
                 {
                     Assert.AreEqual(fusion ? CardKind.FusionCard : CardKind.DecomposeCard, card.Kind);
                     Assert.IsFalse(card.CardFace.gameObject.activeSelf, "秘术牌不得误用金元素卡面");
+                    var frame = card.transform.Find("Artwork/FallbackArtwork/Frame").GetComponent<Image>();
+                    Assert.IsNull(frame.sprite, "文字卡面的底板应为直角矩形，不能复用圆角面板贴图");
+                    Assert.AreEqual(Image.Type.Simple, frame.type);
                 }
             }
         }
