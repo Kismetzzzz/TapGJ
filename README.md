@@ -18,7 +18,7 @@ Unity 2D 原型，用来验证「8×8 棋盘 + 五行元素反应 + 元素牌」
 
 - **点击进入游戏**：入口页显示公告横条，点击后进入主菜单。
 - **开始游戏**：进入章节选择，再进入对应章节的关卡选择。默认配置对应布局图，章节数量与每章关卡数量均可独立调整。
-- **关卡卡片**：显示配置中的序号、名称与目标，目前标明“待开放”。点击在页底显示状态和目标摘要；章节卡片显示当前配置的关卡数量。
+- **关卡卡片**：显示配置中的序号、名称与目标；底部状态字是 `待开放` / `待解锁` / `开始` / `已通关`。**绑了关卡定义的条目点一下直接进关**；没绑定的仍在页底显示状态和目标摘要。章节卡片显示当前配置的关卡数量。
 - **试玩当前原型**：章节页的独立入口，进入现有 `Game.unity` 游戏场景。
 - **用户 / 公告 / 设置**：入口与主菜单右上方纵向排列；用户打开个人成绩与登录区域，公告显示提示，设置保留音量控制。
 - **通关排行榜**：查看个人最快通关、排名、全服榜与好友榜；页面预留前 10 名，可滚轮或触摸滚动。目前未连接 TapTap 服务，显示未登录与空榜状态，登录和刷新按钮给出暂不可用提示。
@@ -27,7 +27,19 @@ Unity 2D 原型，用来验证「8×8 棋盘 + 五行元素反应 + 元素牌」
 
 弹窗阻止背景操作；点击遮罩、关闭或 Esc 恢复原页面和焦点。返回与 Esc 依次从关卡返回章节、从章节返回主菜单、从主菜单返回入口。方向键切换按钮，Enter / 空格确认；超出可见区域的卡片支持滚轮、拖动与键盘选中后自动滚动。
 
-**修改章节与关卡**：选中 `Assets/UI/Data/ChapterCatalog.asset`，在 Inspector 的 `Chapters` 数组增删章节，并修改每章的 `Title`、`Description`、`Levels`。`Levels` 内的 `Title` 与 `Goal` 分别是关卡名称和目标；各章可有不同数量的关卡，也支持空章节。不必改代码或复制页面。重新打开章节页时会读取最新配置；此配置仅用于 UI，尚未实现的玩法仍显示待开放。
+**修改章节与关卡**：选中 `Assets/UI/Data/ChapterCatalog.asset`，在 Inspector 的 `Chapters` 数组增删章节，并修改每章的 `Title`、`Description`、`Levels`。`Levels` 内的 `Title` 与 `Goal` 分别是关卡名称和目标；各章可有不同数量的关卡，也支持空章节。不必改代码或复制页面。重新打开章节页时会读取最新配置；没有绑定关卡定义的条目显示「待开放」。
+
+**把关卡接进章节**（三条规矩都在 `ChapterCatalog` 里，见 `ChapterCatalog.Badge / IsUnlocked / PreviousBound`）：
+
+- 每一条 `Levels[i]` 上有一个 `Level` 字段，填 `Assets/Levels` 下的关卡定义（`LevelDefinition`）。
+  **留空 = 待开放**（只能看目标，点不进去）；**填了 = 点卡片直接进关**（`SceneFlow.LoadLevel`）。
+- 卡片底部的状态字由进度算：`待开放` / `待解锁` / `开始` / `已通关`（`ProgressStore` 按 `levelId` 记）。
+- 解锁链是**跨章节展平**的一条线：第一关永远开放，其余要等**前面最近的已绑定关卡**通关。
+  没绑关卡的条目会被跳过 —— 所以开发期做完哪几关就能连着玩哪几关，不会被还没做的关卡锁死。
+- ⚠ 进关去的是关卡自己的 `sceneName`（默认 `Game`）。那个场景里**必须同时有玩法与局内 UI**：
+  先跑一次菜单 **TapGJ ▸ 接入现有局内 UI**（`BattleGameplayInstaller`），它会把 `BattleGameplay` 的
+  HUD / 棋盘视口装进 `Game.unity`，并备份原场景到 `Artifacts/BattleUiIntegration/`。
+  没跑这一步，关卡进得去但结束不了回合。
 
 音频目前没有素材。将音乐片段拖到 `GameAudio/Music` 的 AudioSource（循环播放），音效通过 `GameAudio.Instance.PlayEffect(clip)` 播放，两者使用各自的音量。`GameAudio` 随场景保留，重复进入菜单时不会生成第二份。
 
@@ -205,6 +217,22 @@ Game.unity
   （相生不算「消失」——元素只是换了身份，所以只有相克才攒瓶子）
 - 装满（默认上限 **5**）后自动产出一张**对应元素的牌**，瓶子清零
 - 玩家初始随机 5 张牌
+
+### 开不开：`Rules.BottleMode`
+
+| 取值 | 行为 |
+|---|---|
+| `Enabled`（**默认**，枚举排 0） | 元素消失 → 喂瓶；满瓶产一张对应元素牌 |
+| `Disabled` | 本关**没有元素瓶**：不喂瓶、不产牌、计数恒 0（`BottleFill` / `GainCard` 两条日志也不发）；但元素照样从棋盘消失，`TotalRemoved` / `RemovedCounts` 照记 |
+
+- 老关卡资产反序列化出来是 0 = `Enabled`，所以**现有所有关卡都不受影响**。
+  这也是为什么用**枚举**而不是 `bool UseBottles`：bool 在老资产上默认 `false`，会把现有的瓶子一起关掉。
+  （和 `EmptyCellCardMode.Summon = 0` 是同一个兼容套路。）
+- 关瓶之后「玉翁敛息」自动判**不适用**（抽到会被跳过、不占本回合），引擎的
+  `ApplyBottleCapacity` 也会变成 no-op（返回 0，容量不变）。
+- **第一章 5 关全部设成 `Disabled`**（章节描述里的「无元素瓶」）；第三章要教小瓶子时才打开它。
+- 旧 IMGUI HUD 在关瓶时不再画瓶子条；新的 uGUI 局内 UI（`BattleGameplayHud`）本来就不画瓶子。
+- 关卡面板摘要会多一句 **`无元素瓶`**，一眼看得出这一关关没关。
 
 ### 出牌规则（`Rules.CardEffect = CardAsVirtualElement`）
 
@@ -484,12 +512,41 @@ public override void OnEncounter(GameEngine engine, EncounterInfo info)
 胜利条件的文案与进度条也会换成机制给的那份（`GoalDescription` / `GetGoalProgress`），
 所以 HUD 不需要知道这一关到底在比什么。
 
-### 现成的两个示例
+### 现成的机制组件
 
 | 组件 | 演示什么 |
 |---|---|
 | [SpawnOnRoundRule](Assets/Scripts/Levels/Mechanics/SpawnOnRoundRule.cs) | 每 N 回合在随机空格生成元素（`OnRoundStart` + `SpawnAt` + `QueueNotice`） |
 | [ReactionCountRule](Assets/Scripts/Levels/Mechanics/ReactionCountRule.cs) | 「累计 N 次相生转换」当胜利条件（`Custom` + `OnEncounter` + `TryExtraWin` + 进度条） |
+| [EqualElementCountsRule](Assets/Scripts/Levels/Mechanics/EqualElementCountsRule.cs) | 「场上各种元素数量相等」当胜利条件（`requireAllPoolElements` + `tolerance`，自带配置自查） |
+| [OnlyTheseElementsRule](Assets/Scripts/Levels/Mechanics/OnlyTheseElementsRule.cs) | 「场上只剩指定的那几种元素」当胜利条件（例：只剩水和火；`allowed` 多选 + `requireEachAllowedPresent`） |
+| [BottleProducedRule](Assets/Scripts/Levels/Mechanics/BottleProducedRule.cs) | 「某元素的小瓶子产出 N 张牌」当胜利条件（第三章小瓶子教学；`element` + `count`） |
+| [FusionCountRule](Assets/Scripts/Levels/Mechanics/FusionCountRule.cs) | 「本局累计融合 N 次」当胜利条件（第二章合成教学） |
+| [DecomposeCountRule](Assets/Scripts/Levels/Mechanics/DecomposeCountRule.cs) | 「本局累计分解 N 次」当胜利条件；`requireNoComposites` 让它变成「分解掉全部复合元素」（分解五种那关） |
+| [ElementKindsRule](Assets/Scripts/Levels/Mechanics/ElementKindsRule.cs) | 「场上恰好剩 N 种元素」当胜利条件（不指定是哪几种；空场天然不算赢） |
+
+> **「A 且 B」型目标**：`Rules.RequireAllWinRules`（默认 **关** = 老语义「任一机制满足即赢」）。
+> 勾上之后**所有**挂着的机制都必须返回 true 才赢 —— 于是「成功合成 1 个复合元素 **且** 场上只剩两种元素」
+> 就是两个小组件叠起来，不用为每种组合再写一个专用类。
+> ⚠ 默认必须是关：老关卡里常有「只做进度条/提示」的机制，它永远返回 false，一开 AND 就会把那关卡成不可能赢。
+
+> 关系型的胜利条件（同时看多种元素）**不要**硬塞进内置的 `GoalKind`：内置那 7 种都只盯一种元素的数量。
+> 用一个 `LevelRuleBehaviour` 子类 + 把关卡 `rules.Goal` 选成 `Custom` 就够了，代价只是这一关要有一个
+> 挂了该组件的关卡预制体。
+>
+> ⚠ 用 `OnlyTheseElementsRule` 时自己确认「要被清掉的那种元素真的清得掉」：元素池里只放
+> 「允许的元素 + 要清掉的元素」，而且要清掉的必须**有牌能打它**（相克让它消失，或相生把它变成允许的元素）。
+> 否则这一关永远赢不了，而配置校验**不会**替你发现这一点。
+
+### 过渡关卡 / 剧情文本
+
+- 数据：关卡资产上的 **`outroText`**（多行文本，留空 = 没有）。「过渡关卡」就是把剧情写在最后一关上。
+- 传递：胜利那一刻 `LevelLoader.OnLevelFinished` 会把它记到
+  [LevelOutro](Assets/Scripts/Flow/LevelOutro.cs)（静态、跨场景活着），失败或没有文本则清空。
+- 展示：局内 UI 的结算面板（`BattleGameplayHud.OnLevelFinished`）会把 `LevelOutro.Current`
+  接在胜负说明后面显示。主界面以后想用就自己读 `LevelOutro.Current` / `HasText` / `Clear()`
+  —— 读完**不会自动清空**，由展示方决定什么时候清。
+- ⚠ 这是一条**单向数据通道**，没有做「剧情分页 / 逐字 / 立绘」——那些都属于 UI 同学的地盘。
 
 重开也走 `LevelLoader.RebuildLevel`（`GameSession` 通过 `ILevelHost` 回调它），
 关卡预制体会被销毁重建，所以机制里的计数跟着归零 —— 不会出现「重开一局但机制还记着上一局的数」。
@@ -531,7 +588,10 @@ Assets/
 │  │  └─ Mechanics/               ★ 关卡机制（挂在关卡预制体上）
 │  │     ├─ LevelRuleBehaviour.cs 机制基类：ILevelRule 的空实现，只覆盖关心的钩子
 │  │     ├─ SpawnOnRoundRule.cs   示例：每 N 回合生成元素
-│  │     └─ ReactionCountRule.cs  示例：累计 N 次相生转换即胜利（自定义目标）
+│  │     ├─ ReactionCountRule.cs  示例：累计 N 次相生转换即胜利（自定义目标）
+│  │     ├─ EqualElementCountsRule.cs 「各种元素数量相等」当目标（关系型，带配置自查）
+│  │     ├─ OnlyTheseElementsRule.cs  「只剩指定的那几种元素」当目标（如只剩水火）
+│  │     └─ BottleProducedRule.cs    「某元素小瓶子产出 N 张牌」当目标（第三章）
 │  ├─ Events/                     ★ 回合事件（每条事件 = 一个 ScriptableObject 子类 + 一个资产）
 │  │  ├─ RoundEventDefinition.cs  事件基类：Id / 显示名 / 说明 / IsApplicable / Apply / Revert
 │  │  ├─ Event_GiveElementCards.cs   元素馈赠（给 N 张元素牌）
@@ -543,6 +603,7 @@ Assets/
 │  ├─ Flow/                       场景流与进度（主界面同学的对接面）
 │  │  ├─ GameLaunchContext.cs     跨场景传「要进哪一关」
 │  │  ├─ SceneFlow.cs             进关 / 回主界面 / 重进本关 / **退出游戏**（编辑器里 = 结束 Play）
+│  │  ├─ LevelOutro.cs            ★ 通关剧情文本的跨场景通道（过渡关卡用）
 │  │  └─ ProgressStore.cs         通关进度（PlayerPrefs）
 │  └─ View/                       表现层：拖进场景的组件（尺寸与位置都由场景决定）
 │     ├─ GameSession.cs           ★ 回合主控：引擎生命周期、回合协程、动画、选中态、日志
@@ -569,6 +630,10 @@ Assets/
    ├─ CompositeElementTests.cs    ★ 复合元素 + 秘术牌（配方表、融合/分解、产生效果、抽牌权重、校验）
    ├─ CompositeViewTests.cs       ★ 复合元素的表现层与两段式选点高亮
    ├─ RoundEventTests.cs          ★ 回合事件（调度可复现、不放回、每条事件的语义、关卡校验）
+   ├─ BottleModeTests.cs          ★ 小瓶子开关（默认有瓶、关瓶后不产牌、玉翁敛息自动跳过）
+   ├─ ChapterCatalogTests.cs      ★ 章节解锁链（待开放/待解锁/已通关、跨章节、跳过未绑定）
+   ├─ ChapterSupportTests.cs      ★ 组合目标 AND、分元素瓶产牌、固定/随机范围转换、剧情通道
+   ├─ Chapter2RuleTests.cs        ★ 融合计数 / 分解计数 / 元素种类 三个胜利条件的判定
    ├─ BoardViewTests.cs           表现层测试（64 格、Sync 对账、锚点布局、手牌排布、卡牌预制体）
    ├─ SceneWiringTests.cs         场景接线校验 + 「接线清单里的字段名还有效」
    ├─ HudQuitTests.cs             ★ 「退出游戏」按钮：两段式确认、超时作废、入口仍在 SceneFlow 上
@@ -978,7 +1043,7 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 | 秘术馈赠 | `Event_GiveSpecialCards` | `countPerKind = 1` | 融合 + 分解各一张；**只在两种都启用的关卡里适用** |
 | 玉翁敛息 | `Event_BottleCapacity` | `capacity = 3` | 本回合瓶子容量降到 3，**触发瞬间先把已达标的瓶子结账产牌**，判定阶段恢复 |
 | 静滞结界 | `Event_SuppressCreepMovement` | — | 本回合准备阶段**跳过小怪移动**（复合元素的产出照旧） |
-| 金/木/水/火/土流漫溢 | `Event_ConvertCells` ×5 个资产 | `element`、`cellCount = 9` | 随机散落 9 格变成该元素：**空格就添加**、已有元素就地转换；墙 / 复合元素跳过 |
+| 金/木/水/火/土流漫溢 | `Event_ConvertCells` ×5 个资产 | `element`、`mode`、`cellCount`/`blockSize`/`rectX..rectHeight` | 把一片区域变成该元素：**空格就添加**、已有元素就地转换；墙 / 复合元素跳过。区域有三种取法（见下） |
 
 ### 每条事件的边界（都是刻意定的）
 
@@ -994,6 +1059,16 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
   **复合元素的每回合产出照旧**（它是产出元素，不是元素之间的相互作用）；玩家出牌照样能引发反应。
 - **流漫溢**：**最多凭空 +9 个元素**，是这套里最强的一条。目标元素不在本关 `ElementPool` 里时
   整条**不适用** —— 否则会打破「棋盘上永远只出现池内元素」那条硬不变量（那条不变量一条测试都没改）。
+  区域由 `mode` 决定，对应「随机 / 固定范围事件」这两种关卡设计：
+
+  | `mode` | 参数 | 效果 |
+  |---|---|---|
+  | `Scatter`（默认） | `cellCount` | 随机散落 N 格，不要求连通 |
+  | `RandomBlock` | `blockSize` | **随机位置**的一块 N×N 正方形（每次不同） |
+  | `FixedRect` | `rectX/rectY/rectWidth/rectHeight` | **固定**的一块矩形（每次同一片区域） |
+
+  引擎侧对应三个 API：`ConvertCellsToElement` / `ConvertBlockToElement` / `ConvertRectToElement`
+  （后两个共用同一套「已有元素就地转换、空格生成一只、墙和复合元素跳过」的结算）。
 
 ### 生命周期
 
@@ -1075,7 +1150,7 @@ Id 重复、没填说明、目录里有空槽位。
 
 ## 十、怎么验证
 
-**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：核心 **224 项**
+**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：核心 **254 项**
 （原有 204 项 + 本次新增的 20 条回合事件用例），另有主菜单 `MainMenuTests`、战斗 UI 与 PlayMode 套件，含
 （⚠ 回合事件那 20 条是在无头许可管道不通的环境里用「Roslyn 编译 + 一份只跑 Core 的临时 harness」验过的，
 第一次正式 Run All 请在编辑器里跑一遍）
@@ -1241,7 +1316,7 @@ Id 重复、没填说明、目录里有空槽位。
 Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
   -runTests -testPlatform EditMode -testResults <xml> -logFile <log>
 ```
-可以验证：编译零警告、**224 项测试**、接线校验逻辑、骨架搭建与「新建关卡」的建资产流程
+可以验证：编译零警告、**254 项测试**、接线校验逻辑、骨架搭建与「新建关卡」的建资产流程
 （测试直接调 `SceneScaffold.BuildSkeleton` / `CreateLevelAsset`）、
 字符画解析与目标判定、关卡机制的全部钩子与注入 API、元素池/牌池的硬约束与配置校验、
 复合元素的全部规则与秘术牌的两段式选点、回合事件的调度与每个事件的语义。
@@ -1363,3 +1438,15 @@ Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
   顺便搬进配置资源（接特效时这件事会更要紧，见第六节）。
 - 无头跑测试需要连 Unity 许可服务的**命名管道**，受限环境里会直接以 199 退出；
   编辑器（或 Unity Hub 占着 `Temp/UnityLockfile`）时也跑不了，**不要强删那个文件**。
+- ⚠ **`Assets/sharder/` 里那几个第三方 ShaderGUI 脚本必须包在 `#if UNITY_EDITOR` 里，否则打包必失败。**
+  它们用了 `MaterialEditor` / `MaterialProperty` / `PropertyDrawer`，但**不在 `Editor/` 文件夹下**，
+  所以会编进 `Assembly-CSharp`；而 player build 不引用 `UnityEditor.dll` → 一次 200+ 个 `CS0246`。
+  具体三处：
+  - `PandaShaderV2.3/Assert/Script/PandavfxGUI23.cs`：整个文件包 `#if UNITY_EDITOR … #endif`
+  - `PandaPost1.0/assert/Scripts/PandaPostGUI_V1.0.cs`：同上
+  - `PandaPost1.0/assert/Scripts/PandaDrawer.cs`：**只包 `DisplayNameDrawer`，
+    `DisplayName` 这个 `PropertyAttribute` 必须留在保护外面** —— 运行时的
+    `PandaPostProcess`（MonoBehaviour，被 `Assets/yuansupai/…prefab` 引用）用了 `[DisplayName]`
+  ⚠ 这个修复**曾经被一次分支合并覆盖掉过**（合进来的版本没有保护，打包报 235 个错）。
+  改这几个文件、或者合并含它们的分支时，先看一眼保护还在不在。
+  也别想着「把 `Assets/sharder` 整个标成 Editor-only asmdef」——那会让上面那个 prefab 的脚本在构建里变成 missing。

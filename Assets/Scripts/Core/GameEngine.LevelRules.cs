@@ -91,9 +91,21 @@ namespace TapGJ.Core
 
         // ---------------------------------------------------------------- 判定钩子
 
-        /// <summary>问所有机制「算不算赢」。第一个返回 true 的生效。</summary>
+        /// <summary>
+        /// 问所有机制「算不算赢」。
+        ///
+        /// 两种语义由 <see cref="Rules.RequireAllWinRules"/> 决定：
+        ///   · 默认（false）：**任一**返回 true 即赢（第一个生效）
+        ///   · 勾上（true）：**全部**返回 true 才赢（用来表达「A 且 B」型目标）
+        ///
+        /// 没有挂任何机制时一律返回 false（`Custom` 目标没挂机制的情况在关卡校验里已经报错了）。
+        /// </summary>
         bool CheckExtraWin(out string reason)
         {
+            bool requireAll = Rules.RequireAllWinRules;
+            bool anyEvaluated = false;
+            string firstMessage = null;
+
             for (int i = 0; i < _levelRules.Count; i++)
             {
                 var rule = _levelRules[i];
@@ -116,13 +128,30 @@ namespace TapGJ.Core
                     continue;
                 }
 
-                if (!won) continue;
-                reason = string.IsNullOrEmpty(message) ? "胜利：关卡机制判定达成" : message;
-                return true;
+                anyEvaluated = true;
+
+                if (!requireAll)
+                {
+                    if (!won) continue;
+                    reason = string.IsNullOrEmpty(message) ? "胜利：关卡机制判定达成" : message;
+                    return true;
+                }
+
+                // AND：有一个没满足就不算赢（直接返回，不用等其它机制）
+                if (!won)
+                {
+                    reason = null;
+                    return false;
+                }
+
+                if (firstMessage == null && !string.IsNullOrEmpty(message)) firstMessage = message;
             }
 
             reason = null;
-            return false;
+            if (!requireAll || !anyEvaluated) return false;
+
+            reason = firstMessage ?? "胜利：所有关卡条件都已满足";
+            return true;
         }
 
         /// <summary>问所有机制「算不算输」。第一个返回 true 的生效。</summary>

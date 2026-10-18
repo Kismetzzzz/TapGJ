@@ -11,6 +11,8 @@ namespace TapGJ.Core
     {
         public Element Element { get; }
         readonly int[] _counts = new int[ElementDefs.Count];
+        /// <summary>每个元素各自「因为瓶满而产出过多少张牌」——第三章的教学目标全靠它。</summary>
+        readonly int[] _granted = new int[ElementDefs.Count];
 
         /// <summary>
         /// 容量。**不是只读的**：回合事件（「玉翁敛息」）会临时把它改小、判定阶段再改回来。
@@ -19,6 +21,7 @@ namespace TapGJ.Core
         /// </summary>
         public int Capacity { get; private set; }
 
+        /// <summary>本局瓶子一共产出过多少张牌（**不分元素**的总数）。分元素的用 <see cref="CardsGranted"/>。</summary>
         public int TotalCardsGranted { get; private set; }
 
         internal Bottle(int capacity)
@@ -27,6 +30,9 @@ namespace TapGJ.Core
         }
 
         public int Count(Element e) => _counts[(int)e];
+
+        /// <summary>这个元素的瓶子**已经产出过多少张对应元素牌**（第三章「生成 N 张火牌」这类目标用它）。</summary>
+        public int CardsGranted(Element e) => _granted[(int)e];
 
         /// <summary>改容量（事件用）。只改数字，不结账 —— 要「先结账再改」用引擎的 ApplyBottleCapacity。</summary>
         internal void SetCapacity(int capacity) => Capacity = capacity < 1 ? 1 : capacity;
@@ -37,7 +43,7 @@ namespace TapGJ.Core
             _counts[(int)e]++;
             if (_counts[(int)e] < Capacity) return false;
             _counts[(int)e] = 0;
-            TotalCardsGranted++;
+            Grant(e, 1);
             return true;
         }
 
@@ -54,8 +60,16 @@ namespace TapGJ.Core
 
             int cards = _counts[i] / capacity;
             _counts[i] %= capacity;
-            TotalCardsGranted += cards;
+            Grant(e, cards);
             return cards;
+        }
+
+        /// <summary>记账：总数 + 分元素各记一份（两条产出路径都走这里）。</summary>
+        void Grant(Element e, int cards)
+        {
+            if (cards <= 0) return;
+            TotalCardsGranted += cards;
+            _granted[(int)e] += cards;
         }
 
         public string DebugLine()
@@ -835,8 +849,12 @@ namespace TapGJ.Core
             Board.Clear(creep.Pos);
             _creeps.Remove(creep.Uid);
 
+            // 本关没有元素瓶（Rules.BottleMode = Disabled）时：不喂瓶、不产牌、也不发那两条日志。
+            // ⚠ 只影响「瓶子」这一层：元素照样从棋盘消失，TotalRemoved / RemovedCounts 照常记。
+            bool feedsBottle = feedBottle && Rules.BottlesEnabled;
+
             // 场上消失一个元素 → 对应瓶子 +1；满瓶自动产出一张对应元素牌。
-            if (feedBottle && Bottle.Add(creep.Element))
+            if (feedsBottle && Bottle.Add(creep.Element))
             {
                 record.Events.Add(new GameEvent
                 {
@@ -847,7 +865,7 @@ namespace TapGJ.Core
                 DrawCard(creep.Element);
             }
 
-            if (feedBottle)
+            if (feedsBottle)
             {
                 record.Events.Add(new GameEvent
                 {

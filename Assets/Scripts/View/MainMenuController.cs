@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using TapGJ.Flow;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -160,11 +161,15 @@ namespace TapGJ.View
                     int levelIndex = i;
                     var level = chapter.levels[i];
                     var button = CreateCard(levelCardTemplate, levelsScroll.content, "Level" + (i + 1).ToString("00") + "Button",
-                        CardTitle(level.title, "未命名关卡"), level.goal, "待开放", i);
+                        CardTitle(level.title, "未命名关卡"), level.goal, chapterCatalog.Badge(index, i), i);
                     button.onClick.AddListener(() => PreviewLevel(levelIndex));
                     _levelButtons.Add(button);
                 }
-            chapterStatusLabel.text = _levelButtons.Count > 0 ? "选择关卡查看目标；关卡内容待开放。" : "本章暂无关卡。";
+            chapterStatusLabel.text = _levelButtons.Count == 0
+                ? "本章暂无关卡。"
+                : chapterCatalog.HasUnlockedLevel(index)
+                    ? "选择关卡查看目标；点「开始」进入。"
+                    : "选择关卡查看目标；关卡内容待开放。";
             ConfigureCardNavigation(_levelButtons, closeChapterButton);
             ShowPage(chapterPanel, _levelButtons.Count > 0 ? _levelButtons[0].gameObject : closeChapterButton.gameObject);
         }
@@ -178,6 +183,37 @@ namespace TapGJ.View
             if (chapter == null || chapter.levels == null || levelIndex < 0 || levelIndex >= chapter.levels.Length
                 || chapter.levels[levelIndex] == null) return;
             var level = chapter.levels[levelIndex];
+
+            // 绑了真实关卡 → 直接进关（没解锁只提示，不进）。
+            // 没绑 → 保持原来的「待开放」提示：那条路是给还没做的内容留的。
+            if (level.level != null)
+            {
+                if (!chapterCatalog.IsUnlocked(_selectedChapter, levelIndex))
+                {
+                    var previous = chapterCatalog.PreviousBound(_selectedChapter, levelIndex);
+                    chapterStatusLabel.text = previous == null
+                        ? "这一关还没开放。"
+                        : $"还没解锁：先通关「{CardTitle(previous.title, "上一关")}」。";
+                    return;
+                }
+
+                // 先自己确认场景可用，再锁住菜单 —— 否则场景没进 Build Settings 时会把主菜单卡死在“正在进入”
+                string scene = string.IsNullOrEmpty(level.level.sceneName) ? "Game" : level.level.sceneName;
+                if (!Application.CanStreamedLevelBeLoaded(scene))
+                {
+                    chapterStatusLabel.text = $"关卡场景「{scene}」不在 Build Settings 里，无法进入。";
+                    Debug.LogError($"[TapGJ] 关卡场景未加入 Build Settings：{scene}", this);
+                    return;
+                }
+
+                ClosePanels();
+                if (Audio != null) Audio.SaveSettings();
+                _loading = true;
+                menuGroup.interactable = false;
+                SceneFlow.LoadLevel(level.level);
+                return;
+            }
+
             string heading = CardTitle(chapter.title, "未命名章节") + " · "
                 + CardTitle(level.title, "未命名关卡") + "待开放。";
             chapterStatusLabel.text = GoalStatus(heading, level.goal);

@@ -32,6 +32,8 @@ namespace PandaTitle
         }
     }
 
+#endif
+
     [AttributeUsage(AttributeTargets.Field)]
     public class DisplayName : PropertyAttribute
     {
@@ -47,5 +49,4 @@ namespace PandaTitle
             return Value;
         }
     }
-#endif
 }

@@ -318,6 +318,10 @@ namespace TapGJ.Core
         /// </summary>
         public int ApplyBottleCapacity(int capacity)
         {
+            // 本关没有元素瓶（Rules.BottleMode = Disabled）：结不了账也改不了容量，直接当没事发生。
+            // 返回 0 = 没结出任何牌，调用方（玉翁敛息）不用再判一次。
+            if (!Rules.BottlesEnabled) return 0;
+
             capacity = Math.Max(1, capacity);
 
             int cards = 0;
@@ -359,63 +363,117 @@ namespace TapGJ.Core
             if (count <= 0) return 0;
             if (!Rules.ElementPool.Has(element)) return 0;
 
-            var cells = new List<Pos>();
+            var cells = ConvertibleCells();
+            Board.Shuffle(cells, _eventRng);
+
+            int changed = 0;
+            for (int i = 0; i < cells.Count && changed < count; i++)
+                if (ConvertOneCell(cells[i], element)) changed++;
+
+            return changed;
+        }
+
+        /// <summary>
+        /// **随机位置的一块 N×N 正方形**里所有格子变成 <paramref name="element"/>（「随机范围事件」用）。
+        /// 块的位置用引擎自己的随机流选，保证同种子可复现；块一定完整落在棋盘内。
+        /// 返回真的发生变化的格数。
+        /// </summary>
+        public int ConvertBlockToElement(Element element, int size)
+        {
+            if (size <= 0) return 0;
+            if (!Rules.ElementPool.Has(element)) return 0;
+
+            int w = Math.Min(size, Board.Width);
+            int h = Math.Min(size, Board.Height);
+            int x = w >= Board.Width ? 0 : _eventRng.Next(Board.Width - w + 1);
+            int y = h >= Board.Height ? 0 : _eventRng.Next(Board.Height - h + 1);
+
+            return ConvertRectToElement(element, x, y, w, h);
+        }
+
+        /// <summary>
+        /// **固定的那一块矩形**里所有格子变成 <paramref name="element"/>（「固定范围事件」用）。
+        /// 每次都作用在同一片区域（不像 <see cref="ConvertBlockToElement"/> 那样随机）。
+        /// 越界部分会被自动裁掉；墙格 / 复合元素格跳过。返回真的发生变化的格数。
+        /// </summary>
+        public int ConvertRectToElement(Element element, int x, int y, int width, int height)
+        {
+            if (width <= 0 || height <= 0) return 0;
+            if (!Rules.ElementPool.Has(element)) return 0;
+
+            int changed = 0;
+            for (int cy = y; cy < y + height; cy++)
+            {
+                for (int cx = x; cx < x + width; cx++)
+                {
+                    var pos = new Pos(cx, cy);
+                    if (!Board.InBounds(pos)) continue;
+                    if (ConvertOneCell(pos, element)) changed++;
+                }
+            }
+
+            return changed;
+        }
+
+        /// <summary>所有「可以放元素」的格子（界内、不是墙、不是复合元素）。</summary>
+        List<Pos> ConvertibleCells()
+        {
+            var cells = new List<Pos>(Board.Width * Board.Height);
             for (int y = 0; y < Board.Height; y++)
             {
                 for (int x = 0; x < Board.Width; x++)
                 {
                     var pos = new Pos(x, y);
-                    if (!Board.IsWalkable(pos)) continue;       // 墙 / 界外
-                    if (Board.HasComposite(pos)) continue;      // 复合元素不是元素格
+                    if (!Board.IsWalkable(pos)) continue;   // 墙 / 界外
+                    if (Board.HasComposite(pos)) continue;  // 复合元素不是元素格
                     cells.Add(pos);
                 }
             }
+            return cells;
+        }
 
-            Board.Shuffle(cells, _eventRng);
+        /// <summary>
+        /// 把一格变成 <paramref name="element"/>：已有元素 → 就地转换；空格 → 生成一只。
+        /// 返回这一格算不算「发生了变化」（本来就是这个元素也算占掉一格）。
+        /// </summary>
+        bool ConvertOneCell(Pos pos, Element element)
+        {
+            if (!Board.IsWalkable(pos) || Board.HasComposite(pos)) return false;
 
-            int changed = 0;
-            for (int i = 0; i < cells.Count && changed < count; i++)
+            var creep = Board.At(pos);
+            if (creep != null)
             {
-                var pos = cells[i];
-                var creep = Board.At(pos);
-
-                if (creep != null)
+                if (creep.Element != element)
                 {
-                    if (creep.Element != element)
+                    var from = creep.Element;
+                    creep.Element = element;
+                    AddEventStepEvent(new GameEvent
                     {
-                        var from = creep.Element;
-                        creep.Element = element;
-                        AddEventStepEvent(new GameEvent
-                        {
-                            Type = GameEventType.Transform,
-                            From = pos,
-                            To = pos,
-                            Element = from,
-                            Uid = creep.Uid,
-                            Text = $"事件：{pos} 的{ElementDefs.Name(from)}变成{ElementDefs.Name(element)}",
-                        });
-                    }
-
-                    changed++; // 本来就是这个元素也算占掉一格（效果范围就是 N 格）
-                    continue;
+                        Type = GameEventType.Transform,
+                        From = pos,
+                        To = pos,
+                        Element = from,
+                        Uid = creep.Uid,
+                        Text = $"事件：{pos} 的{ElementDefs.Name(from)}变成{ElementDefs.Name(element)}",
+                    });
                 }
 
-                var spawned = SpawnAt(pos, element);
-                if (spawned == null) continue;
-
-                AddEventStepEvent(new GameEvent
-                {
-                    Type = GameEventType.Spawn,
-                    From = pos,
-                    To = pos,
-                    Element = element,
-                    Uid = spawned.Uid,
-                    Text = $"事件：{pos} 是空格，生成了 1 个{ElementDefs.Name(element)}元素",
-                });
-                changed++;
+                return true;
             }
 
-            return changed;
+            var spawned = SpawnAt(pos, element);
+            if (spawned == null) return false;
+
+            AddEventStepEvent(new GameEvent
+            {
+                Type = GameEventType.Spawn,
+                From = pos,
+                To = pos,
+                Element = element,
+                Uid = spawned.Uid,
+                Text = $"事件：{pos} 是空格，生成了 1 个{ElementDefs.Name(element)}元素",
+            });
+            return true;
         }
 
         /// <summary>

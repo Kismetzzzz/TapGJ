@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   menuSceneName: MainMenu
   levels:
-  - {fileID: 11400000, guid: 394f145e3ad313c4881c42b2efab4a5f, type: 2}
-  - {fileID: 11400000, guid: dddae46ea6746f243a97b4dcd932b23e, type: 2}
-  - {fileID: 11400000, guid: bfcfa66eaee843549ad07f5237da783a, type: 2}
+  - {fileID: 11400000, guid: 286d05ba2d0d45b783fcc66b6738ddf0, type: 2}
+  - {fileID: 11400000, guid: c0c6c380e6004df1ac02c2f339b0d16f, type: 2}
+  - {fileID: 11400000, guid: 83513ba1aa30466b94b9ff2f517cbd9d, type: 2}
+  - {fileID: 11400000, guid: b7251ad62069449da6f513216082ecd4, type: 2}
+  - {fileID: 11400000, guid: 3f4cf79864bc41129e6a37f871f47aa4, type: 2}

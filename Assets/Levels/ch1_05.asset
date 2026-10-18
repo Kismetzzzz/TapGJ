@@ -10,49 +10,54 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4baacca015d143941812e41b49f10709, type: 3}
-  m_Name: Level_03
+  m_Name: ch1_05
   m_EditorClassIdentifier: 
-  levelId: level_03
-  displayName: "\u7B2C 3 \u5173"
-  description: 
+  levelId: ch1_05
+  displayName: "\u5E73\u5747\u5143\u7D20"
+  description: "\u4E94\u79CD\u5143\u7D20\u6570\u91CF\u62C9\u5E73\uFF08\u6700\u591A\u5DEE 1 \u4E2A\uFF09\u5C31\u7B97\u8D62\u3002"
   previewImage: {fileID: 0}
   sceneName: Game
-  levelPrefab: {fileID: 913595116737357542, guid: 2d13743367a892d48b5fba741ea15e47, type: 3}
-  useFixedSeed: 0
+  levelPrefab: {fileID: 539428887325380736, guid: 64b5a6cd07b34175810ae1a126d665b3, type: 3}
+  useFixedSeed: 1
   fixedSeed: 20240607
   rules:
     BoardWidth: 8
     BoardHeight: 8
     ElementPool: 31
     CardPool: 31
-    CreepsPerElement: 4
-    MaxMoveSteps: 3
+    CreepsPerElement: 0
+    MaxMoveSteps: 0
     InitialHandSize: 5
     HandLimit: 5
     MaxDiscardsPerRound: 5
     MaxCardsPerRound: 0
     BottleCapacity: 5
-    RoundLimit: 15
+    BottleMode: 1
+    EventIntervalMin: 3
+    EventIntervalMax: 6
+    RoundLimit: 12
     Goal:
-      Kind: 0
+      Kind: 6
       Target: 0
       TargetCount: 0
       Rounds: 0
     CardEffect: 0
     EmptyCellCard: 0
-    UseCompositeElements: 1
-    SpecialCardPool: -1
+    UseCompositeElements: 0
+    SpecialCardPool: 0
     ElementCardWeight: 10
-    FusionCardWeight: 2
-    DecomposeCardWeight: 2
+    FusionCardWeight: 10
+    DecomposeCardWeight: 5
     CompositeRange: 1
     CompositeIngredientsPerRound: 4
     FusionRequiresAdjacency: 1
-    AllowMultipleComposites: 1
+    AllowMultipleComposites: 0
     CompositeRandomProductionOrder: 1
     CompositeProducesOnCreation: 1
     DecomposeGrantsElementCards: 1
     InitialComposites: []
-  layoutText: 
+  layoutText: "........\r\n........\r\n..\u91D1.....\r\n....\u91D1...\r\n......\u91D1.\r\n..\u6728.....\r\n....\u6C34...\r\n..\u706B...\u571F."
   fixedInitialHand: 
   initialComposites: []
+  useEvents: 0
+  roundEvents: []

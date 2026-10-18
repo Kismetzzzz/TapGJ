@@ -259,26 +259,29 @@ namespace TapGJ.View
             DrawBar(new Rect(x, y, w, 18f), progress.Fill, progress.Label);
             y += 30f;
 
-            // ---- 元素小瓶子
+            // ---- 元素小瓶子（本关关掉瓶子时整块不画）
             // ⚠ 容量只有**一个**真源：Engine.Bottle.Capacity（本回合实际生效的容量）。
             //   不要读 Rules.BottleCapacity —— 那是本关的基准值，回合事件「玉翁敛息」改的是前者，
             //   读后者会让进度条显示 4/5 而实际 3 就爆。
-            GUI.Label(new Rect(x, y, w, 22f), "<b>元素小瓶子</b>（场上每消失一个元素 +1，满瓶出一张牌）", _label);
-            y += 24f;
-            int capacity = Mathf.Max(1, Engine.Bottle.Capacity);
-            foreach (var e in ElementDefs.All)
+            if (Engine.Rules.BottlesEnabled)
             {
-                int c = Engine.Bottle.Count(e);
-                var color = ElementDefs.Tint(e);
-                GUI.color = color;
-                GUI.Label(new Rect(x, y, 22f, 20f), ElementDefs.Name(e), _label);
-                GUI.color = Color.white;
+                GUI.Label(new Rect(x, y, w, 22f), "<b>元素小瓶子</b>（场上每消失一个元素 +1，满瓶出一张牌）", _label);
+                y += 24f;
+                int capacity = Mathf.Max(1, Engine.Bottle.Capacity);
+                foreach (var e in ElementDefs.All)
+                {
+                    int c = Engine.Bottle.Count(e);
+                    var color = ElementDefs.Tint(e);
+                    GUI.color = color;
+                    GUI.Label(new Rect(x, y, 22f, 20f), ElementDefs.Name(e), _label);
+                    GUI.color = Color.white;
 
-                float fill = (float)c / capacity;
-                DrawBar(new Rect(x + 26f, y + 3f, w - 60f, 14f), fill, $"{c}/{capacity}", color);
-                y += 21f;
+                    float fill = (float)c / capacity;
+                    DrawBar(new Rect(x + 26f, y + 3f, w - 60f, 14f), fill, $"{c}/{capacity}", color);
+                    y += 21f;
+                }
+                y += 6f;
             }
-            y += 6f;
 
             // ---- 阶段提示（手牌本身在下方的手牌区里点）
             string hint;

@@ -42,10 +42,24 @@ namespace TapGJ.Core
     }
 
     /// <summary>
+    /// 这一关有没有元素小瓶子（见 <see cref="Rules.BottleMode"/>）。
+    ///
+    /// ⚠ <see cref="Enabled"/> 故意是 0：加这个字段之前存下来的关卡资产反序列化出来就是 0，
+    /// 于是**旧关卡自动保持「有瓶」**，不需要挨个改资产。想关掉就显式选 <see cref="Disabled"/>。
+    /// </summary>
+    public enum BottleMode
+    {
+        /// <summary>默认：元素消失时喂瓶，满瓶产一张对应元素牌。</summary>
+        Enabled = 0,
+
+        /// <summary>本关没有元素瓶：不喂瓶、不产牌、计数恒为 0。</summary>
+        Disabled = 1,
+    }
+
+    /// <summary>
     /// 秘术牌（融合牌 / 分解牌）的集合（位掩码）。
     /// Inspector 会渲染成多选下拉框，和 <see cref="ElementMask"/> 一样是给关卡作者的开关。
-    /// </summary>
-    [Flags]
+    /// </summary>    [Flags]
     public enum SpecialCardMask
     {
         None = 0,
@@ -136,6 +150,22 @@ namespace TapGJ.Core
         /// <summary>元素小瓶子容量，满瓶换算成 1 张对应元素牌。</summary>
         public int BottleCapacity = 5;
 
+        /// <summary>
+        /// 这一关有没有元素小瓶子。
+        ///
+        /// 关掉之后：场上元素消失**不喂瓶**、也不会有「满瓶产牌」（`BottleFill` / `GainCard` 事件都不会发），
+        /// 瓶子计数恒为 0。这是给「第一章不教瓶子」这种关卡用的（章节描述里写的「无元素瓶」）。
+        ///
+        /// ⚠ 为什么是**枚举**而不是 `bool UseBottles`：这是个非 0 列表，
+        /// 老关卡资产反序列化出来会是 0 —— 枚举排 0 = `Enabled`，于是老关卡自动保持「有瓶」，
+        /// 不需要任何兼容代码。用 bool 的话老资产默认 `false`，会把现有所有关卡的瓶子一起关掉。
+        /// （这和 <see cref="EmptyCellCard"/> 用 `Summon = 0` 是同一个思路。）
+        /// </summary>
+        public BottleMode BottleMode = BottleMode.Enabled;
+
+        /// <summary>这一关喂不喂瓶子（读 <see cref="BottleMode"/>，别在别处再判一次）。</summary>
+        public bool BottlesEnabled => BottleMode == BottleMode.Enabled;
+
         // ------------------------------------------------------------ 回合事件
         // 「每隔 min~max 回合随机来一条本关启用的事件」（第 1 回合不触发，第一次落在 1+[min,max] 回合）。
         // 两个数值留在这里（而不是 LevelDefinition）是因为 Rules 是纯 C#、能被批量跑批与测试直接用；
@@ -155,6 +185,21 @@ namespace TapGJ.Core
         /// 选 <see cref="GoalKind.Custom"/> 时内置判定完全不参与，改由关卡预制体上的 ILevelRule 决定。
         /// </summary>
         public GoalSpec Goal = GoalSpec.WaterOnly();
+
+        /// <summary>
+        /// 多个关卡机制（<see cref="ILevelRule.TryExtraWin"/>）之间是 **OR** 还是 **AND**。
+        ///
+        /// · <c>false</c>（**默认**）：**任一**机制说「赢了」就赢（老语义，现有所有关卡都不受影响）
+        /// · <c>true</c>：**所有**启用的机制都说「赢了」才赢 —— 用来表达「A 且 B」型目标，
+        ///   例如「成功合成 1 个复合元素 **且** 场上只剩两种元素」= 两个小组件叠起来。
+        ///
+        /// 用法：只要关卡 `rules.Goal = Custom`，把每个条件做成一个 `LevelRuleBehaviour` 挂在关卡预制体上，
+        /// 再勾上这一项即可。只有 `Custom` 目标才走这条路；内置目标永远先判。
+        ///
+        /// ⚠ 默认必须是 false：换成 true 会把「挂了多个机制」的老关卡从「任一」变成「全部」，
+        /// 而那些关卡里往往有一个只做进度条/提示的机制，它会永远返回 false，把整关卡成不可能赢。
+        /// </summary>
+        public bool RequireAllWinRules;
 
         /// <summary>元素牌的作用方式（图1 未定义清楚，见 CardEffectMode 注释）。</summary>
         public CardEffectMode CardEffect = CardEffectMode.CardAsVirtualElement;

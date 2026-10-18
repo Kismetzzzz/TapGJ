@@ -103,7 +103,12 @@ namespace TapGJ.View
         void OnLevelFinished(bool victory, string message)
         {
             resultHeading.text = victory ? "通关成功" : "本局结束";
-            resultMessage.text = message;
+
+            // 通关后如果有剧情/过渡文本（LevelDefinition.outroText，由 LevelLoader 写进 LevelOutro），
+            // 接在胜负说明后面一起显示 —— 这就是「过渡关卡」把玩家引到下一章的地方。
+            string outro = victory && TapGJ.Flow.LevelOutro.HasText ? TapGJ.Flow.LevelOutro.Current : null;
+            resultMessage.text = string.IsNullOrEmpty(outro) ? message : message + "\n\n" + outro;
+
             nextLevelButton.gameObject.SetActive(victory && session.HasNextLevel);
             resultPanel.SetActive(true);
             ui.SetModalBlocked(true);

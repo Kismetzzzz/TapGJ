@@ -20,6 +20,10 @@ namespace TapGJ.Levels
         [TextArea] public string description;
         public Sprite previewImage;
 
+        [Tooltip("通关后显示的剧情/过渡文本（留空 = 没有）。会被 LevelLoader 在胜利那一刻记到 LevelOutro 上，" +
+                 "由局内 UI 的结算面板展示；「过渡关卡」就是靠它把玩家引到下一章。")]
+        [TextArea(2, 8)] public string outroText;
+
         [Header("进入方式")]
         [Tooltip("这一关放在哪个场景里（默认 Game）")]
         public string sceneName = "Game";
@@ -319,6 +323,7 @@ namespace TapGJ.Levels
             sb.Append(useEvents
                 ? $"　事件 {(roundEvents == null ? 0 : roundEvents.Length)} 条（每 {rules.EventIntervalMin}~{rules.EventIntervalMax} 回合）"
                 : "　事件 关");
+            if (!rules.BottlesEnabled) sb.Append("　无元素瓶");
             sb.Append($"　回合上限 {rules.RoundLimit}");
             sb.Append($"　目标 {rules.Goal.Describe()}");
 
