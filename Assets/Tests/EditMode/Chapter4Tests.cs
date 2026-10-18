@@ -190,6 +190,23 @@ namespace TapGJ.Tests
         // ---------------------------------------------------------------- 目录接线
 
         [Test]
+        public void 所有正式关卡都开着空格召唤()
+        {
+            // 空格召唤（元素牌打到空格 = 在那里召唤一只该元素的小怪）是**第一章就教过的基础操作**。
+            // 逐关把它关掉，玩家会以为「功能丢了」，而且关了之后没有任何替代手段去主动摆局。
+            // 所以定成硬约定：正式关卡一律 Summon。哪一关真的需要关，必须在这里写清楚原因。
+            var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);
+            Assert.IsNotNull(catalog, "找不到 " + RealCatalogPath);
+
+            foreach (var level in catalog.levels)
+            {
+                Assert.IsNotNull(level, "目录里有空槽位");
+                Assert.AreEqual(EmptyCellCardMode.Summon, level.rules.EmptyCellCard,
+                    level.levelId + " 关掉了空格召唤 —— 正式关卡一律打开（见这条用例的注释）");
+            }
+        }
+
+        [Test]
         public void 关卡目录一共20关_第四章排在最后()
         {
             var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);

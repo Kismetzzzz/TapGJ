@@ -167,7 +167,7 @@ namespace TapGJ.Tests
             // (关卡, 瓶容量, 回合上限, 目标组件上的 (元素, 张数) —— 顺序 = 预制体上的挂载顺序)
             var expectations = new (string id, int capacity, int roundLimit, (Element el, int count)[] goals)[]
             {
-                ("ch3_01", 5, 6, new (Element, int)[0]),                       // 只剩火，用 OnlyTheseElementsRule
+                ("ch3_01", 5, 6, new (Element, int)[0]),   // 内置目标「水 = 0」，没有瓶产出组件
                 ("ch3_02", 5, 8, new[] { (Element.Fire, 5) }),
                 ("ch3_03", 1, 8, new[] { (Element.Metal, 10), (Element.Wood, 10) }),
                 ("ch3_04", 1, 8, new[] { (Element.Water, 7), (Element.Earth, 6), (Element.Fire, 5) }),
@@ -185,10 +185,21 @@ namespace TapGJ.Tests
                 Assert.IsTrue(level.rules.BottlesEnabled, id + " 要开着元素瓶（这一章就是教它）");
                 Assert.AreEqual(capacity, level.rules.BottleCapacity, id + " 的瓶容量");
                 Assert.AreEqual(roundLimit, level.rules.RoundLimit, id + " 的回合上限");
-                Assert.AreEqual(GoalKind.Custom, level.rules.Goal.Kind, id + " 的目标要自定义");
                 Assert.IsFalse(level.useEvents, id + " 是教学章，不带事件");
                 Assert.AreEqual(level.rules.RequireAllWinRules, goals.Length > 1, id + " 多个目标必须用「且」");
 
+                // ch3_01 是唯一用**内置目标**的（元素 ≤ N）：它要教「杀水喂瓶」，
+                // 用「只剩火」的话，召唤出来的土 / 「火生土」都会把一个清不掉的土留在场上 → 一键锁死。
+                if (id == "ch3_01")
+                {
+                    Assert.AreEqual(GoalKind.ElementAtMost, level.rules.Goal.Kind, "ch3_01 用内置目标");
+                    Assert.AreEqual(Element.Water, level.rules.Goal.Target, "盯的是水");
+                    Assert.AreEqual(0, level.rules.Goal.TargetCount, "水要清到 0");
+                    Assert.IsNull(level.levelPrefab, "ch3_01 不需要关卡预制体（没有机制组件）");
+                    continue;
+                }
+
+                Assert.AreEqual(GoalKind.Custom, level.rules.Goal.Kind, id + " 的目标要自定义");
                 Assert.IsNotNull(level.levelPrefab, id + " 必须有关卡预制体");
 
                 var ruleComps = level.levelPrefab.GetComponentsInChildren<BottleProducedRule>(true);

@@ -18,7 +18,7 @@ MonoBehaviour:
   previewImage: {fileID: 0}
   outroText: ""
   sceneName: Game
-  levelPrefab: {fileID: 410000000000000000, guid: d1c2b3a49586778899aabbccddee0011, type: 3}
+  levelPrefab: {fileID: 0}
   useFixedSeed: 1
   fixedSeed: 20240607
   rules:
@@ -38,13 +38,13 @@ MonoBehaviour:
     EventIntervalMax: 6
     RoundLimit: 6
     Goal:
-      Kind: 6
-      Target: 0
+      Kind: 4
+      Target: 2
       TargetCount: 0
       Rounds: 0
     RequireAllWinRules: 0
     CardEffect: 0
-    EmptyCellCard: 1
+    EmptyCellCard: 0
     UseCompositeElements: 0
     SpecialCardPool: 0
     ElementCardWeight: 10

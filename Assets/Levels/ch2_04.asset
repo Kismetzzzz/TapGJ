@@ -44,7 +44,7 @@ MonoBehaviour:
       Rounds: 0
     RequireAllWinRules: 0
     CardEffect: 0
-    EmptyCellCard: 1
+    EmptyCellCard: 0
     UseCompositeElements: 1
     SpecialCardPool: 0
     ElementCardWeight: 10
