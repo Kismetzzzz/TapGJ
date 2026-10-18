@@ -27,6 +27,8 @@ namespace TapGJ.View
         [Header("背景格线校准（由下到上，坐标范围 0–1）")]
         [Tooltip("每条横向格线的高度，以及这条线上从左到右的纵向格线位置。留空时使用原梯形布局。")]
         [SerializeField] CalibrationRow[] calibrationRows = Array.Empty<CalibrationRow>();
+        [Tooltip("菱形棋盘四角，依次为逻辑左下、右下、右上、左上；使用容器内的 0–1 坐标。")]
+        [SerializeField] Vector2[] calibrationCorners = Array.Empty<Vector2>();
         GameSession _session;
         RenderTexture _target;
 
@@ -34,10 +36,52 @@ namespace TapGJ.View
         {
             if (!ValidCalibration(rows)) throw new ArgumentException("格线必须在 0–1 内有序排列，且每行列数相同。", nameof(rows));
             calibrationRows = rows;
+            calibrationCorners = Array.Empty<Vector2>();
             SetVerticesDirty();
         }
 
         static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+
+        static float Cross(Vector2 a, Vector2 b) => a.x * b.y - a.y * b.x;
+
+        static bool ValidCorners(Vector2[] corners)
+        {
+            if (corners == null || corners.Length != 4) return false;
+            for (int i = 0; i < 4; i++)
+            {
+                var p = corners[i];
+                if (!Finite(p.x) || !Finite(p.y) || p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1
+                    || Cross(corners[(i + 1) % 4] - p, corners[(i + 2) % 4] - corners[(i + 1) % 4]) <= .000001f)
+                    return false;
+            }
+            return true;
+        }
+
+        public void SetCornerCalibration(Vector2[] corners)
+        {
+            if (!ValidCorners(corners)) throw new ArgumentException("四角必须在 0–1 内按逆时针围成凸四边形。", nameof(corners));
+            calibrationCorners = (Vector2[])corners.Clone();
+            calibrationRows = Array.Empty<CalibrationRow>();
+            SetVerticesDirty();
+        }
+
+        void CornerProjection(out Vector2 horizontal, out Vector2 vertical, out Vector2 perspective)
+        {
+            var a = calibrationCorners[1] - calibrationCorners[2];
+            var b = calibrationCorners[3] - calibrationCorners[2];
+            var bend = calibrationCorners[0] - calibrationCorners[1] + calibrationCorners[2] - calibrationCorners[3];
+            float determinant = Cross(a, b);
+            perspective = new Vector2(Cross(bend, b), Cross(a, bend)) / determinant;
+            horizontal = calibrationCorners[1] * (1 + perspective.x) - calibrationCorners[0];
+            vertical = calibrationCorners[3] * (1 + perspective.y) - calibrationCorners[0];
+        }
+
+        Vector2 MapCorners(Vector2 grid)
+        {
+            CornerProjection(out var horizontal, out var vertical, out var perspective);
+            return (calibrationCorners[0] + horizontal * grid.x + vertical * grid.y)
+                / (1 + Vector2.Dot(perspective, grid));
+        }
 
         static bool ValidCalibration(CalibrationRow[] rows)
         {
@@ -82,9 +126,10 @@ namespace TapGJ.View
         {
             mesh.Clear();
             Rect rect = GetPixelAdjustedRect();
-            bool calibrated = ValidCalibration(calibrationRows);
-            int columns = calibrated ? (calibrationRows[0].columns.Length - 1) * 4 : 16;
-            int rows = calibrated ? (calibrationRows.Length - 1) * 4 : 16;
+            bool corners = ValidCorners(calibrationCorners);
+            bool calibrated = corners || ValidCalibration(calibrationRows);
+            int columns = corners ? (_session?.Engine?.Board.Width ?? 8) * 4 : calibrated ? (calibrationRows[0].columns.Length - 1) * 4 : 16;
+            int rows = corners ? (_session?.Engine?.Board.Height ?? 8) * 4 : calibrated ? (calibrationRows.Length - 1) * 4 : 16;
             for (int y = 0; y <= rows; y++)
                 for (int x = 0; x <= columns; x++)
                 {
@@ -109,7 +154,11 @@ namespace TapGJ.View
         Vector2 UvToLocal(Vector2 uv, Rect rect, bool calibrated)
         {
             Vector2 mapped;
-            if (calibrated)
+            if (ValidCorners(calibrationCorners))
+            {
+                mapped = MapCorners(BoardToGridUv(uv));
+            }
+            else if (calibrated)
             {
                 var grid = BoardToGridUv(uv);
                 float row = Mathf.Clamp01(grid.y) * (calibrationRows.Length - 1);
@@ -155,6 +204,23 @@ namespace TapGJ.View
             Rect rect = GetPixelAdjustedRect();
             if (!Finite(local.x) || !Finite(local.y) || rect.width <= 0 || rect.height <= 0) return false;
             var point = new Vector2((local.x - rect.xMin) / rect.width, (local.y - rect.yMin) / rect.height);
+            if (ValidCorners(calibrationCorners))
+            {
+                // 四角透视映射的反算，与实际渲染共用同一组顶点。
+                CornerProjection(out var horizontal, out var vertical, out var perspective);
+                horizontal -= point * perspective.x;
+                vertical -= point * perspective.y;
+                float determinant = Cross(horizontal, vertical);
+                if (Mathf.Abs(determinant) < .000001f) return false;
+                var delta = point - calibrationCorners[0];
+                var grid = new Vector2(Cross(delta, vertical), Cross(horizontal, delta)) / determinant;
+                const float tolerance = .00001f;
+                if (!Finite(grid.x) || !Finite(grid.y) || grid.x < -tolerance || grid.x > 1 + tolerance
+                    || grid.y < -tolerance || grid.y > 1 + tolerance || (MapCorners(grid) - point).sqrMagnitude > 1e-10f)
+                    return false;
+                uv = GridToBoardUv(new Vector2(Mathf.Clamp01(grid.x), Mathf.Clamp01(grid.y)));
+                return true;
+            }
             if (!ValidCalibration(calibrationRows))
             {
                 float inset = topInset * point.y;

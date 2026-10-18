@@ -71,9 +71,9 @@ namespace TapGJ.EditorTools
             composition.anchoredPosition = Vector2.zero;
             composition.gameObject.AddComponent<RectMask2D>();
             var bg = Picture(composition, "Background", 0, 0, 1920, 1080, Color.white,
-                AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/BattleBackground.jpg"));
+                AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/BattleBackground.png"));
             bg.preserveAspect = true;
-            var board = Rect(composition, "BoardContent", 420, 236, 1080, 532);
+            var board = Rect(composition, "BoardContent", 340, 200, 1300, 530);
             var controls = Rect(composition, "Controls", 0, 0, 1920, 1080);
             var controlsGroup = controls.gameObject.AddComponent<CanvasGroup>();
 
@@ -181,7 +181,7 @@ namespace TapGJ.EditorTools
 
         static void ImportArt()
         {
-            ImportSprite(ArtPath + "/BattleBackground.jpg", 2048);
+            ImportSprite(ArtPath + "/BattleBackground.png", 4096);
         }
 
         static void ImportSprite(string path, int maxSize, bool mipmaps = false)

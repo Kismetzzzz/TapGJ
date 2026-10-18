@@ -145,30 +145,21 @@ namespace TapGJ.EditorTools
 
         static void ApplyBackgroundBoardCalibration(BattleBoardViewport viewport)
         {
-            // 当前背景以 1920×1080 保存。手绘格线逐行标定，元素与点击使用同一份数据。
-            const float left = 410, top = 238, width = 1090, height = 526;
+            // 原图 2278×1280，完整等比显示在 1920×1080 内；四角取自背景棋盘边缘。
+            const float left = 340, top = 200, width = 1300, height = 530;
             var rect = viewport.rectTransform;
             rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0, 1);
             rect.anchoredPosition = new Vector2(left, -top);
             rect.sizeDelta = new Vector2(width, height);
-            float[] lines = { 761, 687, 614, 545, 478, 413, 351, 291, 240 };
-            float[][] columns =
+            var imageCorners = new[]
             {
-                new float[] { 414, 544, 677, 818, 958, 1085, 1233, 1364, 1493 },
-                new float[] { 422, 550, 685, 819, 957, 1084, 1224, 1349, 1480 },
-                new float[] { 434, 562, 690, 826, 957, 1083, 1217, 1343, 1468 },
-                new float[] { 446, 574, 698, 827, 957, 1083, 1210, 1333, 1454 },
-                new float[] { 458, 583, 706, 833, 957, 1080, 1202, 1324, 1442 },
-                new float[] { 475, 592, 713, 837, 957, 1078, 1196, 1315, 1431 },
-                new float[] { 488, 601, 720, 839, 957, 1078, 1188, 1306, 1418 },
-                new float[] { 504, 610, 727, 843, 957, 1073, 1184, 1298, 1403 },
-                new float[] { 514, 622, 734, 845, 958, 1075, 1178, 1290, 1390 }
+                new Vector2(1136, 855), new Vector2(1849, 505),
+                new Vector2(1129, 252), new Vector2(412, 518)
             };
-            var rows = new BattleBoardViewport.CalibrationRow[lines.Length];
-            for (int y = 0; y < rows.Length; y++)
-                rows[y] = new BattleBoardViewport.CalibrationRow((top + height - lines[y]) / height,
-                    columns[y].Select(x => (x - left) / width).ToArray());
-            viewport.SetCalibration(rows);
+            const float scale = 1920f / 2278;
+            float imageTop = (1080 - 1280 * scale) * .5f;
+            viewport.SetCornerCalibration(imageCorners.Select(p => new Vector2(
+                (p.x * scale - left) / width, (top + height - imageTop - p.y * scale) / height)).ToArray());
         }
 
         public static void RefreshHandLayout()

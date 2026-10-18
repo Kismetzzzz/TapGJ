@@ -68,7 +68,7 @@ namespace TapGJ.EditorTools
             var rail = Rect(controls, "ElementRail", 0, 0, 384, 412);
             rail.anchorMin = rail.anchorMax = rail.pivot = Vector2.zero;
             rail.anchoredPosition = new Vector2(24, 24);
-            rail.localScale = new Vector3(.7f, .7f, 1);
+            rail.localScale = new Vector3(.8f, .8f, 1);
             Label(rail, "Heading", "五行算盘", 0, 0, 384, 36, 27);
             var hint = Label(rail, "Hint", "集齐 5 点，生成对应元素牌", 0, 36, 384, 28, 20);
             var backing = Picture(rail, "Backing", null, 2, 80, 380, 317);

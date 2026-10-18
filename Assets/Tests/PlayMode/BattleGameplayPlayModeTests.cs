@@ -651,6 +651,11 @@ namespace TapGJ.Tests
             Assert.AreEqual(8, hud.Session.Engine.Board.Height);
             var composition = hud.transform.Find("Composition");
             var compositionRect = (RectTransform)composition;
+            var background = composition.Find("Background").GetComponent<Image>();
+            Assert.AreEqual(2278, background.sprite.texture.width, "应使用新背景的原始分辨率");
+            Assert.AreEqual(1280, background.sprite.texture.height);
+            Assert.IsTrue(background.preserveAspect);
+            Assert.IsFalse(background.raycastTarget, "背景图片不能遮挡棋盘点击");
             var viewport = hud.Viewport;
             Canvas.ForceUpdateCanvases();
             var renderedMesh = viewport.canvasRenderer.GetMesh();
@@ -673,9 +678,9 @@ namespace TapGJ.Tests
             // 独立读图标记的前排、后排与中间格子中心，容许手绘边缘的小幅不规则。
             var cells = new[] { new Pos(0, 0), new Pos(7, 0), new Pos(0, 7), new Pos(7, 7),
                 new Pos(3, 3), new Pos(4, 4), new Pos(0, 3), new Pos(7, 3) };
-            var backgroundCenters = new[] { new Vector2(481, 724), new Vector2(1423, 724),
-                new Vector2(560, 265), new Vector2(1348, 265), new Vector2(894, 512), new Vector2(1018, 446),
-                new Vector2(516, 512), new Vector2(1388, 512) };
+            var backgroundCenters = new[] { new Vector2(957, 680), new Vector2(1483, 427),
+                new Vector2(424, 436), new Vector2(952, 238), new Vector2(954, 463), new Vector2(954, 401),
+                new Vector2(711, 568), new Vector2(1240, 340) };
             for (int i = 0; i < cells.Length; i++)
             {
                 var p = cells[i];

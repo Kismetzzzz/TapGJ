@@ -109,5 +109,61 @@ namespace TapGJ.Tests
                 new Vector2(float.NaN, .5f), new Vector2(.5f, float.PositiveInfinity) })
                 Assert.IsFalse(BattleBoardViewport.TryCellAtUv(uv, 4, 3, 1, .1f, out _));
         }
+
+        [Test]
+        public void 菱形背景_四角和内部显示位置可反算到原格子()
+        {
+            var viewport = CreateViewport();
+            try
+            {
+                viewport.SetCornerCalibration(new[] { new Vector2(.5f, 0), new Vector2(1, .43f),
+                    new Vector2(.48f, 1), new Vector2(0, .57f) });
+                Assert.AreEqual(new Vector2(500, 0), viewport.BoardUvToLocal(Vector2.zero));
+                Assert.AreEqual(new Vector2(0, 285), viewport.BoardUvToLocal(Vector2.up));
+                for (int y = 0; y <= 16; y++)
+                    for (int x = 0; x <= 16; x++)
+                    {
+                        var expected = new Vector2(x / 16f, y / 16f);
+                        Assert.IsTrue(viewport.TryBoardUvAtLocalPoint(viewport.BoardUvToLocal(expected), out var actual));
+                        Assert.Less(Vector2.Distance(expected, actual), .00001f);
+                    }
+                foreach (var point in new[] { new Vector2(20, 20), new Vector2(980, 20),
+                    new Vector2(20, 480), new Vector2(980, 480) })
+                    Assert.IsFalse(viewport.TryBoardUvAtLocalPoint(point, out _), "菱形外的山石与云雾不能响应出牌");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(viewport.gameObject); }
+        }
+
+        [Test]
+        public void 四角透视_中心位于背景对角线交点而非四角平均值()
+        {
+            var viewport = CreateViewport();
+            try
+            {
+                viewport.SetCornerCalibration(new[] { Vector2.zero, Vector2.right,
+                    new Vector2(.75f, 1), new Vector2(.25f, 1) });
+                Assert.Less(Vector2.Distance(new Vector2(500, 1000f / 3), viewport.BoardUvToLocal(new Vector2(.5f, .5f))), .001f);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(viewport.gameObject); }
+        }
+
+        [Test]
+        public void 菱形背景_拒绝交叉退化和非法四角且保留已有校准()
+        {
+            var viewport = CreateViewport();
+            try
+            {
+                foreach (var corners in new[]
+                {
+                    new[] { Vector2.zero, Vector2.one, Vector2.right, Vector2.up },
+                    new[] { Vector2.zero, Vector2.right, Vector2.right, Vector2.up },
+                    new[] { Vector2.zero, Vector2.right, Vector2.one, new Vector2(-.1f, 1) },
+                    new[] { Vector2.zero, Vector2.right, Vector2.one, new Vector2(float.NaN, 1) },
+                    new[] { Vector2.zero, Vector2.right, Vector2.one }
+                }) Assert.Throws<ArgumentException>(() => viewport.SetCornerCalibration(corners));
+                Assert.Less(Vector2.Distance(new Vector2(480, 300), viewport.BoardUvToLocal(new Vector2(.5f, .5f))), .01f);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(viewport.gameObject); }
+        }
     }
 }
