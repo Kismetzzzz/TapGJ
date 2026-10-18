@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: ch3_02
   m_EditorClassIdentifier: 
   levelId: ch3_02
-  displayName: "\u4E8C\u5341\u5F20\u706B\u724C"
-  description: "\u8FD9\u4E00\u5173\u7684\u5C0F\u74F6\u5B50\u5F88\u6D45\uFF1A\u5BB9\u91CF 1\uFF0C\u573A\u4E0A\u6BCF\u6D88\u5931 1 \u4E2A\u706B\uFF0C\u706B\u74F6\u5C31\u7ACB\u523B\u7ED9\u4F60 1 \u5F20\u706B\u724C\u3002\u8BA9\u706B\u74F6\u4EA7\u51FA 20 \u5F20\u706B\u724C\u3002"
+  displayName: "\u4E94\u5F20\u706B\u724C"
+  description: "\u74F6\u5B50\u6512\u6EE1 5 \u683C\u624D\u7ED9\u4E00\u5F20\u706B\u724C\uFF1A\u6C34\u514B\u706B\uFF0C\u8BA9\u573A\u4E0A\u6D88\u5931 5 \u4E2A\u706B\u5C31\u6512\u51FA 1 \u5F20\u3002\u8BA9\u706B\u74F6\u4EA7\u51FA 5 \u5F20\u706B\u724C\u3002"
   previewImage: {fileID: 0}
   outroText: ""
   sceneName: Game
@@ -32,7 +32,7 @@ MonoBehaviour:
     HandLimit: 5
     MaxDiscardsPerRound: 5
     MaxCardsPerRound: 0
-    BottleCapacity: 1
+    BottleCapacity: 5
     BottleMode: 0
     EventIntervalMin: 3
     EventIntervalMax: 6
@@ -58,7 +58,7 @@ MonoBehaviour:
     CompositeProducesOnCreation: 1
     DecomposeGrantsElementCards: 1
   initialComposites: []
-  layoutText: "\u706B.\u706B.\u706B.\u706B.\r\n.\u706B.\u706B.\u706B..\r\n\u706B.\u706B.\u706B.\u706B.\r\n.\u706B.\u706B.\u706B..\r\n\u706B.\u706B.\u706B.\u706B.\r\n.\u706B.\u706B.\u706B..\r\n..\u706B..\u706B..\r\n...\u706B...."
+  layoutText: "\u706B.\u706B.\u706B.\u706B.\r\n.\u706B.\u706B.\u706B.\u706B\r\n\u706B.\u706B.\u706B.\u706B.\r\n.\u706B.\u706B.\u706B.\u706B\r\n\u706B.\u706B.\u706B.\u706B.\r\n.\u706B.\u706B.\u706B.\u706B\r\n...\u706B..\u706B.\r\n........"
   fixedInitialHand: 
   useEvents: 0
   roundEvents: []

@@ -15,13 +15,16 @@ namespace TapGJ.Tests
     ///
     /// 第三章的设计见 <c>ChapterCatalog.asset</c> 第三章那 5 条（关卡名/目标就是设计稿原文）：
     ///   1. 只剩火（教「元素消失 → 瓶子涨一格，满 5 格给一张牌」）
-    ///   2. 火瓶产 20 张
+    ///   2. 火瓶产 5 张（容量 5 → 要让 25 个火消失）
     ///   3. 金瓶 10 张 + 木瓶 10 张（教「瓶子里出来的牌就是下一环的弹药」）
     ///   4. 水瓶 7 + 土瓶 6 + 火瓶 5（相克链往下走一环）
     ///   5. 五种各 5 张（五行相克是一个环）
     ///
-    /// ⚠ 除了 ch3_01，其余四关的瓶容量都是 **1**：一局的出牌预算只有「回合上限 × 手牌上限」那么多张，
-    ///   容量 5 时「产 20 张」等于要杀掉 100 个火元素（≈100 次出牌），根本打不出来。
+    /// ⚠ 出牌预算是硬的：一局最多打「回合上限 × 手牌上限」张牌（8 × 5 = 40），
+    ///   而「产 N 张牌」= 该元素消失 **瓶容量 × N** 次。所以：
+    ///   · ch3_01 / ch3_02 用**容量 5**（张数也是 5 → 25 次消失，攒的过程看得见）；
+    ///   · ch3_03 / 04 / 05 的张数大（10 / 7+6+5 / 各 5），容量 5 会变成 100 次以上的消失，
+    ///     打不完，所以用**容量 1**（消失 N 次就给 N 张）。
     /// </summary>
     public class Chapter3Tests
     {
@@ -165,7 +168,7 @@ namespace TapGJ.Tests
             var expectations = new (string id, int capacity, int roundLimit, (Element el, int count)[] goals)[]
             {
                 ("ch3_01", 5, 6, new (Element, int)[0]),                       // 只剩火，用 OnlyTheseElementsRule
-                ("ch3_02", 1, 8, new[] { (Element.Fire, 20) }),
+                ("ch3_02", 5, 8, new[] { (Element.Fire, 5) }),
                 ("ch3_03", 1, 8, new[] { (Element.Metal, 10), (Element.Wood, 10) }),
                 ("ch3_04", 1, 8, new[] { (Element.Water, 7), (Element.Earth, 6), (Element.Fire, 5) }),
                 ("ch3_05", 1, 8, new[]
