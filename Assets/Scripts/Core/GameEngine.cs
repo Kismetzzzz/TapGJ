@@ -1664,11 +1664,23 @@ namespace TapGJ.Core
         }
 
         /// <summary>
-        /// 自定义目标的进度条：取第一个给出了进度（Label 非空）的机制。
+        /// 自定义目标的进度条：把所有给出了进度（Label 非空）的机制**合起来**报。
+        ///
+        /// 为什么要合：第二/三章有一批「A 且 B」的关卡（比如「金瓶 10 张 + 木瓶 10 张」），
+        /// 只报第一条的话，玩家永远看不到第二条差多少 —— 明明还差 8 张，进度条却已经满了。
+        ///
+        /// · 文字：各条 Label 用全角空格连起来（窄屏会被裁掉，所以顺序 = 预制体上的挂载顺序，越靠前越重要）
+        /// · 填充：<see cref="Rules.RequireAllWinRules"/> 为真（且）时取**最差**的那一条，
+        ///   否则（或）取**最好**的那一条 —— 两种语义下「进度条满了 = 要赢了」都成立。
         /// 机制没做进度条就退化成「只有描述、不填充」。
         /// </summary>
         GoalProgress CustomGoalProgress()
         {
+            var labels = new List<string>();
+            string description = null;
+            float best = 0f;
+            float worst = 1f;
+
             foreach (var rule in _levelRules)
             {
                 if (rule == null) continue;
@@ -1683,14 +1695,28 @@ namespace TapGJ.Core
                     continue; // 进度条不值得为它停掉一局，异常留给判定钩子那套去报
                 }
 
-                if (!string.IsNullOrEmpty(progress.Label))
-                {
-                    if (string.IsNullOrEmpty(progress.Description)) progress.Description = WinConditionDescription();
-                    return progress;
-                }
+                if (string.IsNullOrEmpty(progress.Label)) continue;
+
+                labels.Add(progress.Label);
+                if (string.IsNullOrEmpty(description) && !string.IsNullOrEmpty(progress.Description))
+                    description = progress.Description;
+
+                float fill = Clamp01(progress.Fill);
+                if (fill > best) best = fill;
+                if (fill < worst) worst = fill;
             }
 
-            return new GoalProgress { Description = WinConditionDescription(), Fill = 0f, Label = "" };
+            if (labels.Count == 0)
+                return new GoalProgress { Description = WinConditionDescription(), Fill = 0f, Label = "" };
+
+            if (string.IsNullOrEmpty(description)) description = WinConditionDescription();
+
+            return new GoalProgress
+            {
+                Description = description,
+                Fill = Rules.RequireAllWinRules ? worst : best,
+                Label = string.Join("　", labels),
+            };
         }
 
 

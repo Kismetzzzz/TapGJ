@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4baacca015d143941812e41b49f10709, type: 3}
+  m_Name: ch3_03
+  m_EditorClassIdentifier: 
+  levelId: ch3_03
+  displayName: "\u91D1\u724C\u4E0E\u6728\u724C"
+  description: "\u4E24\u4E2A\u5B57\uFF1A\u63A5\u529B\u3002\u706B\u724C\u70E7\u6389\u91D1\uFF08\u91D1\u74F6\u7ED9\u4F60\u91D1\u724C\uFF09\uFF0C\u74F6\u5B50\u91CC\u51FA\u6765\u7684\u91D1\u724C\u518D\u53BB\u780D\u6728\u3002\u91D1\u74F6 10 \u5F20 + \u6728\u74F6 10 \u5F20\u3002"
+  previewImage: {fileID: 0}
+  outroText: ""
+  sceneName: Game
+  levelPrefab: {fileID: 410000000000000002, guid: d3c4b5a60718899aabbccddee0011288, type: 3}
+  useFixedSeed: 1
+  fixedSeed: 20240607
+  rules:
+    BoardWidth: 8
+    BoardHeight: 8
+    ElementPool: 27
+    CardPool: 8
+    CreepsPerElement: 0
+    MaxMoveSteps: 0
+    InitialHandSize: 5
+    HandLimit: 5
+    MaxDiscardsPerRound: 5
+    MaxCardsPerRound: 0
+    BottleCapacity: 1
+    BottleMode: 0
+    EventIntervalMin: 3
+    EventIntervalMax: 6
+    RoundLimit: 8
+    Goal:
+      Kind: 6
+      Target: 0
+      TargetCount: 0
+      Rounds: 0
+    RequireAllWinRules: 1
+    CardEffect: 0
+    EmptyCellCard: 1
+    UseCompositeElements: 0
+    SpecialCardPool: 0
+    ElementCardWeight: 10
+    FusionCardWeight: 0
+    DecomposeCardWeight: 0
+    CompositeRange: 1
+    CompositeIngredientsPerRound: 1
+    FusionRequiresAdjacency: 1
+    AllowMultipleComposites: 0
+    CompositeRandomProductionOrder: 1
+    CompositeProducesOnCreation: 1
+    DecomposeGrantsElementCards: 1
+  initialComposites: []
+  layoutText: "\u91D1.\u6728.\u571F.\u91D1.\r\n.\u571F.\u91D1.\u6728..\r\n\u6728.\u91D1.\u571F.\u6728.\r\n.\u91D1.\u6728.\u91D1..\r\n\u571F.\u6728.\u91D1.\u571F.\r\n.\u6728.\u91D1.\u6728..\r\n\u91D1.\u6728.\u91D1...\r\n.....\u6728.."
+  fixedInitialHand: 
+  useEvents: 0
+  roundEvents: []

@@ -150,7 +150,11 @@ namespace TapGJ.View
                 session.SelectingFusionCard ? session.FusionStage == GameSession.FusionPick.First
                     ? "融合牌：先选择第一个元素" : "融合牌：选择高亮的第二个元素" :
                 session.SelectingDecomposeCard ? "分解牌：点击高亮的复合元素" : $"{session.SelectedCard.Label}：点击高亮格子出牌";
-            if (_lastNote != null && Time.unscaledTime < _noteUntil && _lastNote.Contains("✗")) hint = _lastNote;
+            // 提示行的两条插队规则：出牌失败要立刻说（"✗"），喂瓶/满瓶也要立刻说（"瓶"）——
+            // 第三章整章都在盯瓶子，而这一行是 uGUI 局内界面唯一能实时写字的地方。
+            if (_lastNote != null && Time.unscaledTime < _noteUntil
+                && (_lastNote.Contains("✗") || _lastNote.Contains("瓶")))
+                hint = _lastNote;
             ui.SetSelectionHint(hint);
         }
 

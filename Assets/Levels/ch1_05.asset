@@ -16,6 +16,7 @@ MonoBehaviour:
   displayName: "\u5E73\u5747\u5143\u7D20"
   description: "\u4E94\u79CD\u5143\u7D20\u6570\u91CF\u62C9\u5E73\uFF08\u6700\u591A\u5DEE 1 \u4E2A\uFF09\u5C31\u7B97\u8D62\u3002"
   previewImage: {fileID: 0}
+  outroText: "\u7B2C\u4E00\u7AE0\u7ED3\u675F\u3002\u4E0B\u4E00\u7AE0\uFF1A\u590D\u5408\u5143\u7D20\u3002"
   sceneName: Game
   levelPrefab: {fileID: 539428887325380736, guid: 64b5a6cd07b34175810ae1a126d665b3, type: 3}
   useFixedSeed: 1
