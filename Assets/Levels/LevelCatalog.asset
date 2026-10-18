@@ -14,6 +14,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   menuSceneName: MainMenu
   levels:
-  - {fileID: 11400000, guid: 394f145e3ad313c4881c42b2efab4a5f, type: 2}
-  - {fileID: 11400000, guid: dddae46ea6746f243a97b4dcd932b23e, type: 2}
-  - {fileID: 11400000, guid: bfcfa66eaee843549ad07f5237da783a, type: 2}
+  - {fileID: 11400000, guid: 286d05ba2d0d45b783fcc66b6738ddf0, type: 2}
+  - {fileID: 11400000, guid: c0c6c380e6004df1ac02c2f339b0d16f, type: 2}
+  - {fileID: 11400000, guid: 83513ba1aa30466b94b9ff2f517cbd9d, type: 2}
+  - {fileID: 11400000, guid: b7251ad62069449da6f513216082ecd4, type: 2}
+  - {fileID: 11400000, guid: 3f4cf79864bc41129e6a37f871f47aa4, type: 2}
+  - {fileID: 11400000, guid: e4339a0f387f4c379d8ca8665026ae51, type: 2}
+  - {fileID: 11400000, guid: a1cfac7056cb4d679682279b9800af27, type: 2}
+  - {fileID: 11400000, guid: 3151911fcc804a3d9eaf10b577d7ef73, type: 2}
+  - {fileID: 11400000, guid: 8dde2cb16b8a4308bd72cb046065e76e, type: 2}
+  - {fileID: 11400000, guid: 281c04dd34124279b3c7cbcdec6d0a9f, type: 2}
+  - {fileID: 11400000, guid: b3a1c0d2e4f547898a6b0c1d2e3f4051, type: 2}
+  - {fileID: 11400000, guid: c4b2d1e3f5065889ab7c1d2e3f405162, type: 2}
+  - {fileID: 11400000, guid: d5c3e2f40617799abc8d2e3f40516273, type: 2}
+  - {fileID: 11400000, guid: e6d4f3062788aabccd9e3f4051627384, type: 2}
+  - {fileID: 11400000, guid: f7e5073899abbcdde0f4051627384905, type: 2}
+  - {fileID: 11400000, guid: c1d2e3f4a5b60718293a4b5c6d7e8f01, type: 2}
+  - {fileID: 11400000, guid: c1d2e3f4a5b60718293a4b5c6d7e8f02, type: 2}
+  - {fileID: 11400000, guid: c1d2e3f4a5b60718293a4b5c6d7e8f03, type: 2}
+  - {fileID: 11400000, guid: c1d2e3f4a5b60718293a4b5c6d7e8f04, type: 2}
+  - {fileID: 11400000, guid: c1d2e3f4a5b60718293a4b5c6d7e8f05, type: 2}

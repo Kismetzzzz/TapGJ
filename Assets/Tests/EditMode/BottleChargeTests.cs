@@ -45,6 +45,8 @@ namespace TapGJ.Tests
             Assert.IsTrue(engine.Hand.All(card => card.Element == Element.Fire));
             Assert.AreEqual(2, engine.Bottle.Count(Element.Fire));
             Assert.AreEqual(2, engine.Bottle.TotalCardsGranted);
+            Assert.AreEqual(2, engine.Bottle.CardsGranted(Element.Fire));
+            Assert.AreEqual(0, engine.Bottle.CardsGranted(Element.Water));
         }
 
         [Test]
@@ -55,6 +57,7 @@ namespace TapGJ.Tests
             engine.SetBottleCapacityForRound(3);
             Assert.AreEqual(2, engine.Hand.Count);
             Assert.AreEqual(2, engine.Bottle.Count(Element.Metal));
+            Assert.AreEqual(2, engine.Bottle.CardsGranted(Element.Metal));
             engine.BeginRound();
             Assert.AreEqual(10, engine.Bottle.Capacity);
             Assert.AreEqual(2, engine.Bottle.Count(Element.Metal));
@@ -92,6 +95,22 @@ namespace TapGJ.Tests
             engine.Start();
             Assert.AreEqual(0, engine.Bottle.Count(Element.Water));
             Assert.AreEqual(0, engine.Bottle.TotalCardsGranted);
+            Assert.AreEqual(0, engine.Bottle.CardsGranted(Element.Water));
+        }
+
+        [Test]
+        public void 无瓶关卡_充能与临时门槛接口都不产牌或改变瓶子()
+        {
+            var engine = Engine();
+            engine.Rules.BottleMode = BottleMode.Disabled;
+            int hand = engine.Hand.Count;
+            engine.AddBottleCharge(Element.Fire, 12);
+            engine.SetBottleCapacityForRound(3);
+            Assert.AreEqual(0, engine.Bottle.Count(Element.Fire));
+            Assert.AreEqual(0, engine.Bottle.CardsGranted(Element.Fire));
+            Assert.AreEqual(0, engine.Bottle.TotalCardsGranted);
+            Assert.AreEqual(5, engine.Bottle.Capacity);
+            Assert.AreEqual(hand, engine.Hand.Count);
         }
     }
 }

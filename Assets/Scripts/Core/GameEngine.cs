@@ -12,9 +12,17 @@ namespace TapGJ.Core
     {
         public Element Element { get; }
         readonly int[] _counts = new int[ElementDefs.Count];
-        /// <summary>本回合实际生效的容量；关卡基准值保存在 Rules.BottleCapacity。</summary>
+        /// <summary>每个元素各自「因为瓶满而产出过多少张牌」——第三章的教学目标全靠它。</summary>
+        readonly int[] _granted = new int[ElementDefs.Count];
+
+        /// <summary>
+        /// 容量。**不是只读的**：回合事件（「玉翁敛息」）会临时把它改小、判定阶段再改回来。
+        /// 读「本关的基准容量」请读 <see cref="Rules.BottleCapacity"/>，读「本回合实际生效的容量」读这个 ——
+        /// HUD 画进度条必须读这个，否则事件一改容量它就会骗人。
+        /// </summary>
         public int Capacity { get; private set; }
 
+        /// <summary>本局瓶子一共产出过多少张牌（**不分元素**的总数）。分元素的用 <see cref="CardsGranted"/>。</summary>
         public int TotalCardsGranted { get; private set; }
 
         internal Bottle(int capacity)
@@ -24,7 +32,10 @@ namespace TapGJ.Core
 
         public int Count(Element e) => _counts[(int)e];
 
-        /// <summary>只更新容量；结账和表现层通知由引擎统一处理。</summary>
+        /// <summary>这个元素的瓶子**已经产出过多少张对应元素牌**（第三章「生成 N 张火牌」这类目标用它）。</summary>
+        public int CardsGranted(Element e) => _granted[(int)e];
+
+        /// <summary>改容量（事件用）。只改数字，不结账 —— 要「先结账再改」用引擎的 ApplyBottleCapacity。</summary>
         internal void SetCapacity(int capacity) => Capacity = capacity < 1 ? 1 : capacity;
 
         /// <summary>计数 +1，返回是否满瓶产出卡牌。</summary>
@@ -38,7 +49,7 @@ namespace TapGJ.Core
         {
             if (_counts[(int)e] < Capacity) return false;
             _counts[(int)e] -= Capacity;
-            TotalCardsGranted++;
+            Grant(e, 1);
             return true;
         }
 
@@ -46,7 +57,16 @@ namespace TapGJ.Core
         {
             SetCapacity(capacity);
             Array.Clear(_counts, 0, _counts.Length);
+            Array.Clear(_granted, 0, _granted.Length);
             TotalCardsGranted = 0;
+        }
+
+        /// <summary>记账：总数 + 分元素各记一份（两条产出路径都走这里）。</summary>
+        void Grant(Element e, int cards)
+        {
+            if (cards <= 0) return;
+            TotalCardsGranted += cards;
+            _granted[(int)e] += cards;
         }
 
         public string DebugLine()
@@ -77,6 +97,8 @@ namespace TapGJ.Core
         public Bottle Bottle { get; }
 
         readonly Random _rng;
+        /// <summary>「这一回合还没解锁秘术牌」时用的空数组（避免每次抽牌都分配一个新数组）。</summary>
+        static readonly CardKind[] NoSpecialCards = new CardKind[0];
         readonly List<Card> _hand = new List<Card>();
         readonly Dictionary<int, Creep> _creeps = new Dictionary<int, Creep>();
         readonly Queue<StepRecord> _steps = new Queue<StepRecord>();
@@ -828,8 +850,12 @@ namespace TapGJ.Core
             Board.Clear(creep.Pos);
             _creeps.Remove(creep.Uid);
 
+            // 本关没有元素瓶（Rules.BottleMode = Disabled）时：不喂瓶、不产牌、也不发那两条日志。
+            // ⚠ 只影响「瓶子」这一层：元素照样从棋盘消失，TotalRemoved / RemovedCounts 照常记。
+            bool feedsBottle = feedBottle && Rules.BottlesEnabled;
+
             // 场上消失一个元素 → 对应瓶子 +1；满瓶自动产出一张对应元素牌。
-            if (feedBottle) FillBottle(creep.Element, 1, record, where);
+            if (feedsBottle) FillBottle(creep.Element, 1, record, where);
 
             TotalRemoved++;
             _removed[creep.Element] = RemovedOf(creep.Element) + 1;
@@ -1209,10 +1235,15 @@ namespace TapGJ.Core
         /// 抽一张牌：先按**权重**决定这一张是元素牌还是哪种秘术牌，再决定具体内容。
         /// 这是「秘术牌比例可控」的实现点 —— 权重在 <see cref="Rules"/> 上（元素/融合/分解各一个）。
         /// 元素牌池为空时秘术牌仍然照常抽得出来（反之亦然）。
+        ///
+        /// 秘术牌还有一道**回合门**：<see cref="Rules.SpecialCardUnlockRound"/> 之前的回合
+        /// 只发元素牌（教学关用「第 1 回合先只看，第 2 回合再给分解牌」就是这个）。
         /// </summary>
         Card DrawRandomCard()
         {
-            var specials = Rules.DrawableSpecialCards();
+            var specials = Rules.SpecialCardsAvailableAtRound(Round)
+                ? Rules.DrawableSpecialCards()
+                : NoSpecialCards;
             bool hasElements = Rules.PoolCards.Length > 0 && Rules.ElementCardWeight > 0;
 
             int elementWeight = hasElements ? Math.Max(0, Rules.ElementCardWeight) : 0;
@@ -1596,11 +1627,23 @@ namespace TapGJ.Core
         }
 
         /// <summary>
-        /// 自定义目标的进度条：取第一个给出了进度（Label 非空）的机制。
+        /// 自定义目标的进度条：把所有给出了进度（Label 非空）的机制**合起来**报。
+        ///
+        /// 为什么要合：第二/三章有一批「A 且 B」的关卡（比如「金瓶 10 张 + 木瓶 10 张」），
+        /// 只报第一条的话，玩家永远看不到第二条差多少 —— 明明还差 8 张，进度条却已经满了。
+        ///
+        /// · 文字：各条 Label 用全角空格连起来（窄屏会被裁掉，所以顺序 = 预制体上的挂载顺序，越靠前越重要）
+        /// · 填充：<see cref="Rules.RequireAllWinRules"/> 为真（且）时取**最差**的那一条，
+        ///   否则（或）取**最好**的那一条 —— 两种语义下「进度条满了 = 要赢了」都成立。
         /// 机制没做进度条就退化成「只有描述、不填充」。
         /// </summary>
         GoalProgress CustomGoalProgress()
         {
+            var labels = new List<string>();
+            string description = null;
+            float best = 0f;
+            float worst = 1f;
+
             foreach (var rule in _levelRules)
             {
                 if (rule == null) continue;
@@ -1615,14 +1658,28 @@ namespace TapGJ.Core
                     continue; // 进度条不值得为它停掉一局，异常留给判定钩子那套去报
                 }
 
-                if (!string.IsNullOrEmpty(progress.Label))
-                {
-                    if (string.IsNullOrEmpty(progress.Description)) progress.Description = WinConditionDescription();
-                    return progress;
-                }
+                if (string.IsNullOrEmpty(progress.Label)) continue;
+
+                labels.Add(progress.Label);
+                if (string.IsNullOrEmpty(description) && !string.IsNullOrEmpty(progress.Description))
+                    description = progress.Description;
+
+                float fill = Clamp01(progress.Fill);
+                if (fill > best) best = fill;
+                if (fill < worst) worst = fill;
             }
 
-            return new GoalProgress { Description = WinConditionDescription(), Fill = 0f, Label = "" };
+            if (labels.Count == 0)
+                return new GoalProgress { Description = WinConditionDescription(), Fill = 0f, Label = "" };
+
+            if (string.IsNullOrEmpty(description)) description = WinConditionDescription();
+
+            return new GoalProgress
+            {
+                Description = description,
+                Fill = Rules.RequireAllWinRules ? worst : best,
+                Label = string.Join("　", labels),
+            };
         }
 
 

@@ -26,6 +26,7 @@ namespace TapGJ.Core
 
         int ChangeBottleCapacity(int capacity, bool redeem = true)
         {
+            if (!Rules.BottlesEnabled) return 0;
             Bottle.SetCapacity(capacity);
             var record = _eventRecord ?? new StepRecord();
             int firstChange = record.Events.Count;
@@ -54,6 +55,7 @@ namespace TapGJ.Core
 
         void FillBottle(Element element, int amount, StepRecord record, Pos where)
         {
+            if (!Rules.BottlesEnabled) return;
             while (amount > 0)
             {
                 // 恢复较低的基准门槛时先保留进度，下次充能再结清已有份数。

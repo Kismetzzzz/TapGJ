@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4baacca015d143941812e41b49f10709, type: 3}
+  m_Name: ch4_05
+  m_EditorClassIdentifier: 
+  levelId: ch4_05
+  displayName: "\u5E73\u5747\u5143\u7D20"
+  description: "\u4E94\u4E2A\u74F6\u5B50\u3001\u4E94\u79CD\u5143\u7D20\uFF0C\u6570\u91CF\u62C9\u5E73\uFF08\u6700\u591A\u5DEE 1 \u4E2A\uFF09\u5C31\u7B97\u8D62 \u2014\u2014 \u4F46\u4E8B\u4EF6\u4F1A\u9694\u51E0\u56DE\u5408\u5F80\u573A\u4E0A\u704C\u91D1\u3001\u6216\u8005\u628A\u6240\u6709\u5143\u7D20\u5B9A\u4F4F\u3002\u6536\u5C3E\u5173\u3002"
+  previewImage: {fileID: 0}
+  outroText: "\u7B2C\u56DB\u7AE0\u7ED3\u675F\u3002\u4E94\u79CD\u5143\u7D20\u3001\u4E5D\u6761\u4E8B\u4EF6\u3001\u4E94\u4E2A\u74F6\u5B50 \u2014\u2014 \u5230\u8FD9\u513F\u4F60\u5DF2\u7ECF\u628A\u8FD9\u4E00\u7248\u7684\u539F\u578B\u73A9\u901A\u4E86\u3002"
+  sceneName: Game
+  levelPrefab: {fileID: 420000000000000005, guid: d1e2f3a4b5c60718293a4b5c6d7e8f05, type: 3}
+  useFixedSeed: 1
+  fixedSeed: 20240607
+  rules:
+    BoardWidth: 8
+    BoardHeight: 8
+    ElementPool: 31
+    CardPool: 31
+    CreepsPerElement: 0
+    MaxMoveSteps: 0
+    InitialHandSize: 5
+    HandLimit: 5
+    MaxDiscardsPerRound: 5
+    MaxCardsPerRound: 0
+    BottleCapacity: 5
+    BottleMode: 1
+    EventIntervalMin: 1
+    EventIntervalMax: 2
+    RoundLimit: 8
+    Goal:
+      Kind: 6
+      Target: 0
+      TargetCount: 0
+      Rounds: 0
+    RequireAllWinRules: 0
+    CardEffect: 0
+    EmptyCellCard: 0
+    UseCompositeElements: 0
+    SpecialCardPool: 0
+    ElementCardWeight: 10
+    FusionCardWeight: 0
+    DecomposeCardWeight: 0
+    CompositeRange: 1
+    CompositeIngredientsPerRound: 1
+    FusionRequiresAdjacency: 1
+    AllowMultipleComposites: 0
+    CompositeRandomProductionOrder: 1
+    CompositeProducesOnCreation: 1
+    DecomposeGrantsElementCards: 1
+  initialComposites: []
+  layoutText: "\u91D1.\u91D1.\u91D1.\u91D1.\r\n........\r\n\u6728.\u6728.\u6728...\r\n\u91D1.....\u91D1.\r\n\u6C34.\u6C34.\u6C34...\r\n........\r\n\u706B.\u706B.\u571F.\u571F.\r\n........"
+  fixedInitialHand: 
+  useEvents: 1
+  roundEvents:
+  - {fileID: 11400000, guid: a1b2c3d4e5f60718293a4b5c6d7e8f01, type: 2}
+  - {fileID: 11400000, guid: a1b2c3d4e5f60718293a4b5c6d7e8f09, type: 2}
+  - {fileID: 11400000, guid: a1b2c3d4e5f60718293a4b5c6d7e8f04, type: 2}

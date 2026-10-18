@@ -87,7 +87,12 @@ namespace TapGJ.Tests
                     "返回按钮文字必须实际渲染，不能因按钮高度不足而消失");
                 for (int l = 1; l <= catalog.chapters[c - 1].levels.Length; l++)
                 {
-                    Button(page + "/Level" + l.ToString("00") + "Button").onClick.Invoke();
+                    var entry = catalog.chapters[c - 1].levels[l - 1];
+                    var card = Button(page + "/Level" + l.ToString("00") + "Button");
+                    Assert.AreEqual(catalog.Badge(c - 1, l - 1),
+                        card.transform.Find("Availability").GetComponent<Text>().text);
+                    if (entry.definition != null) continue;
+                    card.onClick.Invoke();
                     Assert.AreEqual(catalog.chapters[c - 1].title + " · " + catalog.chapters[c - 1].levels[l - 1].title
                         + "待开放。\n目标：" + catalog.chapters[c - 1].levels[l - 1].goal.Replace('\n', ' '),
                         Find(page + "/StatusLabel").GetComponent<Text>().text);
@@ -113,6 +118,8 @@ namespace TapGJ.Tests
             var original = catalog.chapters;
             var selected = ScriptableObject.CreateInstance<LevelDefinition>();
             var other = ScriptableObject.CreateInstance<LevelDefinition>();
+            other.levelId = "menu_selection_previous_test";
+            ProgressStore.Reset(other.levelId);
             selected.levelId = "menu_selection_test";
             selected.displayName = "选关验证";
             selected.useFixedSeed = true;
@@ -143,7 +150,14 @@ namespace TapGJ.Tests
                 controller.OpenLevels();
                 Button("LevelsPanel/Chapter02Button").onClick.Invoke();
                 Assert.AreEqual("待开放", Button("ChapterPanel/Level01Button").transform.Find("Availability").GetComponent<Text>().text);
-                Assert.AreEqual("开始挑战 →", Button("ChapterPanel/Level04Button").transform.Find("Availability").GetComponent<Text>().text);
+                Assert.AreEqual("待解锁", Button("ChapterPanel/Level04Button").transform.Find("Availability").GetComponent<Text>().text);
+                Button("ChapterPanel/Level04Button").onClick.Invoke();
+                StringAssert.Contains("先通关", Find("ChapterPanel/StatusLabel").GetComponent<Text>().text);
+                Assert.AreEqual("MainMenu", SceneManager.GetActiveScene().name);
+                Assert.IsFalse(GameLaunchContext.HasLevel);
+                ProgressStore.MarkClearedOnly(other.levelId);
+                controller.OpenChapter(1);
+                Assert.AreEqual("开始", Button("ChapterPanel/Level04Button").transform.Find("Availability").GetComponent<Text>().text);
                 Assert.IsFalse(Find("ChapterPanel/StatusLabel").GetComponent<Text>().text.Contains("关卡内容待开放"));
 
                 Button("ChapterPanel/Level01Button").onClick.Invoke();
@@ -174,6 +188,7 @@ namespace TapGJ.Tests
             {
                 catalog.chapters = original;
                 Object.Destroy(selected);
+                ProgressStore.Reset(other.levelId);
                 Object.Destroy(other);
             }
         }
@@ -613,7 +628,8 @@ namespace TapGJ.Tests
             var originalImageColors = templates.Select(t => t.GetComponent<Image>().color).ToArray();
             var originalLabelColors = templates.Select(t => t.transform.Find("Label").GetComponent<Text>().color).ToArray();
             var originalFontSizes = templates.Select(t => t.transform.Find("Label").GetComponent<Text>().fontSize).ToArray();
-            var originalFonts = templates.Select(t => t.transform.Find("Label").GetComponent<Text>().font).ToArray();
+            var expectedFonts = templates.Select(t => t.transform.Find("Label").GetComponent<UiFontBinding>())
+                .Select(binding => binding.Theme.GetFont(binding.Role)).ToArray();
             var originalSizes = templates.Select(t => t.GetComponent<RectTransform>().sizeDelta).ToArray();
             var originalPositions = templates.Select(t => t.GetComponent<RectTransform>().anchoredPosition).ToArray();
             try
@@ -637,7 +653,7 @@ namespace TapGJ.Tests
                     Assert.AreEqual(Color.white, chapter.GetComponent<Image>().color);
                     Assert.AreEqual(Color.yellow, chapter.transform.Find("Label").GetComponent<Text>().color);
                     Assert.AreEqual(27, chapter.transform.Find("Label").GetComponent<Text>().fontSize);
-                    Assert.AreSame(originalFonts[0], chapter.transform.Find("Label").GetComponent<Text>().font);
+                    Assert.AreSame(expectedFonts[0], chapter.transform.Find("Label").GetComponent<Text>().font);
                     Assert.AreEqual(originalSizes[0] + new Vector2(16, 8), chapter.GetComponent<RectTransform>().sizeDelta);
                     Assert.AreEqual(new Vector2(3, 0), chapter.GetComponent<RectTransform>().anchoredPosition);
                     chapter.onClick.Invoke();
@@ -646,7 +662,7 @@ namespace TapGJ.Tests
                     Assert.AreEqual(Color.white, level.GetComponent<Image>().color);
                     Assert.AreEqual(Color.yellow, level.transform.Find("Label").GetComponent<Text>().color);
                     Assert.AreEqual(27, level.transform.Find("Label").GetComponent<Text>().fontSize);
-                    Assert.AreSame(originalFonts[1], level.transform.Find("Label").GetComponent<Text>().font);
+                    Assert.AreSame(expectedFonts[1], level.transform.Find("Label").GetComponent<Text>().font);
                     Assert.AreEqual(originalSizes[1] + new Vector2(16, 8), level.GetComponent<RectTransform>().sizeDelta);
                     Assert.AreEqual(new Vector2(3, 0), level.GetComponent<RectTransform>().anchoredPosition);
                     yield return null;

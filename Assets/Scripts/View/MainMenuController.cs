@@ -154,21 +154,22 @@ namespace TapGJ.View
             chapterTitleLabel.text = CardTitle(chapter.title, "未命名章节") + " · 关卡选择";
             chapterMarkerLabel.text = (index + 1).ToString("00");
             ClearCards(_levelButtons);
-            bool hasPlayableLevel = false;
             if (chapter.levels != null)
                 for (int i = 0; i < chapter.levels.Length; i++)
                 {
                     if (chapter.levels[i] == null) continue;
                     int levelIndex = i;
                     var level = chapter.levels[i];
-                    hasPlayableLevel |= level.definition != null;
                     var button = CreateCard(levelCardTemplate, levelsScroll.content, "Level" + (i + 1).ToString("00") + "Button",
-                        CardTitle(level.title, "未命名关卡"), level.goal, level.definition != null ? "开始挑战 →" : "待开放", i);
+                        CardTitle(level.title, "未命名关卡"), level.goal, chapterCatalog.Badge(index, i), i);
                     button.onClick.AddListener(() => PreviewLevel(levelIndex));
                     _levelButtons.Add(button);
                 }
-            chapterStatusLabel.text = _levelButtons.Count == 0 ? "本章暂无关卡。" : hasPlayableLevel
-                ? "选择关卡开始挑战；待开放关卡可查看目标。" : "选择关卡查看目标；关卡内容待开放。";
+            chapterStatusLabel.text = _levelButtons.Count == 0
+                ? "本章暂无关卡。"
+                : chapterCatalog.HasUnlockedLevel(index)
+                    ? "选择关卡查看目标；点「开始」进入。"
+                    : "选择关卡查看目标；关卡内容待开放。";
             ConfigureCardNavigation(_levelButtons, closeChapterButton);
             ShowPage(chapterPanel, _levelButtons.Count > 0 ? _levelButtons[0].gameObject : closeChapterButton.gameObject);
         }
@@ -184,6 +185,15 @@ namespace TapGJ.View
             var level = chapter.levels[levelIndex];
             if (level.definition != null)
             {
+                if (!chapterCatalog.IsUnlocked(_selectedChapter, levelIndex))
+                {
+                    var previous = chapterCatalog.PreviousBound(_selectedChapter, levelIndex);
+                    chapterStatusLabel.text = previous == null
+                        ? "这一关还没开放。"
+                        : $"还没解锁：先通关「{CardTitle(previous.title, "上一关")}」。";
+                    return;
+                }
+
                 var definition = level.definition;
                 if (string.IsNullOrWhiteSpace(definition.sceneName)
                     || !Application.CanStreamedLevelBeLoaded(definition.sceneName))
@@ -193,7 +203,8 @@ namespace TapGJ.View
                     return;
                 }
 
-                Audio.SaveSettings();
+                ClosePanels();
+                if (Audio != null) Audio.SaveSettings();
                 _loading = true;
                 menuGroup.interactable = false;
                 chapterStatusLabel.text = "正在进入关卡…";

@@ -209,11 +209,19 @@ namespace TapGJ.Levels
                            + "选中关卡资产时 Inspector 里也会实时显示。");
         }
 
-        /// <summary>赢了就写进度（给菜单同学解锁用）。</summary>
+        /// <summary>
+        /// 赢了就写进度（给菜单同学解锁用），并把这一关的剧情文本交给 <see cref="LevelOutro"/>。
+        ///
+        /// ⚠ 剧情要在**任何提前返回之前**写：没有 levelId 的调试关卡也能有剧情。
+        /// </summary>
         void OnLevelFinished(bool victory, string message)
         {
-            if (!victory || CurrentLevel == null || string.IsNullOrEmpty(CurrentLevel.levelId)) return;
-            if (session.Engine == null) return;
+            if (CurrentLevel == null) return;
+
+            LevelOutro.Set(victory ? CurrentLevel.outroText : null);
+
+            if (!victory || string.IsNullOrEmpty(CurrentLevel.levelId)) return;
+            if (session == null || session.Engine == null) return;
 
             ProgressStore.MarkCleared(CurrentLevel.levelId, session.Engine.Round);
         }

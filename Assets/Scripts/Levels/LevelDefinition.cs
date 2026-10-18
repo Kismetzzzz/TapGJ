@@ -20,6 +20,10 @@ namespace TapGJ.Levels
         [TextArea] public string description;
         public Sprite previewImage;
 
+        [Tooltip("通关后显示的剧情/过渡文本（留空 = 没有）。会被 LevelLoader 在胜利那一刻记到 LevelOutro 上，" +
+                 "由局内 UI 的结算面板展示；「过渡关卡」就是靠它把玩家引到下一章。")]
+        [TextArea(2, 8)] public string outroText;
+
         [Header("进入方式")]
         [Tooltip("这一关放在哪个场景里（默认 Game）")]
         public string sceneName = "Game";
@@ -89,6 +93,12 @@ namespace TapGJ.Levels
                 into.Add("可抽卡牌一个都没勾。运行时按「全部元素」处理（兼容旧数据），但建议显式勾上。");
 
             var effective = rules.Clone();
+
+            // 开局初始复合元素是**关卡层**的字段（`LevelDefinition.initialComposites`）：
+            // LevelLoader 进关时才把它拷进 `rules.InitialComposites`（见 LevelLoader.BuildSetup）。
+            // 校验必须做**同一个拷贝**，否则「这一关摆了初始复合元素」在规则副本里根本看不到，
+            // 于是 `Rules.CollectIssues` 会误报「总开关白勾」「分解牌永远用不出去」两条假警告。
+            effective.InitialComposites = initialComposites ?? new CompositePlacement[0];
 
             // 规则数值本身合不合法（越界、负数之类会抛异常，这里抓成一句人话继续往下查）
             try
@@ -319,6 +329,7 @@ namespace TapGJ.Levels
             sb.Append(useEvents
                 ? $"　事件 {(roundEvents == null ? 0 : roundEvents.Length)} 条（每 {rules.EventIntervalMin}~{rules.EventIntervalMax} 回合）"
                 : "　事件 关");
+            if (!rules.BottlesEnabled) sb.Append("　无元素瓶");
             sb.Append($"　回合上限 {rules.RoundLimit}");
             sb.Append($"　目标 {rules.Goal.Describe()}");
 
@@ -349,6 +360,9 @@ namespace TapGJ.Levels
             parts.Add(cards.Count == 0
                 ? "不发秘术牌"
                 : string.Join("+", cards) + $"（权重 {rules.ElementCardWeight}/{rules.FusionCardWeight}/{rules.DecomposeCardWeight}）");
+
+            if (rules.SpecialCardUnlockRound > 1)
+                parts.Add($"第 {rules.SpecialCardUnlockRound} 回合起才发");
 
             if (rules.InitialComposites != null && rules.InitialComposites.Length > 0)
                 parts.Add($"开局 {rules.InitialComposites.Length} 个");

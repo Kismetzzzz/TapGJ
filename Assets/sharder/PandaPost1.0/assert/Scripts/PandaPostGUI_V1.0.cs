@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+// Editor-only ShaderGUI. Wrapped so the player build (which has no UnityEditor.dll) compiles.
 using System;
 using UnityEngine;
 using UnityEditor;

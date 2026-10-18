@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4baacca015d143941812e41b49f10709, type: 3}
+  m_Name: ch4_01
+  m_EditorClassIdentifier: 
+  levelId: ch4_01
+  displayName: "\u53D1\u724C\u4E8B\u4EF6"
+  description: "\u5F00\u5C40\u6446\u7740\u70EC\u548C\u7194\u5CA9\u4E24\u79CD\u590D\u5408\u5143\u7D20\u3002\u628A\u5B83\u4EEC\u90FD\u62C6\u6389 \u2014\u2014 \u4F46\u8FD9\u4E00\u5173\u51E0\u4E4E\u62BD\u4E0D\u5230\u79D8\u672F\u724C\uFF0C\u724C\u5F97\u9760\u300C\u6BCF\u51E0\u56DE\u5408\u53D1\u4E00\u6B21\u300D\u7684\u4E8B\u4EF6\u7ED9\u3002"
+  previewImage: {fileID: 0}
+  outroText: ""
+  sceneName: Game
+  levelPrefab: {fileID: 420000000000000001, guid: d1e2f3a4b5c60718293a4b5c6d7e8f01, type: 3}
+  useFixedSeed: 1
+  fixedSeed: 20240607
+  rules:
+    BoardWidth: 8
+    BoardHeight: 8
+    ElementPool: 26
+    CardPool: 26
+    CreepsPerElement: 0
+    MaxMoveSteps: 0
+    InitialHandSize: 5
+    HandLimit: 5
+    MaxDiscardsPerRound: 5
+    MaxCardsPerRound: 0
+    BottleCapacity: 5
+    BottleMode: 1
+    EventIntervalMin: 2
+    EventIntervalMax: 3
+    RoundLimit: 10
+    Goal:
+      Kind: 6
+      Target: 0
+      TargetCount: 0
+      Rounds: 0
+    RequireAllWinRules: 0
+    CardEffect: 0
+    EmptyCellCard: 0
+    UseCompositeElements: 1
+    SpecialCardPool: 3
+    ElementCardWeight: 10
+    FusionCardWeight: 2
+    DecomposeCardWeight: 2
+    CompositeRange: 1
+    CompositeIngredientsPerRound: 1
+    FusionRequiresAdjacency: 1
+    AllowMultipleComposites: 1
+    CompositeRandomProductionOrder: 1
+    CompositeProducesOnCreation: 0
+    DecomposeGrantsElementCards: 1
+  initialComposites:
+  - X: 3
+    Y: 3
+    Kind: 0
+  - X: 4
+    Y: 4
+    Kind: 1
+  layoutText: "\u706B......\u6728\r\n........\r\n....\u6728...\r\n........\r\n........\r\n...\u571F....\r\n........\r\n\u571F......\u706B"
+  fixedInitialHand: 
+  useEvents: 1
+  roundEvents:
+  - {fileID: 11400000, guid: a1b2c3d4e5f60718293a4b5c6d7e8f01, type: 2}
+  - {fileID: 11400000, guid: a1b2c3d4e5f60718293a4b5c6d7e8f02, type: 2}

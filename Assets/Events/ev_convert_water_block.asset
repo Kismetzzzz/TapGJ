@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91f074e2750445e0a26e9d2061038bd4, type: 3}
+  m_Name: ev_convert_water_block
+  m_EditorClassIdentifier: 
+  eventId: ev_convert_water_block
+  displayName: "\u6C34\u6D41\u6F2B\u6EA2"
+  description: "\u968F\u673A\u4E00\u5757 3\u00D73 \u53D8\u6210\u6C34\uFF08\u4F4D\u7F6E\u6BCF\u56DE\u5408\u90FD\u4E0D\u540C\uFF09"
+  element: 2
+  mode: 1
+  cellCount: 9
+  blockSize: 3
+  rectX: 2
+  rectY: 2
+  rectWidth: 3
+  rectHeight: 3

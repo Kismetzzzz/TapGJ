@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82149325f7194b02b3e22829feefe8bd, type: 3}
+  m_Name: ev_special_gift
+  m_EditorClassIdentifier: 
+  eventId: ev_special_gift
+  displayName: "\u79D8\u672F\u9988\u8D60"
+  description: "\u878D\u5408\u724C\u548C\u5206\u89E3\u724C\u5404\u767D\u9001\u4E00\u5F20\uFF08\u53EA\u5728\u4E24\u79CD\u724C\u90FD\u542F\u7528\u7684\u5173\u5361\u91CC\u9002\u7528\uFF09"
+  countPerKind: 1

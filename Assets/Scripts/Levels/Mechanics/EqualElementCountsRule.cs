@@ -35,6 +35,12 @@ namespace TapGJ.Levels.Mechanics
             ? "场上每种可用元素都有，且数量都相等"
             : "场上出现过的元素数量都相等（只剩一种也算）";
 
+        /// <summary>允许的最大差额（编辑器工具 / 测试用）。</summary>
+        public int Tolerance => tolerance;
+
+        /// <summary>是不是要求「元素池里每种都在场」（编辑器工具 / 测试用）。</summary>
+        public bool RequireAllPoolElements => requireAllPoolElements;
+
         // ---------------------------------------------------------------- 判定
 
         public override bool TryExtraWin(GameEngine engine, out string message)

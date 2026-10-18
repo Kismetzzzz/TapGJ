@@ -559,7 +559,7 @@ namespace TapGJ.Tests
             AssertHandMatches(session, hud.Ui);
             Assert.IsTrue(session.GoToNextLevel());
             yield return WaitForAction();
-            Assert.AreEqual("level_01", loader.CurrentLevel.levelId);
+            Assert.AreEqual("ch1_01", loader.CurrentLevel.levelId);
             AssertHandMatches(session, hud.Ui);
         }
 

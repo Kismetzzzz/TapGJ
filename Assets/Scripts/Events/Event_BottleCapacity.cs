@@ -22,6 +22,13 @@ namespace TapGJ.Events
 
         public override bool IsApplicable(GameEngine engine, out string reason)
         {
+            // 本关根本没有瓶子 → 这条事件什么都做不了，抽到会被跳过（不占本回合）。
+            if (!engine.Rules.BottlesEnabled)
+            {
+                reason = "本关没有元素瓶（Rules.BottleMode = Disabled）";
+                return false;
+            }
+
             if (capacity < 1)
             {
                 reason = $"容量 {capacity} 非法（至少 1）";

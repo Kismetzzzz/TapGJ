@@ -108,7 +108,12 @@ namespace TapGJ.View
         void OnLevelFinished(bool victory, string message)
         {
             resultHeading.text = victory ? "通关成功" : "本局结束";
-            resultMessage.text = message;
+
+            // 通关后如果有剧情/过渡文本（LevelDefinition.outroText，由 LevelLoader 写进 LevelOutro），
+            // 接在胜负说明后面一起显示 —— 这就是「过渡关卡」把玩家引到下一章的地方。
+            string outro = victory && TapGJ.Flow.LevelOutro.HasText ? TapGJ.Flow.LevelOutro.Current : null;
+            resultMessage.text = string.IsNullOrEmpty(outro) ? message : message + "\n\n" + outro;
+
             nextLevelButton.gameObject.SetActive(victory && session.HasNextLevel);
             resultPanel.SetActive(true);
             ui.SetModalBlocked(true);
@@ -159,7 +164,11 @@ namespace TapGJ.View
                 session.SelectingFusionCard ? session.FusionStage == GameSession.FusionPick.First
                     ? "融合牌：先选择第一个元素" : "融合牌：选择高亮的第二个元素" :
                 session.SelectingDecomposeCard ? "分解牌：点击高亮的复合元素" : $"{session.SelectedCard.Label}：点击高亮格子出牌";
-            if (_lastNote != null && Time.unscaledTime < _noteUntil && _lastNote.Contains("✗")) hint = _lastNote;
+            // 提示行的两条插队规则：出牌失败要立刻说（"✗"），喂瓶/满瓶也要立刻说（"瓶"）——
+            // 第三章整章都在盯瓶子，而这一行是 uGUI 局内界面唯一能实时写字的地方。
+            if (_lastNote != null && Time.unscaledTime < _noteUntil
+                && (_lastNote.Contains("✗") || _lastNote.Contains("瓶")))
+                hint = _lastNote;
             ui.SetSelectionHint(hint);
         }
 

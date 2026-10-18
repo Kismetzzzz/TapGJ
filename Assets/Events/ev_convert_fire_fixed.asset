@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91f074e2750445e0a26e9d2061038bd4, type: 3}
+  m_Name: ev_convert_fire_fixed
+  m_EditorClassIdentifier: 
+  eventId: ev_convert_fire_fixed
+  displayName: "\u706B\u6D41\u6F2B\u6EA2\uFF08\u56FA\u5B9A\uFF09"
+  description: "\u53F3\u4E0B\u90A3\u7247\u56FA\u5B9A\u533A\u57DF\u53D8\u6210\u706B\uFF08\u7A7A\u7684\u683C\u5B50\u4F1A\u51ED\u7A7A\u957F\u51FA\u4E00\u4E2A\u706B\uFF09"
+  element: 3
+  mode: 2
+  cellCount: 9
+  blockSize: 3
+  rectX: 5
+  rectY: 3
+  rectWidth: 3
+  rectHeight: 3

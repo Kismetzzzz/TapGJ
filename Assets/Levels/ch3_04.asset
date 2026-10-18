@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4baacca015d143941812e41b49f10709, type: 3}
+  m_Name: ch3_04
+  m_EditorClassIdentifier: 
+  levelId: ch3_04
+  displayName: "\u4E09\u8272\u74F6\u5B50"
+  description: "\u76F8\u514B\u94FE\u4E00\u73AF\u6263\u4E00\u73AF\uFF1A\u6728\u514B\u571F\u3001\u571F\u514B\u6C34\u3001\u6C34\u514B\u706B\u3002\u8BA9\u6C34\u74F6\u4EA7\u51FA 7 \u5F20\u3001\u571F\u74F6 6 \u5F20\u3001\u706B\u74F6 5 \u5F20\u3002"
+  previewImage: {fileID: 0}
+  outroText: ""
+  sceneName: Game
+  levelPrefab: {fileID: 410000000000000003, guid: d4c5b6a708299aabbccddee00112299a, type: 3}
+  useFixedSeed: 1
+  fixedSeed: 20240607
+  rules:
+    BoardWidth: 8
+    BoardHeight: 8
+    ElementPool: 30
+    CardPool: 18
+    CreepsPerElement: 0
+    MaxMoveSteps: 0
+    InitialHandSize: 5
+    HandLimit: 5
+    MaxDiscardsPerRound: 5
+    MaxCardsPerRound: 0
+    BottleCapacity: 1
+    BottleMode: 0
+    EventIntervalMin: 3
+    EventIntervalMax: 6
+    RoundLimit: 8
+    Goal:
+      Kind: 6
+      Target: 0
+      TargetCount: 0
+      Rounds: 0
+    RequireAllWinRules: 1
+    CardEffect: 0
+    EmptyCellCard: 0
+    UseCompositeElements: 0
+    SpecialCardPool: 0
+    ElementCardWeight: 10
+    FusionCardWeight: 0
+    DecomposeCardWeight: 0
+    CompositeRange: 1
+    CompositeIngredientsPerRound: 1
+    FusionRequiresAdjacency: 1
+    AllowMultipleComposites: 0
+    CompositeRandomProductionOrder: 1
+    CompositeProducesOnCreation: 1
+    DecomposeGrantsElementCards: 1
+  initialComposites: []
+  layoutText: "\u571F.\u6C34.\u706B.\u571F.\r\n.\u6C34.\u706B.\u571F..\r\n\u706B.\u571F.\u6C34.\u706B.\r\n.\u6C34.\u571F.\u6C34..\r\n\u6C34.\u706B.\u571F.\u6C34.\r\n........\r\n........\r\n........"
+  fixedInitialHand:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 4
+  useEvents: 0
+  roundEvents: []
