@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TapGJ.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -31,6 +32,10 @@ namespace TapGJ.View
         [SerializeField] Vector2[] calibrationCorners = Array.Empty<Vector2>();
         GameSession _session;
         RenderTexture _target;
+        readonly Dictionary<CreepView, BattleBoardPieceView> _pieces = new Dictionary<CreepView, BattleBoardPieceView>();
+        readonly HashSet<CreepView> _livePieces = new HashSet<CreepView>();
+        readonly List<CreepView> _stalePieces = new List<CreepView>();
+        readonly Vector2[] _pieceCorners = new Vector2[4];
 
         public void SetCalibration(CalibrationRow[] rows)
         {
@@ -120,6 +125,43 @@ namespace TapGJ.View
             boardCamera.orthographicSize = height * .5f;
             boardCamera.transform.position = board.BoardCenter + new Vector3(0, 0, -10);
             SetVerticesDirty();
+        }
+
+        void LateUpdate()
+        {
+            if (_session == null || _session.Engine == null) return;
+            var board = _session.Board;
+            _livePieces.Clear();
+            foreach (var source in board.CreepViews)
+            {
+                if (source == null) continue;
+                _livePieces.Add(source);
+                if (!_pieces.TryGetValue(source, out var piece))
+                {
+                    piece = BattleBoardPieceView.Create(rectTransform, source);
+                    _pieces.Add(source, piece);
+                }
+                var position = board.transform.InverseTransformPoint(source.transform.position);
+                var uv = new Vector2(position.x / board.BoardWidthWorld + .5f, position.y / board.BoardHeightWorld + .5f);
+                var center = BoardUvToLocal(uv);
+                var halfWidth = new Vector2(board.CellSize / board.BoardWidthWorld * .5f, 0);
+                var halfHeight = new Vector2(0, board.CellSize / board.BoardHeightWorld * .5f);
+                _pieceCorners[0] = BoardUvToLocal(uv - halfWidth - halfHeight);
+                _pieceCorners[1] = BoardUvToLocal(uv - halfWidth + halfHeight);
+                _pieceCorners[2] = BoardUvToLocal(uv + halfWidth + halfHeight);
+                _pieceCorners[3] = BoardUvToLocal(uv + halfWidth - halfHeight);
+                piece.Refresh(center, _pieceCorners, source.transform.localScale.x / (board.CellSize * CreepView.BodyScale));
+            }
+            _stalePieces.Clear();
+            foreach (var pair in _pieces)
+                if (!_livePieces.Contains(pair.Key)) _stalePieces.Add(pair.Key);
+            foreach (var source in _stalePieces)
+            {
+                // 立即隐藏，避免销毁延迟让已消失或重开的棋子多留一帧。
+                _pieces[source].gameObject.SetActive(false);
+                BoardView.Kill(_pieces[source].gameObject);
+                _pieces.Remove(source);
+            }
         }
 
         protected override void OnPopulateMesh(VertexHelper mesh)

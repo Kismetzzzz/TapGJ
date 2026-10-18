@@ -700,6 +700,66 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 菱形棋子_四角贴合格子且跟随移动和消散状态()
+        {
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var board = hud.Session.Board;
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            var pieces = hud.Viewport.GetComponentsInChildren<BattleBoardPieceView>();
+            Assert.AreEqual(board.CreepObjectCount, pieces.Length, "每只占格者应恰好显示一枚菱形棋子");
+            foreach (var source in board.CreepViews)
+            {
+                var piece = pieces.Single(p => p.name == "DiamondPiece_" + source.Uid);
+                var label = piece.transform.Find("Label").GetComponent<Text>();
+                var mesh = piece.canvasRenderer.GetMesh();
+                Assert.IsNotNull(mesh);
+                Assert.AreEqual(4, mesh.vertexCount);
+                var position = board.transform.InverseTransformPoint(source.transform.position);
+                var uv = new Vector2(position.x / board.BoardWidthWorld + .5f, position.y / board.BoardHeightWorld + .5f);
+                var half = new Vector2(board.CellSize / board.BoardWidthWorld, board.CellSize / board.BoardHeightWorld) * .5f;
+                foreach (var corner in new[] { uv - half, uv + new Vector2(-half.x, half.y),
+                    uv + half, uv + new Vector2(half.x, -half.y) })
+                {
+                    var expected = hud.Viewport.BoardUvToLocal(corner);
+                    Assert.IsTrue(mesh.vertices.Any(v => Vector2.Distance(expected,
+                        hud.Viewport.rectTransform.InverseTransformPoint(piece.transform.TransformPoint(v))) < .01f),
+                        "棋子实际渲染的四角必须贴合对应格子的四角，不能固定旋转 45 度");
+                }
+                Assert.Less(Quaternion.Angle(Quaternion.identity, label.transform.localRotation), .01f,
+                    "元素文字应正向显示");
+                Assert.AreEqual(source.Label.text, label.text);
+                Assert.AreEqual(source.Body.color, piece.color);
+                Assert.IsFalse(piece.raycastTarget);
+                Assert.IsFalse(label.raycastTarget);
+                Assert.IsTrue(source.Body.forceRenderingOff, "不得同时显示旧的地面色块");
+                Assert.IsTrue(hud.Viewport.TryCellAtLocalPoint(((RectTransform)piece.transform).anchoredPosition, out var cell));
+                Assert.AreEqual(source.Uid, hud.Session.Engine.Board.OccupantAt(cell)?.Uid);
+            }
+
+            var moving = board.CreepViews.First();
+            var movingPiece = pieces.Single(p => p.name == "DiamondPiece_" + moving.Uid);
+            var originalPosition = moving.transform.localPosition;
+            var originalColor = moving.Body.color;
+            try
+            {
+                var target = new Pos(3, 3);
+                moving.transform.localPosition = board.CellLocalPos(target);
+                moving.Body.color = new Color(originalColor.r, originalColor.g, originalColor.b, .35f);
+                yield return null;
+                yield return null;
+                Assert.IsTrue(hud.Viewport.TryCellAtLocalPoint(((RectTransform)movingPiece.transform).anchoredPosition, out var actual));
+                Assert.AreEqual(target, actual, "棋子应跟随动画中的实际位置");
+                Assert.AreEqual(.35f, movingPiece.color.a, .001f);
+            }
+            finally
+            {
+                moving.transform.localPosition = originalPosition;
+                moving.Body.color = originalColor;
+            }
+        }
+
+        [UnityTest]
         public IEnumerator 真实界面_保存两种尺寸的渲染预览()
         {
             var hud = Object.FindFirstObjectByType<BattleGameplayHud>();

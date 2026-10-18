@@ -68,6 +68,8 @@
 
 背景保留完整原图，不可见的逻辑棋盘负责布局。`BattleBoardViewport` 使用背景棋盘四角的透视校准，元素、移动动画、复合元素、高亮和点击共用同一份映射，贴合斜向菱形格线。格子中心会考虑 CellGap 的半个边距，棋盘接缝和菱形外的点击不触发出牌。当前保存的校准对应背景中的 8×8 格子，逻辑棋盘尺寸仍来自关卡；其他尺寸的关卡会铺满同一区域，需要相应背景才能逐格匹配。
 
+局内棋子使用贴合格子的透视菱形色块，四个角和斜边跟随对应格子的方向与远近变化，格子之间保留间隙。元素文字居中正向显示。棋子沿用原有移动、缩放和淡出动画；复合元素保留外圈。菱形和文字不拦截点击，出牌仍按原有棋盘格判定。
+
 以后覆盖 `Assets/UI/Art/Battle/BattleBackground.png` 并保留 `.meta`，预览和玩法界面都会换图；也可在 BattleGameplay 预制体的 `Composition/Background` 更换 Sprite。背景的棋盘区域变化时，在 `Composition/BoardContent` 调整 RectTransform 位置与尺寸，然后调整 viewport 的 Calibration Corners：依次对应逻辑左下、右下、右上、左上，使用容器内从左到右、从下到上的 0–1 坐标。当前四角在图片上依次为下端、右端、上端、左端。元素与点击自动使用更新后的数据。校准时可暂时关闭 BoardView 的 Transparent Cells 查看真实格子，完成后重新开启，让底板隐藏、背景透出。四角数据留空时仍支持原有逐行格线校准与 Top Inset 梯形布局。
 
 编辑器菜单 **TapGJ → 接入现有局内 UI** 可从 BattleUI 重新生成玩法预制体并接线。首次接入前的 Game 场景保存在 `Artifacts/BattleUiIntegration/Game-before-integration.unity`。重新接入会更新玩法 UI 的布局和接线，先保存当前场景。
