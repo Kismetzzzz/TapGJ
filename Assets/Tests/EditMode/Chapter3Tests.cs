@@ -137,7 +137,7 @@ namespace TapGJ.Tests
         {
             var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);
             Assert.IsNotNull(catalog, "找不到 " + RealCatalogPath);
-            Assert.AreEqual(15, catalog.levels.Length, "第一~三章共 15 关");
+            Assert.AreEqual(20, catalog.levels.Length, "第一~四章共 20 关");
 
             var ids = catalog.levels.Select(l => l.levelId).ToList();
             Assert.AreEqual(15, ids.Count, "目录里有空槽位");

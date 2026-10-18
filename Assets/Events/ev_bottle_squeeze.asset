@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53c9767a3f824dbb813d5bfef4c16591, type: 3}
+  m_Name: ev_bottle_squeeze
+  m_EditorClassIdentifier: 
+  eventId: ev_bottle_squeeze
+  displayName: "\u7389\u7FC1\u655B\u606F"
+  description: "\u672C\u56DE\u5408\u5C0F\u74F6\u5B50\u7684\u5BB9\u91CF\u53D8\u6210 3\uFF1A\u5148\u628A\u6512\u591F\u7684\u6362\u724C\uFF0C\u518D\u6309\u65B0\u5BB9\u91CF\u91CD\u65B0\u6512"
+  capacity: 3
