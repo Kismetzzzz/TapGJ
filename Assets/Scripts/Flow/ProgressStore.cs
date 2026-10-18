@@ -29,6 +29,21 @@ namespace TapGJ.Flow
         public static int BestRounds(string levelId)
             => string.IsNullOrEmpty(levelId) ? 0 : PlayerPrefs.GetInt($"TapGJ.best.{levelId}", 0);
 
+        /// <summary>
+        /// **只**把「已通关」这一位打上，不写最好成绩。
+        ///
+        /// 给调试工具用（编辑器里的「解锁下一关 / 解锁全部」）：试玩时想把后面的关卡打开，
+        /// 但不该把自己的测试成绩混进真实的回合数记录里。玩法流程**不要**用它 —— 正常通关走
+        /// <see cref="MarkCleared"/>。
+        /// </summary>
+        public static void MarkClearedOnly(string levelId)
+        {
+            if (string.IsNullOrEmpty(levelId)) return;
+
+            PlayerPrefs.SetInt($"TapGJ.cleared.{levelId}", 1);
+            PlayerPrefs.Save();
+        }
+
         public static void Reset(string levelId)
         {
             if (string.IsNullOrEmpty(levelId)) return;

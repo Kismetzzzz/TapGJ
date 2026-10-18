@@ -629,7 +629,9 @@ Assets/
 │  ├─ RulesInspectorWindow.cs     菜单 TapGJ ▸ 规则与批量模拟（反应表 / 跑批 / 玩法说明）
 │  ├─ GameSessionInspector.cs     GameSession 面板：标出规则来自关卡还是场景兜底（兜底那份会置灰）
 │  ├─ LevelDefinitionInspector.cs ★ 关卡面板：摘要 + 实时配置校验 + 「Play 这一关」
-│  └─ SceneScaffold.cs            菜单 TapGJ ▸ 搭骨架 / 新建 Game 场景 / 新建关卡 / 校验场景 / 校验所有关卡 / 校验所有事件
+│  ├─ SceneScaffold.cs            菜单 TapGJ ▸ 搭骨架 / 新建 Game 场景 / 新建关卡 / 校验场景 / 校验所有关卡 / 校验所有事件
+│  ├─ LevelUnlockTools.cs         调试解锁的纯逻辑（只写「已通关」，不写最好成绩）
+│  └─ LevelDebugWindow.cs         菜单 TapGJ ▸ 调试 ▸ 关卡解锁面板 / 解锁下一关 / 全部解锁 / 清空进度
 └─ Tests/EditMode/
    ├─ CoreRulesTests.cs           规则层测试（开局、相生相克、瓶子、出牌、胜负、40 局跑批）
    ├─ CompositeElementTests.cs    ★ 复合元素 + 秘术牌（配方表、融合/分解、产生效果、抽牌权重、校验）
@@ -826,6 +828,15 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 | `TapGJ ▸ 校验所有事件（目录 + 全部事件资产）` | 事件 Id 重复、没填说明、目录空槽位（「某条事件在本关适不适用」由关卡校验报） |
 | `TapGJ ▸ 打印当前对局状态（仅 Play 时）` | Play 时把阶段/回合/场上元素/瓶子/手牌打到 Console |
 | `TapGJ ▸ 规则与批量模拟` | 反应表、批量跑批、玩法说明（模拟器里可以直接调秘术牌池与抽牌权重） |
+| `TapGJ ▸ 调试 ▸ 关卡解锁面板 (Level Debug)` | **调试用**：一眼看到每关的通关/解锁状态，单点「解锁到这里」或「全部解锁」 |
+| `TapGJ ▸ 调试 ▸ 解锁下一关 (Unlock Next)` | 一键把「第一个还没通关的关卡」标成已通关 → **下一关立刻解锁**（按一次推一关） |
+| `TapGJ ▸ 调试 ▸ 全部解锁 / 清空进度` | 20 关全开 / 全部锁回第一关 |
+
+> **调试解锁只改「已通关」标记，不写最好成绩**（`ProgressStore.MarkClearedOnly`）：
+> 试玩时推关卡不会把自己的测试回合数混进真实成绩里。
+> 解锁面板里还有一个「进入」按钮 —— 只在 **Play 模式**下有效（那时 `SceneFlow` 才能真的加载 Game 场景），
+> 所以流程是：点 Play 进菜单 → 用面板直接把进度推到想测的那关 → 按「进入」跳过去。
+> ⚠ 菜单页的关卡卡片是**打开页面时**建的，改完进度要**重新进一次章节页**才会刷新。
 
 ---
 
@@ -1282,8 +1293,8 @@ Id 重复、没填说明、目录里有空槽位。
 
 ## 十、怎么验证
 
-**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：核心 **271 项**
-（原有 204 项 + 20 条回合事件用例 + 5 条「秘术牌解锁回合」用例 + 6 条第三章用例 + 6 条第四章用例 + 其余章节相关用例），另有主菜单 `MainMenuTests`、战斗 UI 与 PlayMode 套件，含
+**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：核心 **276 项**
+（原有 204 项 + 20 条回合事件用例 + 5 条「秘术牌解锁回合」用例 + 6 条第三章用例 + 6 条第四章用例 + 5 条调试工具用例 + 其余章节相关用例），另有主菜单 `MainMenuTests`、战斗 UI 与 PlayMode 套件，含
 （⚠ 回合事件那 20 条是在无头许可管道不通的环境里用「Roslyn 编译 + 一份只跑 Core 的临时 harness」验过的，
 第一次正式 Run All 请在编辑器里跑一遍）
 - 反应表：5 对相生逐对钉死（输家变成赢家）+ 5 对相克逐对钉死（输家消失）+ 双向一致性
@@ -1424,6 +1435,9 @@ Id 重复、没填说明、目录里有空槽位。
     三种取格方式（FixedRect / RandomBlock / Scatter）都有资产、5 关配置零问题、
     事件池与（瓶容量 / 回合上限 / 事件间隔 / 目标组件）逐项钉死、
     **每一章绑的关卡都必须属于这一章**（`chN_` 前缀 —— 之前第四章被误绑成第三章的关卡过）
+  - **调试解锁工具**（`LevelDebugToolsTests`）：按展平顺序推进（待开放的条目跳过，和真实解锁链口径一致）、
+    「解锁到这里」只标目标之前那几关且幂等、「全部解锁 / 清空进度」的返回值与最终状态、
+    以及**调试解锁不写最好成绩**（`BestRounds` 仍然是 0）
 - **回合事件**（`RoundEventTests`，见第九节）：
   - **没挂事件池 = 与加这套系统之前逐位一致**（`EventsEnabled` 假、`NextEventRound` 为 0、跑 5 回合零事件）
   - 调度：**第 1 回合不触发**、第一次落在第 `1+[min,max]` 回合（默认 4~7）、每次触发后重新排间隔、
@@ -1473,7 +1487,7 @@ Id 重复、没填说明、目录里有空槽位。
 Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
   -runTests -testPlatform EditMode -testResults <xml> -logFile <log>
 ```
-可以验证：编译零警告、**271 项测试**、接线校验逻辑、骨架搭建与「新建关卡」的建资产流程
+可以验证：编译零警告、**276 项测试**、接线校验逻辑、骨架搭建与「新建关卡」的建资产流程
 （测试直接调 `SceneScaffold.BuildSkeleton` / `CreateLevelAsset`）、
 字符画解析与目标判定、关卡机制的全部钩子与注入 API、元素池/牌池的硬约束与配置校验、
 复合元素的全部规则与秘术牌的两段式选点、回合事件的调度与每个事件的语义。
