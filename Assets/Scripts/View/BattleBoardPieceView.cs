@@ -12,7 +12,7 @@ namespace TapGJ.View
         readonly Vector2[] _corners = new Vector2[4];
         readonly UIVertex[] _quad = new UIVertex[4];
 
-        public static BattleBoardPieceView Create(RectTransform parent, CreepView source)
+        public static BattleBoardPieceView Create(RectTransform parent, CreepView source, UiFontTheme fontTheme)
         {
             var root = new GameObject("DiamondPiece_" + source.Uid, typeof(RectTransform), typeof(CanvasRenderer));
             root.layer = parent.gameObject.layer;
@@ -26,11 +26,13 @@ namespace TapGJ.View
             label.layer = root.layer;
             label.transform.SetParent(root.transform, false);
             piece._label = label.GetComponent<Text>();
+            piece._label.font = source.Label.font;
             piece._label.alignment = TextAnchor.MiddleCenter;
             piece._label.raycastTarget = false;
             piece._label.supportRichText = false;
             piece._label.resizeTextForBestFit = true;
             piece._label.resizeTextMinSize = 8;
+            label.AddComponent<UiFontBinding>().Configure(fontTheme, UiFontRole.Body);
             return piece;
         }
 
@@ -70,7 +72,6 @@ namespace TapGJ.View
             color = _source.Body.color;
             _label.rectTransform.sizeDelta = new Vector2(size.x * .55f, size.y * .75f);
             _label.text = _source.Label.text;
-            _label.font = _source.Label.font;
             _label.fontStyle = _source.Label.fontStyle;
             _label.color = _source.Label.color;
             _label.resizeTextMaxSize = Mathf.Max(8, Mathf.RoundToInt(size.y * .65f));

@@ -712,6 +712,11 @@ namespace TapGJ.Tests
             {
                 var piece = pieces.Single(p => p.name == "DiamondPiece_" + source.Uid);
                 var label = piece.transform.Find("Label").GetComponent<Text>();
+                var fontBinding = label.GetComponent<UiFontBinding>();
+                Assert.IsNotNull(fontBinding, "棋子文字也应参与统一换字体");
+                Assert.IsNotNull(fontBinding.Theme);
+                Assert.AreSame(fontBinding.Theme.GetFont(UiFontRole.Body), label.font,
+                    "棋子刷新不能覆盖默认 UI 字体");
                 var mesh = piece.canvasRenderer.GetMesh();
                 Assert.IsNotNull(mesh);
                 Assert.AreEqual(4, mesh.vertexCount);

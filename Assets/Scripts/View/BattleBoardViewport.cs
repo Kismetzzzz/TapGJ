@@ -31,6 +31,7 @@ namespace TapGJ.View
         [Tooltip("菱形棋盘四角，依次为逻辑左下、右下、右上、左上；使用容器内的 0–1 坐标。")]
         [SerializeField] Vector2[] calibrationCorners = Array.Empty<Vector2>();
         GameSession _session;
+        UiFontTheme _fontTheme;
         RenderTexture _target;
         readonly Dictionary<CreepView, BattleBoardPieceView> _pieces = new Dictionary<CreepView, BattleBoardPieceView>();
         readonly HashSet<CreepView> _livePieces = new HashSet<CreepView>();
@@ -108,6 +109,7 @@ namespace TapGJ.View
         public void Setup(GameSession session)
         {
             _session = session;
+            _fontTheme = GetComponentInParent<BattleUiController>()?.GetComponentInChildren<UiFontBinding>(true)?.Theme;
             var board = session.Board;
             float width = board.BoardWidthWorld * board.transform.lossyScale.x;
             float height = board.BoardHeightWorld * board.transform.lossyScale.y;
@@ -138,7 +140,7 @@ namespace TapGJ.View
                 _livePieces.Add(source);
                 if (!_pieces.TryGetValue(source, out var piece))
                 {
-                    piece = BattleBoardPieceView.Create(rectTransform, source);
+                    piece = BattleBoardPieceView.Create(rectTransform, source, _fontTheme);
                     _pieces.Add(source, piece);
                 }
                 var position = board.transform.InverseTransformPoint(source.transform.position);

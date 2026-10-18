@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6cac2d2e54f56f14c807dcac30b776cf, type: 3}
   m_Name: UiFontTheme
   m_EditorClassIdentifier: 
-  body: {fileID: 0}
+  systemBodyFont: KaiTi
+  body: {fileID: 12800000, guid: 7185b102b91bbab4ea95be9f59a3e09f, type: 3}
   title: {fileID: 0}
   number: {fileID: 0}
