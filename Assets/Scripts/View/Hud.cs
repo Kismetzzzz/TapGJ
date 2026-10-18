@@ -211,8 +211,8 @@ namespace TapGJ.View
             GUI.backgroundColor = prevBg;
             y += 32f;
 
-            // ---- 下一关：目录里当前关的下一关（最后一关绕回第一关）。
-            // 没有关卡加载器（开发兜底路径）/ 目录里没有别的关卡时按钮置灰，标签会写明原因。
+            // ---- 下一关：目录里当前关之后的下一关，到目录末尾就停止。
+            // 没有关卡加载器（开发兜底路径）/ 后面没有可用关卡时按钮置灰，标签会写明原因。
             // ⚠ 播动画时不给按：换关会重建整关，正在播的步骤动画属于上一关，按下去会错位。
             GUI.backgroundColor = new Color(0.75f, 0.95f, 0.8f);
             GUI.enabled = _session.HasNextLevel && !_session.Busy;

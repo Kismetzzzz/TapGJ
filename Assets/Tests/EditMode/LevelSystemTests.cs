@@ -210,7 +210,7 @@ namespace TapGJ.Tests
         // ---------------------------------------------------------------- 下一关（HUD 的按钮）
 
         [Test]
-        public void 目录_下一关按顺序走_最后一关绕回第一关()
+        public void 目录_下一关按顺序走_最后一关不再返回第一关()
         {
             var catalog = ScriptableObject.CreateInstance<LevelCatalog>();
             var a = MakeLevel("aaa");
@@ -222,7 +222,7 @@ namespace TapGJ.Tests
             {
                 Assert.AreSame(b, catalog.NextAfter("aaa"));
                 Assert.AreSame(c, catalog.NextAfter("bbb"));
-                Assert.AreSame(a, catalog.NextAfter("ccc"), "最后一关的下一关是第一关（目录是循环的）");
+                Assert.IsNull(catalog.NextAfter("ccc"), "通关最后一关后不能把重新开始当成下一关");
 
                 // 找不到当前关（在玩一个不在目录里的调试关 / id 为空）→ 回到目录第一关
                 Assert.AreSame(a, catalog.NextAfter("zzz"));
@@ -249,7 +249,7 @@ namespace TapGJ.Tests
             try
             {
                 Assert.AreSame(b, catalog.NextAfter("aaa"), "当前关后面那个洞要跳过（关卡被删了但目录没清）");
-                Assert.AreSame(a, catalog.NextAfter("bbb"), "末尾的洞也跳过，绕回第一关");
+                Assert.IsNull(catalog.NextAfter("bbb"), "末尾没有可用关卡时应结束，不能绕回第一关");
             }
             finally
             {

@@ -145,7 +145,7 @@ namespace TapGJ.Levels
         public string NextLevelName => NextLevel == null ? null : DisplayNameOf(NextLevel);
 
         /// <summary>
-        /// 切到下一关（目录里当前关的下一关，最后一关绕回第一关）。
+        /// 切到目录里当前关之后的下一关；已到末尾时返回 false。
         ///
         /// 逐条说明：
         ///   · **种子**：传 0 给 <see cref="RebuildLevel"/> = 「这一关该用什么种子就用什么」——

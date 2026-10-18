@@ -564,6 +564,56 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 下一关_走完整个目录后停止_不会重新开始也不会改动通关记录()
+        {
+            var loader = Object.FindFirstObjectByType<LevelLoader>();
+            var session = Object.FindFirstObjectByType<GameSession>();
+            var catalog = Resources.FindObjectsOfTypeAll<LevelCatalog>()
+                .Single(c => c.levels != null && c.levels.Contains(loader.CurrentLevel));
+            var clearedBefore = catalog.levels.Select(level => ProgressStore.IsCleared(level.levelId)).ToArray();
+            var bestBefore = catalog.levels.Select(level => ProgressStore.BestRounds(level.levelId)).ToArray();
+
+            // 暂停回合推进，只验证换关导航不会写入通关记录。
+            session.Paused = true;
+            try
+            {
+                loader.LoadLevel(catalog.levels[0], 4242);
+                yield return null;
+                for (int i = 1; i < catalog.levels.Length; i++)
+                {
+                    var previousInstance = loader.CurrentInstance;
+                    Assert.AreSame(catalog.levels[i], loader.NextLevel);
+                    Assert.IsTrue(session.GoToNextLevel());
+                    Assert.AreSame(catalog.levels[i], loader.CurrentLevel);
+                    yield return null;
+                    Assert.IsTrue(previousInstance == null, "换关后应销毁上一关的预制体实例");
+                }
+
+                var finalLevel = loader.CurrentLevel;
+                var finalEngine = session.Engine;
+                var finalInstance = loader.CurrentInstance;
+                Assert.IsFalse(session.HasNextLevel, "目录已到末尾，应等待新内容或返回选关");
+                Assert.IsNull(loader.NextLevelName);
+                Assert.AreEqual("下一关（没有下一关）", Hud.NextLevelButtonLabel(session));
+                Assert.IsFalse(session.GoToNextLevel());
+                yield return null;
+                Assert.AreSame(finalLevel, loader.CurrentLevel);
+                Assert.AreSame(finalEngine, session.Engine, "没有下一关时不能重新创建一局");
+                Assert.AreSame(finalInstance, loader.CurrentInstance);
+                Assert.AreSame(finalLevel, GameLaunchContext.Level);
+                for (int i = 0; i < catalog.levels.Length; i++)
+                {
+                    Assert.AreEqual(clearedBefore[i], ProgressStore.IsCleared(catalog.levels[i].levelId));
+                    Assert.AreEqual(bestBefore[i], ProgressStore.BestRounds(catalog.levels[i].levelId));
+                }
+            }
+            finally
+            {
+                session.Paused = false;
+            }
+        }
+
+        [UnityTest]
         public IEnumerator 秘术牌_显示真实类型并使用独立文字卡面()
         {
             var hud = Object.FindFirstObjectByType<BattleGameplayHud>();

@@ -14,7 +14,7 @@ namespace TapGJ.Tests
     /// 「下一关」的端到端测试：真的搭一套 GameSession（棋盘 / 手牌 / 输入 / 关卡加载器）、真的换一关，
     /// 验证换完之后关卡定义、规则、回合数、日志都换了一套。
     ///
-    /// 目录查找本身（哪一关在谁后面、最后一关绕回第一关）在 LevelSystemTests 里逐条钉过，
+    /// 目录查找本身（哪一关在谁后面、最后一关停止）在 LevelSystemTests 里逐条钉过，
     /// 这里钉的是「点下去之后发生了什么」。
     /// </summary>
     public class LevelSwitchTests
@@ -57,7 +57,8 @@ namespace TapGJ.Tests
 
                 Assert.AreSame(second, loader.CurrentLevel);
                 Assert.AreEqual("第 2 关", loader.CurrentLevelName);
-                Assert.AreEqual("第 1 关", loader.NextLevelName, "最后一关的下一关是第一关（目录是循环的）");
+                Assert.IsNull(loader.NextLevelName, "最后一关不能把第一关显示成下一关");
+                Assert.IsFalse(session.HasNextLevel);
                 Assert.AreNotSame(beforeEngine, session.Engine, "换关要重建引擎，不能接着上一关的残局打");
                 Assert.AreEqual(7, session.Engine.Rules.RoundLimit, "现在跑的是第 2 关的规则");
                 Assert.AreEqual(1, session.Engine.Round, "换关 = 新的一局，从第 1 回合开始");
