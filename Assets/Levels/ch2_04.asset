@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4baacca015d143941812e41b49f10709, type: 3}
+  m_Name: ch2_04
+  m_EditorClassIdentifier: 
+  levelId: ch2_04
+  displayName: "\u7075\u6CC9"
+  description: "\u7075\u6CC9\u6BCF\u56DE\u5408\u90FD\u4F1A\u751F\u51FA\u6C34\u548C\u6728\u3002\u7528\u6728\u724C\u628A\u6C34\u53D8\u6210\u6728\uFF0C\u8BA9\u573A\u4E0A\u53EA\u5269\u6728\u3002"
+  previewImage: {fileID: 0}
+  outroText: ""
+  sceneName: Game
+  levelPrefab: {fileID: 808894031156450432, guid: 341a52da9270429ebaa72a7b0016877e, type: 3}
+  useFixedSeed: 1
+  fixedSeed: 20240607
+  rules:
+    BoardWidth: 8
+    BoardHeight: 8
+    ElementPool: 6
+    CardPool: 2
+    CreepsPerElement: 0
+    MaxMoveSteps: 0
+    InitialHandSize: 5
+    HandLimit: 5
+    MaxDiscardsPerRound: 5
+    MaxCardsPerRound: 0
+    BottleCapacity: 5
+    BottleMode: 1
+    EventIntervalMin: 3
+    EventIntervalMax: 6
+    RoundLimit: 8
+    Goal:
+      Kind: 6
+      Target: 0
+      TargetCount: 0
+      Rounds: 0
+    RequireAllWinRules: 0
+    CardEffect: 0
+    EmptyCellCard: 1
+    UseCompositeElements: 1
+    SpecialCardPool: 0
+    ElementCardWeight: 10
+    FusionCardWeight: 0
+    DecomposeCardWeight: 0
+    CompositeRange: 1
+    CompositeIngredientsPerRound: 2
+    FusionRequiresAdjacency: 1
+    AllowMultipleComposites: 0
+    CompositeRandomProductionOrder: 1
+    CompositeProducesOnCreation: 1
+    DecomposeGrantsElementCards: 1
+  initialComposites:
+  - X: 4
+    Y: 4
+    Kind: 4
+  layoutText: "........\r\n..\u6C34...\u6C34.\r\n........\r\n........\r\n........\r\n..\u6728...\u6728.\r\n........\r\n....\u6C34..."
+  fixedInitialHand: 
+  useEvents: 0
+  roundEvents: []

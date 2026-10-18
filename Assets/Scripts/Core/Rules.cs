@@ -261,6 +261,18 @@ namespace TapGJ.Core
         public int DecomposeCardWeight = 5;
 
         /// <summary>
+        /// **秘术牌从第几回合开始进牌堆**（1 = 开局就能抽到；默认 1，所以对老关卡零影响）。
+        ///
+        /// 教学关的常用节奏：「第 1 回合只发元素牌，让玩家先看清楚这个复合元素每回合都在产什么，
+        /// 第 2 回合再把分解牌发下来」。因为抽牌只发生在每回合的准备阶段之后
+        /// （起手牌算第 1 回合的牌），所以设成 2 就等于「第 1 回合手里一张秘术牌都没有」。
+        ///
+        /// ⚠ 只管秘术牌（融合 / 分解）；元素牌照旧。只在 <see cref="UseCompositeElements"/> 勾着时有意义。
+        /// ⚠ 别设得比 <see cref="RoundLimit"/> 还大，那样一张都抽不到（配置校验会报出来）。
+        /// </summary>
+        public int SpecialCardUnlockRound = 1;
+
+        /// <summary>
         /// 复合元素「产生」效果的作用范围（切比雪夫距离）：
         /// 1 = 紧邻的 8 格（3×3 去掉自己），2 = 5×5。
         /// 图2 写的是「进入范围内生产」，范围多大原表没写死，所以做成可调。
@@ -369,6 +381,15 @@ namespace TapGJ.Core
                 default: return false;
             }
         }
+
+        /// <summary>
+        /// 第 <paramref name="round"/> 回合抽牌时**能不能抽到秘术牌**。
+        ///
+        /// <paramref name="round"/> &lt;= 0 按第 1 回合算 —— 起手牌是在 <see cref="GameEngine.BeginRound"/>
+        /// 之前抽的（那时 <see cref="GameEngine.Round"/> 还是 0），但它实际上就是第 1 回合的牌。
+        /// </summary>
+        public bool SpecialCardsAvailableAtRound(int round)
+            => Math.Max(1, round) >= Math.Max(1, SpecialCardUnlockRound);
 
         /// <summary>
         /// 总开关勾着、但这一层其实是空的：没选任何可抽的秘术牌，开局也没摆初始复合元素。
@@ -516,6 +537,7 @@ namespace TapGJ.Core
             if (ElementCardWeight < 0) throw new ArgumentException("ElementCardWeight 不能为负");
             if (FusionCardWeight < 0) throw new ArgumentException("FusionCardWeight 不能为负");
             if (DecomposeCardWeight < 0) throw new ArgumentException("DecomposeCardWeight 不能为负");
+            if (SpecialCardUnlockRound < 1) throw new ArgumentException("SpecialCardUnlockRound 至少为 1（1 = 开局就能抽到秘术牌）");
         }
 
         /// <summary>
@@ -613,6 +635,15 @@ namespace TapGJ.Core
 
             bool wantsFusion = HasSpecialCard(CardKind.FusionCard);
             bool wantsDecompose = HasSpecialCard(CardKind.DecomposeCard);
+
+            // 解锁回合被设成了一关永远到不了的地方 → 秘术牌一张都抽不到（含起手牌）。
+            // 这不是死局，但配的人几乎肯定是笔误（比如照着「第 3 回合」填，结果关卡只有 2 回合）。
+            if ((wantsFusion || wantsDecompose) && SpecialCardUnlockRound > RoundLimit)
+            {
+                into.Add($"秘术牌从第 {SpecialCardUnlockRound} 回合才开始进牌堆（SpecialCardUnlockRound），"
+                         + $"但本关回合上限只有 {RoundLimit} → 一张秘术牌都抽不到（起手也没有）。"
+                         + "要么把回合上限调大，要么把这个值调回 1。");
+            }
 
             if (!HasAnyDrawableCard())
             {

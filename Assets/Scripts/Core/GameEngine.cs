@@ -100,6 +100,8 @@ namespace TapGJ.Core
         public Bottle Bottle { get; }
 
         readonly Random _rng;
+        /// <summary>「这一回合还没解锁秘术牌」时用的空数组（避免每次抽牌都分配一个新数组）。</summary>
+        static readonly CardKind[] NoSpecialCards = new CardKind[0];
         readonly List<Card> _hand = new List<Card>();
         readonly Dictionary<int, Creep> _creeps = new Dictionary<int, Creep>();
         readonly Queue<StepRecord> _steps = new Queue<StepRecord>();
@@ -1270,10 +1272,15 @@ namespace TapGJ.Core
         /// 抽一张牌：先按**权重**决定这一张是元素牌还是哪种秘术牌，再决定具体内容。
         /// 这是「秘术牌比例可控」的实现点 —— 权重在 <see cref="Rules"/> 上（元素/融合/分解各一个）。
         /// 元素牌池为空时秘术牌仍然照常抽得出来（反之亦然）。
+        ///
+        /// 秘术牌还有一道**回合门**：<see cref="Rules.SpecialCardUnlockRound"/> 之前的回合
+        /// 只发元素牌（教学关用「第 1 回合先只看，第 2 回合再给分解牌」就是这个）。
         /// </summary>
         Card DrawRandomCard()
         {
-            var specials = Rules.DrawableSpecialCards();
+            var specials = Rules.SpecialCardsAvailableAtRound(Round)
+                ? Rules.DrawableSpecialCards()
+                : NoSpecialCards;
             bool hasElements = Rules.PoolCards.Length > 0 && Rules.ElementCardWeight > 0;
 
             int elementWeight = hasElements ? Math.Max(0, Rules.ElementCardWeight) : 0;

@@ -94,6 +94,12 @@ namespace TapGJ.Levels
 
             var effective = rules.Clone();
 
+            // 开局初始复合元素是**关卡层**的字段（`LevelDefinition.initialComposites`）：
+            // LevelLoader 进关时才把它拷进 `rules.InitialComposites`（见 LevelLoader.BuildSetup）。
+            // 校验必须做**同一个拷贝**，否则「这一关摆了初始复合元素」在规则副本里根本看不到，
+            // 于是 `Rules.CollectIssues` 会误报「总开关白勾」「分解牌永远用不出去」两条假警告。
+            effective.InitialComposites = initialComposites ?? new CompositePlacement[0];
+
             // 规则数值本身合不合法（越界、负数之类会抛异常，这里抓成一句人话继续往下查）
             try
             {
@@ -354,6 +360,9 @@ namespace TapGJ.Levels
             parts.Add(cards.Count == 0
                 ? "不发秘术牌"
                 : string.Join("+", cards) + $"（权重 {rules.ElementCardWeight}/{rules.FusionCardWeight}/{rules.DecomposeCardWeight}）");
+
+            if (rules.SpecialCardUnlockRound > 1)
+                parts.Add($"第 {rules.SpecialCardUnlockRound} 回合起才发");
 
             if (rules.InitialComposites != null && rules.InitialComposites.Length > 0)
                 parts.Add($"开局 {rules.InitialComposites.Length} 个");

@@ -522,7 +522,7 @@ public override void OnEncounter(GameEngine engine, EncounterInfo info)
 | [OnlyTheseElementsRule](Assets/Scripts/Levels/Mechanics/OnlyTheseElementsRule.cs) | 「场上只剩指定的那几种元素」当胜利条件（例：只剩水和火；`allowed` 多选 + `requireEachAllowedPresent`） |
 | [BottleProducedRule](Assets/Scripts/Levels/Mechanics/BottleProducedRule.cs) | 「某元素的小瓶子产出 N 张牌」当胜利条件（第三章小瓶子教学；`element` + `count`） |
 | [FusionCountRule](Assets/Scripts/Levels/Mechanics/FusionCountRule.cs) | 「本局累计融合 N 次」当胜利条件（第二章合成教学） |
-| [DecomposeCountRule](Assets/Scripts/Levels/Mechanics/DecomposeCountRule.cs) | 「本局累计分解 N 次」当胜利条件；`requireNoComposites` 让它变成「分解掉全部复合元素」（分解五种那关） |
+| [DecomposeCountRule](Assets/Scripts/Levels/Mechanics/DecomposeCountRule.cs) | 「本局累计分解 N 次」当胜利条件；`requireNoComposites` 让它变成「分解掉全部复合元素」（分解五种那关）。复合元素可以是开局摆好的，也可以是玩家自己合的 |
 | [ElementKindsRule](Assets/Scripts/Levels/Mechanics/ElementKindsRule.cs) | 「场上恰好剩 N 种元素」当胜利条件（不指定是哪几种；空场天然不算赢） |
 
 > **「A 且 B」型目标**：`Rules.RequireAllWinRules`（默认 **关** = 老语义「任一机制满足即赢」）。
@@ -952,9 +952,21 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 | `ElementCardWeight` | 10 | 元素牌的权重 |
 | `FusionCardWeight` | 10 | 融合牌的权重 |
 | `DecomposeCardWeight` | 5 | 分解牌的权重 |
+| `SpecialCardUnlockRound` | 1 | **秘术牌从第几回合开始进牌堆**。1 = 开局就有；设成 2 = 第 1 回合只发元素牌（教学关节奏） |
 
 例：元素 10 / 融合 10 → 手牌里大约一半是融合牌；把融合牌权重调到 0 就等于关掉它；
 只想给融合牌不想给分解牌，就在 `SpecialCardPool` 里把分解牌取消勾选。
+
+**`SpecialCardUnlockRound` 是给「先看、再动手」的教学关节奏用的**（ch2_02 就是）：
+
+```
+第 1 回合：只发元素牌 → 玩家盯着灵泉，看它每回合往旁边吐 2 个水 + 2 个木，拆不掉
+第 2 回合：分解牌进牌堆 → 玩家把灵泉拆回两张元素牌
+```
+
+因为**抽牌只发生在每回合的准备阶段之后**（起手牌算第 1 回合的牌），所以设成 2 就等于
+「第 1 回合手里一张秘术牌都没有」，不需要额外的「禁止出牌」逻辑。
+⚠ 设得比 `RoundLimit` 还大 = 这一关永远抽不到秘术牌，配置校验会直接报出来。
 
 有两张死牌会被**自动跳过**（抽不到，也就不会污染手牌）：
 
@@ -977,8 +989,33 @@ uGUI 版直接订阅 `EventRaised` 做增量追加。
 - 关卡资产面板顶部那行摘要会直接写 **`复合元素 开（融合牌、分解牌、权重 10/10/5、开局 2 个）`**
   或 **`复合元素 关`**，不用往下翻就知道这一关到底有没有这一层
 - 编辑器里 **TapGJ ▸ 规则与批量模拟** 的「批量模拟」页有同一个总开关
-  （没勾时下面整块置灰并说明原因），跑批报告里会多打一行
+  （没勾时旁边整块置灰并说明原因），跑批报告里会多打一行
   「融合 N 次 / 分解 N 次 / 复合元素产出 N 个 / 场上最多同时 N 个」
+
+### 第二章 5 关现在是怎么配的
+
+> 这一章的教学顺序：**合出来 → 收不住 → 拆掉 → 用复合元素当压力源 → 收尾**
+> 全部 `Goal = Custom`、`BottleMode = Disabled`、`useEvents = 0`。
+
+| 关卡 | 名字 | 胜利条件（关卡预制体上的组件） | 关键差异 |
+|---|---|---|---|
+| `ch2_01` | 合成 | `FusionCount(1)` + `ElementKinds(2)`（AND） | 开局没有复合元素，棋盘上摆着金/水/木三种；要先清掉一种再合 |
+| `ch2_02` | 分解 | `DecomposeCount(1)` | 开局一个灵泉；**`SpecialCardUnlockRound = 2`** → 第 1 回合只发元素牌，让玩家看着它吐元素 |
+| `ch2_03` | 分解五种 | `DecomposeCount(5)` + `requireNoComposites` | **开局一个复合元素都没有**：玩家自己融合、自己拆，来回 5 次 |
+| `ch2_04` | 只剩木 | `OnlyTheseElements(木)` | 灵泉当压力源：每回合往场上吐木 + 水，玩家只能用木牌把水一个个转成木 |
+| `ch2_05` | 收尾 | `FusionCount(1)` + `EqualElementCounts(±1)`（AND） | 金比别的多 2 个，先砍掉一个再合，合完数量刚好平 |
+
+几条踩过的坑（数值别照抄，照**原因**改）：
+
+- `ch2_02` / `ch2_03` 的**抽牌只发生在每回合准备阶段之后**：手牌满了就一张都不抽。
+  所以 `ch2_02` 第 1 回合玩家得把元素牌打出去，第 2 回合才有位置接分解牌；
+  `HandLimit` 太小时手牌会被一种牌堵死（测试脚本里就撞见过「6 张融合牌、场上还有一个拆不掉的复合元素」）。
+  `ch2_03` 因此把 `HandLimit` 提到 6、权重调成 元素 30 / 融合 30 / 分解 18。
+- `ch2_03` 必须允许**空格召唤**（`EmptyCellCard = Summon`）：融合要求两个元素十字相邻，
+  开局那 5 个孤零零的元素根本凑不出一对，不给召唤就无从下手。
+- `ch2_03` 关掉了 `CompositeProducesOnCreation`：融合当回合就产 4 个元素，会把「合一个→拆一个」的循环搅乱，
+  「复合元素会不断产元素」这件事让 `ch2_02` / `ch2_04` 去演示。
+- `ch2_01` / `ch2_05` 也不能开 `CompositeProducesOnCreation`：多出来的元素会当场破坏「恰好两种」/「数量平均」。
 
 ### 几个实现上的取舍（想改的话从这里下手）
 
@@ -1150,8 +1187,8 @@ Id 重复、没填说明、目录里有空槽位。
 
 ## 十、怎么验证
 
-**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：核心 **254 项**
-（原有 204 项 + 本次新增的 20 条回合事件用例），另有主菜单 `MainMenuTests`、战斗 UI 与 PlayMode 套件，含
+**A. 跑测试**（Window ▸ General ▸ Test Runner ▸ EditMode ▸ Run All）：核心 **259 项**
+（原有 204 项 + 20 条回合事件用例 + 5 条「秘术牌解锁回合」用例 + 其余章节相关用例），另有主菜单 `MainMenuTests`、战斗 UI 与 PlayMode 套件，含
 （⚠ 回合事件那 20 条是在无头许可管道不通的环境里用「Roslyn 编译 + 一份只跑 Core 的临时 harness」验过的，
 第一次正式 Run All 请在编辑器里跑一遍）
 - 反应表：5 对相生逐对钉死（输家变成赢家）+ 5 对相克逐对钉死（输家消失）+ 双向一致性
@@ -1267,6 +1304,16 @@ Id 重复、没填说明、目录里有空槽位。
   - 配置校验：开了融合牌却凑不出配方 / 开了分解牌却拿不到复合元素 / 权重为 0 / 初始复合元素越界，
     以及一条干净配置必须**零问题**
   - **面板摘要**：`CompositeFeatureText` 对「关」和「开（融合牌、分解牌、权重 …、开局 N 个）」都逐字钉住
+  - **秘术牌解锁回合**（`SpecialCardUnlockTests`）：默认 1 = 与加这个字段之前完全一致；
+    设成 2 时**第 1 回合起手一张秘术牌都没有**、第 2 回合抽牌阶段就发下来；
+    `Round = 0`（起手抽牌那一刻）按第 1 回合算；解锁回合大于回合上限 → 配置校验报「一张秘术牌都抽不到」；
+    小于 1 → `Validate` 直接抛
+  - **第二章 5 关的可通关性**（离线 harness：把 `.asset` / `.prefab` 里的字段**原样解析**成 `Rules`，
+    再造 `GameEngine` 让一个贪心玩家真打，不是手抄数值）：
+    ch2_02 第 1 回合起手零分解牌、灵泉一回合产 4 个元素、第 2 回合抽出分解牌后通关；
+    ch2_03「自己合 5 次 + 拆 5 次」在第 7 回合通关（12 回合上限，20 个种子全通）；
+    ch2_01 / ch2_04 / ch2_05 在 `N = 2` 下仍然可通关（而且都能在第 1 回合打出胜利条件 —— 教学关偏短，
+    想让它们撑久一点就把目标调高：`FusionCount(2)`、把灵泉换成每回合更凶的参数……）
 - **回合事件**（`RoundEventTests`，见第九节）：
   - **没挂事件池 = 与加这套系统之前逐位一致**（`EventsEnabled` 假、`NextEventRound` 为 0、跑 5 回合零事件）
   - 调度：**第 1 回合不触发**、第一次落在第 `1+[min,max]` 回合（默认 4~7）、每次触发后重新排间隔、
@@ -1316,7 +1363,7 @@ Id 重复、没填说明、目录里有空槽位。
 Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
   -runTests -testPlatform EditMode -testResults <xml> -logFile <log>
 ```
-可以验证：编译零警告、**254 项测试**、接线校验逻辑、骨架搭建与「新建关卡」的建资产流程
+可以验证：编译零警告、**259 项测试**、接线校验逻辑、骨架搭建与「新建关卡」的建资产流程
 （测试直接调 `SceneScaffold.BuildSkeleton` / `CreateLevelAsset`）、
 字符画解析与目标判定、关卡机制的全部钩子与注入 API、元素池/牌池的硬约束与配置校验、
 复合元素的全部规则与秘术牌的两段式选点、回合事件的调度与每个事件的语义。
@@ -1369,8 +1416,9 @@ Unity.exe -batchmode -nographics -projectPath D:\LiquidCat\TapGJ ^
   （要的话调 `engine.DrawSpecialCard(CardKind)` 就行，沙盒/机制都能用）
 - **分解牌不占每回合出牌上限**（它是纯解场牌）。想让它也吃上限，把 `TryPlayDecomposeCard` 里
   `CheckSpecialCardPlayable` 的那一段复用过来即可
-- **复合元素每回合都会「产生」满额元素**，`CompositeIngredientsPerRound = 4` 时两种元素各 4 个，
-  一个复合元素就是每回合 +8 只 —— 数值上很可能偏强，先用第八节的模拟器跑一遍再定
+- **复合元素每回合都会「产生」满额元素**：`CompositeIngredientsPerRound = N` → 两种组成元素**各 N 个**，
+  一个复合元素一回合就是 **+2N**。默认 `N = 4`（原表设定，+8/回合，8×8 两三个回合就塞满），
+  **第二章 5 关统一用 `N = 2`**（+4/回合）。想让「复合元素很凶」就用 4，教学关建议 1~2
 - **复合元素不计入任何胜利条件**（它既不算元素、也不进元素种类统计）。
   所以「全场只剩水元素」之类的目标在有复合元素的关卡里是按**元素**判的，不看复合元素
 - 玩家没有出牌次数限制（原型故意放开，方便试；调参数据见第四节，4 张较平衡）
