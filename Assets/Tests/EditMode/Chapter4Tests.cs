@@ -50,7 +50,7 @@ namespace TapGJ.Tests
             Assert.IsEmpty(issues, string.Join(" / ", issues));
 
             var inCatalog = catalog.All().ToList();
-            Assert.AreEqual(10, inCatalog.Count, "第四章准备了 10 条事件（给牌 2 + 玉翁 + 静滞 + 流漫溢 6）");
+            Assert.AreEqual(11, inCatalog.Count, "第四章准备了 11 条事件（给牌 2 + 玉翁 2 + 静滞 + 流漫溢 6）");
 
             var onDisk = new List<RoundEventDefinition>();
             foreach (var guid in AssetDatabase.FindAssets("", new[] { EventDir }))
@@ -119,8 +119,8 @@ namespace TapGJ.Tests
             {
                 ("ch4_01", 5, 10, 2, 3, new[] { "ev_element_gift", "ev_special_gift" },
                  "decompose:2:noComposite"),
-                ("ch4_02", 1, 10, 2, 3, new[] { "ev_convert_fire_fixed", "ev_convert_earth_fixed" },
-                 "bottle:水3,bottle:土6,bottle:火5,bottle:金4,bottle:木2"),
+                ("ch4_02", 5, 12, 2, 3, new[] { "ev_convert_fire_fixed", "ev_convert_earth_fixed" },
+                 "bottle:水1,bottle:土1,bottle:火1,bottle:金1,bottle:木1"),
                 ("ch4_03", 5, 10, 2, 3, new[] { "ev_convert_water_block", "ev_convert_fire_block" },
                  "only:土"),
                 ("ch4_04", 5, 10, 2, 3, new[] { "ev_element_gift", "ev_convert_wood_scatter" },

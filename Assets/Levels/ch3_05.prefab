@@ -50,7 +50,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   goalDescription: 
   element: 0
-  count: 5
+  count: 1
 --- !u!114 &410000000000000007
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -65,7 +65,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   goalDescription: 
   element: 1
-  count: 5
+  count: 1
 --- !u!114 &410000000000000008
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -80,7 +80,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   goalDescription: 
   element: 2
-  count: 5
+  count: 1
 --- !u!114 &410000000000000009
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -95,7 +95,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   goalDescription: 
   element: 3
-  count: 5
+  count: 1
 --- !u!114 &410000000000000010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -110,4 +110,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   goalDescription: 
   element: 4
-  count: 5
+  count: 1

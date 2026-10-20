@@ -48,7 +48,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   goalDescription: 
   element: 2
-  count: 7
+  count: 1
 --- !u!114 &410000000000000006
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -63,7 +63,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   goalDescription: 
   element: 4
-  count: 6
+  count: 1
 --- !u!114 &410000000000000007
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -78,4 +78,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   goalDescription: 
   element: 3
-  count: 5
+  count: 1

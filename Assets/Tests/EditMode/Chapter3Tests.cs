@@ -175,12 +175,12 @@ namespace TapGJ.Tests
             var expectations = new (string id, int capacity, int roundLimit, (Element el, int count)[] goals)[]
             {
                 ("ch3_01", 5, 6, new (Element, int)[0]),   // 内置目标「水 = 0」，没有瓶产出组件
-                ("ch3_02", 2, 12, new[] { (Element.Fire, 3) }),
-                ("ch3_03", 1, 12, new[] { (Element.Metal, 6), (Element.Wood, 6) }),
-                ("ch3_04", 1, 12, new[] { (Element.Water, 7), (Element.Earth, 6), (Element.Fire, 5) }),
-                ("ch3_05", 1, 8, new[]
+                ("ch3_02", 5, 12, new[] { (Element.Fire, 1) }),
+                ("ch3_03", 5, 12, new[] { (Element.Metal, 1), (Element.Wood, 1) }),
+                ("ch3_04", 5, 12, new[] { (Element.Water, 1), (Element.Earth, 1), (Element.Fire, 1) }),
+                ("ch3_05", 5, 12, new[]
                 {
-                    (Element.Metal, 5), (Element.Wood, 5), (Element.Water, 5), (Element.Fire, 5), (Element.Earth, 5),
+                    (Element.Metal, 1), (Element.Wood, 1), (Element.Water, 1), (Element.Fire, 1), (Element.Earth, 1),
                 }),
             };
 
