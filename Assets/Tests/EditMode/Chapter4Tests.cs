@@ -207,14 +207,19 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 除两个纯教学关外_所有关卡的牌池都是五种全开()
+        public void 只有三节第一课保留单一牌池_其余关卡五种全开()
         {
-            // 牌池只有 1 种元素时：每张牌都一样（没有决策空间），而且玩家一旦偏离预期路线就没牌可用，
+            // 牌池只有 1 种元素时：每张牌都一样（没有决策空间），玩家一旦偏离预期路线就没牌可用、
             // 直接卡死（测试反馈：「连开两把全是火牌」「新玩家探索就卡关」）。
-            // 所以定成约定：**只有 ch1_01（相克）/ ch1_02（相生）这两个纯教学关**保留单一牌池，
-            // 其余全部 ElementPool = CardPool = 全部五种。
+            //
+            // 但**每一节的「第一课」**反过来需要单一种牌：只有一种牌，起手就是 5 张同色，
+            // 一回合必定能做完一件事 —— 教学点才凸显得出来：
+            //   · ch1_01：教相克（只有金牌；5 张金牌 + 5 只木，一回合清完）
+            //   · ch1_02：教相生（只有水牌）
+            //   · ch3_01：教小瓶子（只有土牌；5 张土牌 + 5 只水 → 一回合攒满一瓶）
+            // 其余关卡一律 ElementPool = CardPool = 全部五种。
             var everywhere = ElementMask.All;
-            var tutorials = new[] { "ch1_01", "ch1_02" };
+            var tutorials = new[] { "ch1_01", "ch1_02", "ch3_01" };
 
             var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);
             Assert.IsNotNull(catalog, "找不到 " + RealCatalogPath);
