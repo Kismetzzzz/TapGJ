@@ -14,7 +14,7 @@ namespace TapGJ.Levels.Mechanics
     ///   而每次消失基本都要一张牌（一局最多打「回合上限 × 手牌上限」张）。
     ///   所以容量 5 的关卡「产 20 张」= 100 次出牌，通常根本打不完。三个办法：
     ///     ① 把 N 定小（容量 5 → 4 张就只要 20 次出牌）；
-    ///     ② **把 `BottleCapacity` 调小**（第三章做法：容量 1 → 产 N 张 = 消失 N 次）；
+    ///     ② **把 `BottleCapacity` 调小**（容量 1 → 产 N 张只需要让 N 个消失）；
     ///     ③ 配一个持续的元素源（复合元素、每回合生成元素的机制），让「消失」不必全靠出牌。
     /// </summary>
     public sealed class BottleProducedRule : LevelRuleBehaviour

@@ -95,8 +95,9 @@ namespace TapGJ.Core
         /// 问所有机制「算不算赢」。
         ///
         /// 两种语义由 <see cref="Rules.RequireAllWinRules"/> 决定：
-        ///   · 默认（false）：**任一**返回 true 即赢（第一个生效）
-        ///   · 勾上（true）：**全部**返回 true 才赢（用来表达「A 且 B」型目标）
+        ///   · 默认（false）：**任一**返回 true 即赢（第一个生效，文案就用它的）
+        ///   · 勾上（true）：**全部**返回 true 才赢（用来表达「A 且 B」型目标）——
+        ///     文案要把每一条都并进去，不能只报第一条（见 <see cref="CombineWinMessages"/>）
         ///
         /// 没有挂任何机制时一律返回 false（`Custom` 目标没挂机制的情况在关卡校验里已经报错了）。
         /// </summary>
@@ -104,7 +105,7 @@ namespace TapGJ.Core
         {
             bool requireAll = Rules.RequireAllWinRules;
             bool anyEvaluated = false;
-            string firstMessage = null;
+            var messages = requireAll ? new List<string>() : null;
 
             for (int i = 0; i < _levelRules.Count; i++)
             {
@@ -144,14 +145,38 @@ namespace TapGJ.Core
                     return false;
                 }
 
-                if (firstMessage == null && !string.IsNullOrEmpty(message)) firstMessage = message;
+                if (!string.IsNullOrEmpty(message)) messages.Add(message);
             }
 
             reason = null;
             if (!requireAll || !anyEvaluated) return false;
 
-            reason = firstMessage ?? "胜利：所有关卡条件都已满足";
+            reason = CombineWinMessages(messages);
             return true;
+        }
+
+        /// <summary>
+        /// 「且」语义下把每个机制的胜利文案并成一句。
+        ///
+        /// 为什么不能只取第一条：多目标关卡（「金瓶 1 张 **且** 木瓶 1 张」）通关时，
+        /// 玩家刚打完木瓶却只看到金瓶那一句，会以为提示错了（第三章第三关的真实反馈）。
+        /// 这里只保留一个「胜利：」前缀，其余用「；」连接；重复文案仍然保留（不同机制的达标数据不同）。
+        /// </summary>
+        static string CombineWinMessages(List<string> messages)
+        {
+            if (messages == null || messages.Count == 0) return "胜利：所有关卡条件都已满足";
+            if (messages.Count == 1) return messages[0];
+
+            const string prefix = "胜利：";
+            var parts = new List<string>(messages.Count);
+            foreach (var text in messages)
+            {
+                parts.Add(text.StartsWith(prefix, StringComparison.Ordinal)
+                    ? text.Substring(prefix.Length)
+                    : text);
+            }
+
+            return prefix + string.Join("；", parts);
         }
 
         /// <summary>问所有机制「算不算输」。第一个返回 true 的生效。</summary>

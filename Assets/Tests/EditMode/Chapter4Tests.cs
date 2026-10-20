@@ -12,7 +12,10 @@ using UnityEngine;
 namespace TapGJ.Tests
 {
     /// <summary>
-    /// 第四章「加入事件牌」：9 个事件资产 + 5 关真实资产。
+    /// 第四章「事件教学」：11 个事件资产 + 5 关真实资产。
+    ///
+    /// 本章起**叠加**：事件（本章新机制）+ 小瓶子（第三章）+ 秘术牌（第二章，第 3 关起）。
+    /// 只有 ch4_02 是纯瓶子关（目标就是「五个瓶子各产一张」，牌堆里只留元素牌）。
     ///
     /// 设计稿（见 <c>ChapterCatalog.asset</c> 第四章那 5 条）：
     ///   1. 发牌事件 · 运用随机分解两种复合元素
@@ -143,6 +146,41 @@ namespace TapGJ.Tests
                     row.id + " 的事件池（顺序 = 预制体/资产的挂载顺序，改了就说明设计变了）");
 
                 Assert.AreEqual(row.goals, DescribeGoals(level), row.id + " 的目标组件");
+            }
+        }
+
+        // ---------------------------------------------------------------- 机制叠加
+
+        [Test]
+        public void 第四章五关都保留小瓶子_后三关再叠上秘术牌()
+        {
+            // 叠加规则：第四章 = 事件（本章新机制）+ 小瓶子（第三章）+ 秘术牌（第二章，第 3 关起）。
+            // ch4_02 例外：它是「五个瓶子各产一张」的纯瓶子关，牌堆越干净越好。
+            foreach (var id in LevelIds)
+            {
+                var level = Load(id);
+                Assert.IsNotNull(level, "找不到关卡资产 " + id);
+
+                Assert.IsTrue(level.rules.BottlesEnabled,
+                    id + " 从第三章起小瓶子就不该再被关掉（这一章是叠加，不是替换）");
+
+                bool expectsComposites = id != "ch4_02";
+                Assert.AreEqual(expectsComposites, level.rules.UseCompositeElements, id + " 的秘术牌开关");
+
+                if (!expectsComposites) continue;
+
+                Assert.IsTrue(level.rules.HasSpecialCard(CardKind.FusionCard), id + " 要有融合牌");
+                Assert.IsTrue(level.rules.HasSpecialCard(CardKind.DecomposeCard), id + " 要有分解牌");
+                Assert.Greater(level.rules.FusionCardWeight, 0, id + " 融合牌权重不能是 0（等于没开）");
+
+                // ch4_01 的目标是「拆掉复合元素」；ch4_03~05 的目标看的是**场上元素构成**，
+                // 所以后三关的复合元素必须停止每回合产元素 —— 否则「只剩 X / 数量平均」会被它一直搅乱。
+                if (id == "ch4_01") continue;
+
+                Assert.IsFalse(level.rules.CompositeProducesOnCreation,
+                    id + " 是棋盘状态目标 → 复合元素不能每回合产元素");
+                Assert.AreEqual(6, level.rules.HandLimit,
+                    id + " 牌堆里多了秘术牌 → 手牌上限 +1");
             }
         }
 

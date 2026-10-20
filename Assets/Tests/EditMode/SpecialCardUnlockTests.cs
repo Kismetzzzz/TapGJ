@@ -28,6 +28,10 @@ namespace TapGJ.Tests
             ElementCardWeight = 0,   // 没有元素牌可抽 → 解锁前只剩「退回发元素牌」这一条路
             DecomposeCardWeight = 10,
             SpecialCardUnlockRound = unlockRound,
+
+            // 分解牌只有「本关可能拿到复合元素」时才进牌堆（见 Rules.DrawableSpecialCards）：
+            // 这里摆一个初始复合元素，否则分解牌是死牌、抽牌阶段会直接跳过它。
+            InitialComposites = new[] { new CompositePlacement(1, 1, CompositeKind.Ember) },
         };
 
         static int CountDecompose(GameEngine engine)

@@ -33,7 +33,7 @@ MonoBehaviour:
     MaxDiscardsPerRound: 5
     MaxCardsPerRound: 0
     BottleCapacity: 5
-    BottleMode: 1
+    BottleMode: 0
     EventIntervalMin: 2
     EventIntervalMax: 3
     RoundLimit: 10
