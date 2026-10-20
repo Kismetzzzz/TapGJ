@@ -217,6 +217,55 @@ namespace TapGJ.Tests
         }
 
         [Test]
+        public void 除两个纯教学关外_所有关卡的牌池都是五种全开()
+        {
+            // 牌池只有 1 种元素时：每张牌都一样（没有决策空间），而且玩家一旦偏离预期路线就没牌可用，
+            // 直接卡死（测试反馈：「连开两把全是火牌」「新玩家探索就卡关」）。
+            // 所以定成约定：**只有 ch1_01（相克）/ ch1_02（相生）这两个纯教学关**保留单一牌池，
+            // 其余全部 ElementPool = CardPool = 全部五种。
+            var everywhere = ElementMask.All;
+            var tutorials = new[] { "ch1_01", "ch1_02" };
+
+            var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);
+            Assert.IsNotNull(catalog, "找不到 " + RealCatalogPath);
+
+            foreach (var level in catalog.levels)
+            {
+                Assert.IsNotNull(level, "目录里有空槽位");
+
+                if (System.Array.IndexOf(tutorials, level.levelId) >= 0)
+                {
+                    Assert.AreNotEqual(everywhere, level.rules.CardPool,
+                        level.levelId + " 是纯教学关，牌池应该**故意**保持单一（这一关就是教那一种牌）");
+                    continue;
+                }
+
+                Assert.AreEqual(everywhere, level.rules.CardPool,
+                    level.levelId + " 的牌池不是五种全开 —— 牌池太窄会让玩家没得选、还会卡关");
+                Assert.AreEqual(everywhere, level.rules.ElementPool,
+                    level.levelId + " 的元素池不是全部 —— 牌池必须是元素池的子集，所以两者要一起开");
+            }
+        }
+
+        [Test]
+        public void 所有正式关卡的元素都会自己移动()
+        {
+            // 图1 的准备阶段就是「每只小怪随机方向走 0~3 格」——这是玩法的核心，不是可选装饰。
+            // 关掉 MaxMoveSteps（=0）会让整局变成静止棋盘：元素永远不动、不会自己相生相克、
+            // 玩家看到的只是一个摆好的谜题，而不是那个「会动的五行战场」。
+            // 所以定成硬约定：正式关卡 MaxMoveSteps ≥ 1。
+            var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);
+            Assert.IsNotNull(catalog, "找不到 " + RealCatalogPath);
+
+            foreach (var level in catalog.levels)
+            {
+                Assert.IsNotNull(level, "目录里有空槽位");
+                Assert.GreaterOrEqual(level.rules.MaxMoveSteps, 1,
+                    level.levelId + " 的 MaxMoveSteps = 0 —— 元素不会自己走了（图1 的准备阶段被关掉了）");
+            }
+        }
+
+        [Test]
         public void 关卡目录一共20关_第四章排在最后()
         {
             var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);

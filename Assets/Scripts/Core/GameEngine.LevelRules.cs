@@ -188,12 +188,29 @@ namespace TapGJ.Core
             return false;
         }
 
-        /// <summary>自定义目标的文案：第一个给了非空描述的机制说了算。</summary>
+        /// <summary>
+        /// 自定义目标的文案：把所有给了描述的机制**连起来**，而不是「第一个说了算」。
+        ///
+        /// 为什么改：多目标关卡（「金瓶 10 张 **且** 木瓶 10 张」「五种瓶子各 5 张」）
+        /// 只报第一条的话，HUD 左上角就只写了一个目标，玩家会以为只要干那一件事 —— 测试反馈过这一点。
+        ///
+        /// 连接词按语义取：<see cref="Rules.RequireAllWinRules"/>（且）用「且」，否则（或）用「或」。
+        /// 重复的文案（同一个机制挂了两份）只留一份。
+        /// </summary>
         string CustomGoalDescription()
         {
+            var parts = new List<string>();
             foreach (var rule in _levelRules)
-                if (rule != null && !string.IsNullOrEmpty(rule.GoalDescription)) return rule.GoalDescription;
-            return null;
+            {
+                if (rule == null) continue;
+
+                var text = rule.GoalDescription;
+                if (string.IsNullOrEmpty(text)) continue;
+                if (!parts.Contains(text)) parts.Add(text);
+            }
+
+            if (parts.Count == 0) return null;
+            return string.Join(Rules.RequireAllWinRules ? "　且　" : "　或　", parts);
         }
 
         // ---------------------------------------------------------------- 注入 API（给机制改棋盘用）

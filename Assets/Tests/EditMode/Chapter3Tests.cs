@@ -13,18 +13,19 @@ namespace TapGJ.Tests
     /// <summary>
     /// 第三章「小瓶子教学」：目标组件 + 5 关真实资产。
     ///
-    /// 第三章的设计见 <c>ChapterCatalog.asset</c> 第三章那 5 条（关卡名/目标就是设计稿原文）：
-    ///   1. 只剩火（教「元素消失 → 瓶子涨一格，满 5 格给一张牌」）
-    ///   2. 火瓶产 5 张（容量 5 → 要让 25 个火消失）
-    ///   3. 金瓶 10 张 + 木瓶 10 张（教「瓶子里出来的牌就是下一环的弹药」）
+    /// 第三章的设计见 <c>ChapterCatalog.asset</c> 第三章那 5 条：
+    ///   1. 把水清光（教「元素消失 → 瓶子涨一格，满 5 格给一张牌」）
+    ///   2. 火瓶产 3 张（容量 2 → 要让 6 个火消失）
+    ///   3. 金瓶 6 张 + 木瓶 6 张（教「瓶子里出来的牌就是下一环的弹药」）
     ///   4. 水瓶 7 + 土瓶 6 + 火瓶 5（相克链往下走一环）
     ///   5. 五种各 5 张（五行相克是一个环）
     ///
-    /// ⚠ 出牌预算是硬的：一局最多打「回合上限 × 手牌上限」张牌（8 × 5 = 40），
-    ///   而「产 N 张牌」= 该元素消失 **瓶容量 × N** 次。所以：
-    ///   · ch3_01 / ch3_02 用**容量 5**（张数也是 5 → 25 次消失，攒的过程看得见）；
-    ///   · ch3_03 / 04 / 05 的张数大（10 / 7+6+5 / 各 5），容量 5 会变成 100 次以上的消失，
-    ///     打不完，所以用**容量 1**（消失 N 次就给 N 张）。
+    /// ⚠ 出牌预算是硬的：一局最多打「回合上限 × 手牌上限」张牌（8 × 5 = 40）。
+    ///   而**牌池是全部五种元素**（除 ch1_01/ch1_02 两个纯教学关），所以某种元素牌
+    ///   一局大概只抽得到「出牌数 ÷ 5」≈ 8 张 —— 这就是 ch3_02（要 6 张水牌）
+    ///   和 ch3_03（要 6 张火牌）把张数压到 6 以内的原因。
+    ///   ch3_04 / ch3_05 能吃下更大的张数，是因为它们的链条**自己供牌**
+    ///   （杀掉 X 就拿到 X 牌，X 牌正好是杀下一种元素的弹药）。
     /// </summary>
     public class Chapter3Tests
     {
@@ -96,7 +97,8 @@ namespace TapGJ.Tests
         {
             public string Label;
             public float Fill;
-            public string GoalDescription => "假目标";
+            public string Text = "假目标";
+            public string GoalDescription => Text;
             public void OnLevelStart(GameEngine engine) { }
             public void OnRoundStart(GameEngine engine) { }
             public void OnEncounter(GameEngine engine, EncounterInfo info) { }
@@ -117,17 +119,22 @@ namespace TapGJ.Tests
             };
             var engine = new GameEngine(rules, 1);
             engine.Start();
-            engine.AttachRule(new StubRule { Label = "金牌 3 / 10", Fill = 0.3f });
-            engine.AttachRule(new StubRule { Label = "木牌 9 / 10", Fill = 0.9f });
+            engine.AttachRule(new StubRule { Label = "金牌 3 / 10", Fill = 0.3f, Text = "让金瓶产出 10 张" });
+            engine.AttachRule(new StubRule { Label = "木牌 9 / 10", Fill = 0.9f, Text = "让木瓶产出 10 张" });
 
             // 或：哪条先达成算哪条 → 进度条取最好的那条
-            Assert.AreEqual("金牌 3 / 10　木牌 9 / 10", engine.GetGoalProgress().Label,
+            var or = engine.GetGoalProgress();
+            Assert.AreEqual("金牌 3 / 10　木牌 9 / 10", or.Label,
                 "两条目标都要写出来（只报第一条的话，玩家永远看不到第二条差多少）");
-            Assert.AreEqual(0.9f, engine.GetGoalProgress().Fill, 0.001f, "「或」取最好的那条");
+            Assert.AreEqual(0.9f, or.Fill, 0.001f, "「或」取最好的那条");
+            StringAssert.Contains("让木瓶产出 10 张", or.Description,
+                "**标题**也要把所有目标连起来 —— 之前只写第一条，玩家以为只要做完那一件事");
+            StringAssert.Contains("让金瓶产出 10 张", or.Description);
 
             // 且：必须全部达成 → 进度条取最差的那条，满了才等于要赢
             engine.Rules.RequireAllWinRules = true;
             Assert.AreEqual(0.3f, engine.GetGoalProgress().Fill, 0.001f, "「且」取最差的那条");
+            StringAssert.Contains("　且　", engine.GetGoalProgress().Description, "「且」语义下用「且」连接");
         }
 
         // ---------------------------------------------------------------- 真实资产
@@ -168,9 +175,9 @@ namespace TapGJ.Tests
             var expectations = new (string id, int capacity, int roundLimit, (Element el, int count)[] goals)[]
             {
                 ("ch3_01", 5, 6, new (Element, int)[0]),   // 内置目标「水 = 0」，没有瓶产出组件
-                ("ch3_02", 5, 8, new[] { (Element.Fire, 5) }),
-                ("ch3_03", 1, 8, new[] { (Element.Metal, 10), (Element.Wood, 10) }),
-                ("ch3_04", 1, 8, new[] { (Element.Water, 7), (Element.Earth, 6), (Element.Fire, 5) }),
+                ("ch3_02", 2, 12, new[] { (Element.Fire, 3) }),
+                ("ch3_03", 1, 12, new[] { (Element.Metal, 6), (Element.Wood, 6) }),
+                ("ch3_04", 1, 12, new[] { (Element.Water, 7), (Element.Earth, 6), (Element.Fire, 5) }),
                 ("ch3_05", 1, 8, new[]
                 {
                     (Element.Metal, 5), (Element.Wood, 5), (Element.Water, 5), (Element.Fire, 5), (Element.Earth, 5),

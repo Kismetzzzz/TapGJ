@@ -73,6 +73,9 @@ namespace TapGJ.View
 
         int _selectedCardId = -1;
 
+        /// <summary>本回合是不是「因为目标达成而自动结算」—— 弃牌阶段据此不再等玩家点结束。</summary>
+        bool _autoFinishing;
+
         /// <summary>融合牌的两段式选点：先点元素1，再点元素2。</summary>
         public enum FusionPick
         {
@@ -395,16 +398,53 @@ namespace TapGJ.View
                 board.Sync();
 
                 // ---------- 玩家行动阶段：等玩家出牌 / 结束出牌 ----------
+                // 目标一旦达成就直接结算，不再要求玩家点「结束出牌」——
+                // 否则玩家会以为游戏卡死（测试反馈过）。
                 while (Engine.Phase == GamePhase.PlayerAction)
+                {
+                    if (TapGJ.Flow.AutoFinish.ShouldFinish(Engine, Busy, Paused, out var winReason))
+                    {
+                        _autoFinishing = true;
+                        CancelSelection();
+                        Note($"目标已达成，自动结算：{winReason}");
+                        Engine.EndPlayerPhase();
+                        FlushLog();
+                        break;
+                    }
+
                     yield return null;
+                }
 
                 // ---------- 弃牌阶段：等玩家弃牌 / 结束弃牌 ----------
                 while (Engine.PendingStepCount > 0)
                     yield return PlayStepRoutine(Engine.DequeueStep());
                 FlushLog();
 
+                // 上一步自动结算了，或者玩家弃牌后刚好达成目标 → 同样直接进判定
                 while (Engine.Phase == GamePhase.Discard)
+                {
+                    string winReason = null;
+                    bool won = _autoFinishing
+                               || TapGJ.Flow.AutoFinish.ShouldFinish(Engine, Busy, Paused, out winReason);
+
+                    if (won)
+                    {
+                        if (!_autoFinishing)
+                        {
+                            _autoFinishing = true;
+                            CancelSelection();
+                            Note($"目标已达成，自动结算：{winReason}");
+                        }
+
+                        Engine.EndDiscardPhase();
+                        FlushLog();
+                        break;
+                    }
+
                     yield return null;
+                }
+
+                _autoFinishing = false;
 
                 // ---------- 判定阶段 ----------
                 if (!InstantPlayback) yield return new WaitForSeconds(0.12f);
