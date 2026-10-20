@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace TapGJ.View
 {
-    /// <summary>从共享配置读取整张卡面，选中时抬起并播放素材流光。</summary>
+    /// <summary>从共享配置读取整张卡面，选中时抬起。流光闪过后淡边光留到取消。</summary>
     [ExecuteAlways, DisallowMultipleComponent]
     public sealed class BattleUiCard : MonoBehaviour
     {

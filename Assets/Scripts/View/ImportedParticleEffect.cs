@@ -12,6 +12,9 @@ namespace TapGJ.View
     {
         const int StageLayer = 31;
         const float SelectionPadding = 1.3f;
+        const float SelectionFlashOpacity = .32f;
+        const float SelectionHoldOpacity = .18f;
+        const float SelectionFlashSeconds = .75f;
         static readonly HashSet<int> Slots = new HashSet<int>();
         readonly List<Renderer> _additive = new List<Renderer>();
         Material _material;
@@ -23,7 +26,7 @@ namespace TapGJ.View
         RenderTexture _output, _opacity;
         ParticleSystem[] _particles;
         int _slot = -1;
-        bool _loop;
+        bool _loop, _selectionHold;
         float _elapsed;
         public bool IsRange => _loop;
         public Texture OutputTexture => _output;
@@ -130,6 +133,7 @@ namespace TapGJ.View
             bool loop, float halfHeight, bool selection)
         {
             _loop = loop;
+            _selectionHold = selection;
             _slot = 0;
             while (Slots.Contains(_slot)) _slot++;
             Slots.Add(_slot);
@@ -148,6 +152,8 @@ namespace TapGJ.View
                 main.useUnscaledTime = true;
                 // 爆点组的父粒子是作者的循环控制器，关闭循环才能自然结束。
                 if (!loop) main.loop = false;
+                // 选中边光原寿命 0.75 秒。拉长这一颗，系统时长不动；亮度稍后收到淡稳态，取消时才拆掉。
+                if (selection) main.startLifetime = 10000f;
                 main.stopAction = ParticleSystemStopAction.None;
                 main.cullingMode = ParticleSystemCullingMode.AlwaysSimulate;
             }
@@ -186,7 +192,7 @@ namespace TapGJ.View
             _material = composite;
             composite.mainTexture = _output;
             composite.SetTexture("_CardOpacity", _opacity);
-            composite.SetFloat("_EffectOpacity", selection ? .32f : loop ? .65f : 1);
+            composite.SetFloat("_EffectOpacity", selection ? SelectionFlashOpacity : loop ? .65f : 1);
             var image = GetComponent<RawImage>();
             if (image != null)
             {
@@ -286,7 +292,11 @@ namespace TapGJ.View
         void LateUpdate()
         {
             _elapsed += Time.unscaledDeltaTime;
+            if (_selectionHold)
+                _material.SetFloat("_EffectOpacity", Mathf.Lerp(SelectionFlashOpacity, SelectionHoldOpacity,
+                    Mathf.SmoothStep(0, 1, Mathf.Clamp01((_elapsed - SelectionFlashSeconds) / .2f))));
             RenderEffect();
+            if (_selectionHold) return;
             if (!_loop && (_elapsed > 8 || _elapsed > .1f && !Alive())) BoardView.Kill(gameObject);
         }
 

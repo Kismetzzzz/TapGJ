@@ -96,6 +96,44 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 选中边光在流光结束后仍然留着_取消后一起消失()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/BattleUI.unity");
+            var card = Object.FindFirstObjectByType<BattleUiController>().Cards[0];
+            card.SetSelected(true);
+            var effect = card.GetComponentInChildren<ImportedParticleEffect>();
+            var image = effect.GetComponent<RawImage>();
+            yield return new WaitForSecondsRealtime(.2f);
+            Assert.Greater(image.material.GetFloat("_EffectOpacity"), .3f, "点选后的第一下仍是原来的流光亮度");
+            yield return new WaitForSecondsRealtime(1f);
+            Assert.IsTrue(card.Selected);
+            Assert.IsTrue(effect.gameObject.activeInHierarchy, "选中期间边光不能跟着粒子原寿命消失");
+            Assert.AreEqual(.18f, image.material.GetFloat("_EffectOpacity"), .02f, "流光过后收成淡边光");
+            var output = (RenderTexture)effect.OutputTexture;
+            var glow = new Texture2D(output.width, output.height, TextureFormat.RGBAFloat, false);
+            var previous = RenderTexture.active;
+            try
+            {
+                RenderTexture.active = output;
+                glow.ReadPixels(new Rect(0, 0, output.width, output.height), 0, 0);
+                glow.Apply();
+                Assert.Less(glow.GetPixel(output.width / 2, output.height / 2).maxColorComponent, .03f,
+                    "稳态边光中心仍然透明");
+                Assert.Greater(glow.GetPixels().Count(pixel => pixel.r + pixel.g + pixel.b > .1f), 50,
+                    "稳态边光仍然亮着");
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                Object.Destroy(glow);
+            }
+            var sourceRect = (RectTransform)card.transform.Find("Artwork");
+            card.SetSelected(false);
+            Assert.AreEqual(0, sourceRect.anchoredPosition.y);
+            Assert.IsFalse(effect.gameObject.activeSelf);
+        }
+
+        [UnityTest]
         public IEnumerator 选中光效_中心透明且不在卡面留下矩形色带()
         {
             yield return SceneManager.LoadSceneAsync("Assets/Scenes/Game.unity");
