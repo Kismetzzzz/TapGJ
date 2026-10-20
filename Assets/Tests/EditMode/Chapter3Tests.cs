@@ -96,7 +96,8 @@ namespace TapGJ.Tests
         {
             public string Label;
             public float Fill;
-            public string GoalDescription => "假目标";
+            public string Text = "假目标";
+            public string GoalDescription => Text;
             public void OnLevelStart(GameEngine engine) { }
             public void OnRoundStart(GameEngine engine) { }
             public void OnEncounter(GameEngine engine, EncounterInfo info) { }
@@ -117,17 +118,22 @@ namespace TapGJ.Tests
             };
             var engine = new GameEngine(rules, 1);
             engine.Start();
-            engine.AttachRule(new StubRule { Label = "金牌 3 / 10", Fill = 0.3f });
-            engine.AttachRule(new StubRule { Label = "木牌 9 / 10", Fill = 0.9f });
+            engine.AttachRule(new StubRule { Label = "金牌 3 / 10", Fill = 0.3f, Text = "让金瓶产出 10 张" });
+            engine.AttachRule(new StubRule { Label = "木牌 9 / 10", Fill = 0.9f, Text = "让木瓶产出 10 张" });
 
             // 或：哪条先达成算哪条 → 进度条取最好的那条
-            Assert.AreEqual("金牌 3 / 10　木牌 9 / 10", engine.GetGoalProgress().Label,
+            var or = engine.GetGoalProgress();
+            Assert.AreEqual("金牌 3 / 10　木牌 9 / 10", or.Label,
                 "两条目标都要写出来（只报第一条的话，玩家永远看不到第二条差多少）");
-            Assert.AreEqual(0.9f, engine.GetGoalProgress().Fill, 0.001f, "「或」取最好的那条");
+            Assert.AreEqual(0.9f, or.Fill, 0.001f, "「或」取最好的那条");
+            StringAssert.Contains("让木瓶产出 10 张", or.Description,
+                "**标题**也要把所有目标连起来 —— 之前只写第一条，玩家以为只要做完那一件事");
+            StringAssert.Contains("让金瓶产出 10 张", or.Description);
 
             // 且：必须全部达成 → 进度条取最差的那条，满了才等于要赢
             engine.Rules.RequireAllWinRules = true;
             Assert.AreEqual(0.3f, engine.GetGoalProgress().Fill, 0.001f, "「且」取最差的那条");
+            StringAssert.Contains("　且　", engine.GetGoalProgress().Description, "「且」语义下用「且」连接");
         }
 
         // ---------------------------------------------------------------- 真实资产
