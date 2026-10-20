@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: ch3_02
   m_EditorClassIdentifier: 
   levelId: ch3_02
-  displayName: "\u4E94\u5F20\u706B\u724C"
-  description: "\u74F6\u5B50\u6512\u6EE1 5 \u683C\u624D\u7ED9\u4E00\u5F20\u706B\u724C\uFF1A\u6C34\u514B\u706B\uFF0C\u8BA9\u573A\u4E0A\u6D88\u5931 5 \u4E2A\u706B\u5C31\u6512\u51FA 1 \u5F20\u3002\u8BA9\u706B\u74F6\u4EA7\u51FA 5 \u5F20\u706B\u724C\u3002"
+  displayName: "\u4E09\u5F20\u706B\u724C"
+  description: "\u706B\u74F6\u6BCF\u6512\u6EE1 2 \u683C\u5C31\u7ED9\u4E00\u5F20\u706B\u724C\uFF1A\u6C34\u514B\u706B\uFF0C\u8BA9\u573A\u4E0A\u6D88\u5931 2 \u4E2A\u706B\u5C31\u6512\u51FA 1 \u5F20\u3002\u8BA9\u706B\u74F6\u4EA7\u51FA 3 \u5F20\u706B\u724C\u3002"
   previewImage: {fileID: 0}
   outroText: ""
   sceneName: Game
@@ -24,19 +24,19 @@ MonoBehaviour:
   rules:
     BoardWidth: 8
     BoardHeight: 8
-    ElementPool: 12
-    CardPool: 4
+    ElementPool: 31
+    CardPool: 31
     CreepsPerElement: 0
     MaxMoveSteps: 3
     InitialHandSize: 5
     HandLimit: 5
     MaxDiscardsPerRound: 5
     MaxCardsPerRound: 0
-    BottleCapacity: 5
+    BottleCapacity: 2
     BottleMode: 0
     EventIntervalMin: 3
     EventIntervalMax: 6
-    RoundLimit: 8
+    RoundLimit: 12
     Goal:
       Kind: 6
       Target: 0

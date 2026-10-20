@@ -24,8 +24,8 @@ MonoBehaviour:
   rules:
     BoardWidth: 8
     BoardHeight: 8
-    ElementPool: 7
-    CardPool: 7
+    ElementPool: 31
+    CardPool: 31
     CreepsPerElement: 0
     MaxMoveSteps: 3
     InitialHandSize: 5
