@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   levelId: ch3_05
   displayName: "\u4E94\u884C\u4E00\u5708"
-  description: "\u76F8\u514B\u662F\u4E00\u4E2A\u73AF\uFF1A\u706B\u514B\u91D1\u3001\u91D1\u514B\u6728\u3001\u6728\u514B\u571F\u3001\u571F\u514B\u6C34\u3001\u6C34\u514B\u706B\u3002\u8BA9\u4E94\u79CD\u5C0F\u74F6\u5B50\u5404\u4EA7\u51FA 5 \u5F20\u724C\u3002"
+  description: "\u76F8\u514B\u662F\u4E00\u4E2A\u73AF\uFF1A\u706B\u514B\u91D1\u3001\u91D1\u514B\u6728\u3001\u6728\u514B\u571F\u3001\u571F\u514B\u6C34\u3001\u6C34\u514B\u706B\u3002\u8BA9\u4E94\u79CD\u5C0F\u74F6\u5B50\u5404\u4EA7\u51FA 1 \u5F20\u724C\uFF08\u5404\u8BA9 5 \u4E2A\u6D88\u5931\uFF09\u3002"
   previewImage: {fileID: 0}
   outroText: "\u7B2C\u4E09\u7AE0\u7ED3\u675F\u3002\u4E0B\u4E00\u7AE0\uFF1A\u68CB\u76D8\u4E0A\u4F1A\u51FA\u73B0\u300C\u4E8B\u4EF6\u724C\u300D\u2014\u2014\u6BCF\u9694\u51E0\u56DE\u5408\u6380\u4E00\u6B21\u684C\u5B50\uFF0C\u522B\u6307\u671B\u5C40\u9762\u4E00\u76F4\u662F\u4F60\u5E03\u7F6E\u7684\u6837\u5B50\u3002"
   sceneName: Game
@@ -29,14 +29,14 @@ MonoBehaviour:
     CreepsPerElement: 0
     MaxMoveSteps: 3
     InitialHandSize: 5
-    HandLimit: 5
+    HandLimit: 6
     MaxDiscardsPerRound: 5
     MaxCardsPerRound: 0
-    BottleCapacity: 1
+    BottleCapacity: 5
     BottleMode: 0
     EventIntervalMin: 3
     EventIntervalMax: 6
-    RoundLimit: 8
+    RoundLimit: 12
     Goal:
       Kind: 6
       Target: 0
@@ -45,11 +45,11 @@ MonoBehaviour:
     RequireAllWinRules: 1
     CardEffect: 0
     EmptyCellCard: 0
-    UseCompositeElements: 0
-    SpecialCardPool: 0
+    UseCompositeElements: 1
+    SpecialCardPool: 3
     ElementCardWeight: 10
-    FusionCardWeight: 0
-    DecomposeCardWeight: 0
+    FusionCardWeight: 1
+    DecomposeCardWeight: 1
     CompositeRange: 1
     CompositeIngredientsPerRound: 1
     FusionRequiresAdjacency: 1

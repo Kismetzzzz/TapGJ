@@ -12,7 +12,10 @@ using UnityEngine;
 namespace TapGJ.Tests
 {
     /// <summary>
-    /// 第四章「加入事件牌」：9 个事件资产 + 5 关真实资产。
+    /// 第四章「事件教学」：11 个事件资产 + 5 关真实资产。
+    ///
+    /// 本章起**叠加**：事件（本章新机制）+ 小瓶子（第三章）+ 秘术牌（第二章，第 3 关起）。
+    /// 只有 ch4_02 是纯瓶子关（目标就是「五个瓶子各产一张」，牌堆里只留元素牌）。
     ///
     /// 设计稿（见 <c>ChapterCatalog.asset</c> 第四章那 5 条）：
     ///   1. 发牌事件 · 运用随机分解两种复合元素
@@ -50,7 +53,7 @@ namespace TapGJ.Tests
             Assert.IsEmpty(issues, string.Join(" / ", issues));
 
             var inCatalog = catalog.All().ToList();
-            Assert.AreEqual(10, inCatalog.Count, "第四章准备了 10 条事件（给牌 2 + 玉翁 + 静滞 + 流漫溢 6）");
+            Assert.AreEqual(11, inCatalog.Count, "第四章准备了 11 条事件（给牌 2 + 玉翁 2 + 静滞 + 流漫溢 6）");
 
             var onDisk = new List<RoundEventDefinition>();
             foreach (var guid in AssetDatabase.FindAssets("", new[] { EventDir }))
@@ -119,8 +122,8 @@ namespace TapGJ.Tests
             {
                 ("ch4_01", 5, 10, 2, 3, new[] { "ev_element_gift", "ev_special_gift" },
                  "decompose:2:noComposite"),
-                ("ch4_02", 1, 10, 2, 3, new[] { "ev_convert_fire_fixed", "ev_convert_earth_fixed" },
-                 "bottle:水3,bottle:土6,bottle:火5,bottle:金4,bottle:木2"),
+                ("ch4_02", 5, 12, 2, 3, new[] { "ev_convert_fire_fixed", "ev_convert_earth_fixed" },
+                 "bottle:水1,bottle:土1,bottle:火1,bottle:金1,bottle:木1"),
                 ("ch4_03", 5, 10, 2, 3, new[] { "ev_convert_water_block", "ev_convert_fire_block" },
                  "only:土"),
                 ("ch4_04", 5, 10, 2, 3, new[] { "ev_element_gift", "ev_convert_wood_scatter" },
@@ -143,6 +146,41 @@ namespace TapGJ.Tests
                     row.id + " 的事件池（顺序 = 预制体/资产的挂载顺序，改了就说明设计变了）");
 
                 Assert.AreEqual(row.goals, DescribeGoals(level), row.id + " 的目标组件");
+            }
+        }
+
+        // ---------------------------------------------------------------- 机制叠加
+
+        [Test]
+        public void 第四章五关都保留小瓶子_后三关再叠上秘术牌()
+        {
+            // 叠加规则：第四章 = 事件（本章新机制）+ 小瓶子（第三章）+ 秘术牌（第二章，第 3 关起）。
+            // ch4_02 例外：它是「五个瓶子各产一张」的纯瓶子关，牌堆越干净越好。
+            foreach (var id in LevelIds)
+            {
+                var level = Load(id);
+                Assert.IsNotNull(level, "找不到关卡资产 " + id);
+
+                Assert.IsTrue(level.rules.BottlesEnabled,
+                    id + " 从第三章起小瓶子就不该再被关掉（这一章是叠加，不是替换）");
+
+                bool expectsComposites = id != "ch4_02";
+                Assert.AreEqual(expectsComposites, level.rules.UseCompositeElements, id + " 的秘术牌开关");
+
+                if (!expectsComposites) continue;
+
+                Assert.IsTrue(level.rules.HasSpecialCard(CardKind.FusionCard), id + " 要有融合牌");
+                Assert.IsTrue(level.rules.HasSpecialCard(CardKind.DecomposeCard), id + " 要有分解牌");
+                Assert.Greater(level.rules.FusionCardWeight, 0, id + " 融合牌权重不能是 0（等于没开）");
+
+                // ch4_01 的目标是「拆掉复合元素」；ch4_03~05 的目标看的是**场上元素构成**，
+                // 所以后三关的复合元素必须停止每回合产元素 —— 否则「只剩 X / 数量平均」会被它一直搅乱。
+                if (id == "ch4_01") continue;
+
+                Assert.IsFalse(level.rules.CompositeProducesOnCreation,
+                    id + " 是棋盘状态目标 → 复合元素不能每回合产元素");
+                Assert.AreEqual(6, level.rules.HandLimit,
+                    id + " 牌堆里多了秘术牌 → 手牌上限 +1");
             }
         }
 
@@ -217,14 +255,19 @@ namespace TapGJ.Tests
         }
 
         [Test]
-        public void 除两个纯教学关外_所有关卡的牌池都是五种全开()
+        public void 只有三节第一课保留单一牌池_其余关卡五种全开()
         {
-            // 牌池只有 1 种元素时：每张牌都一样（没有决策空间），而且玩家一旦偏离预期路线就没牌可用，
+            // 牌池只有 1 种元素时：每张牌都一样（没有决策空间），玩家一旦偏离预期路线就没牌可用、
             // 直接卡死（测试反馈：「连开两把全是火牌」「新玩家探索就卡关」）。
-            // 所以定成约定：**只有 ch1_01（相克）/ ch1_02（相生）这两个纯教学关**保留单一牌池，
-            // 其余全部 ElementPool = CardPool = 全部五种。
+            //
+            // 但**每一节的「第一课」**反过来需要单一种牌：只有一种牌，起手就是 5 张同色，
+            // 一回合必定能做完一件事 —— 教学点才凸显得出来：
+            //   · ch1_01：教相克（只有金牌；5 张金牌 + 5 只木，一回合清完）
+            //   · ch1_02：教相生（只有水牌）
+            //   · ch3_01：教小瓶子（只有土牌；5 张土牌 + 5 只水 → 一回合攒满一瓶）
+            // 其余关卡一律 ElementPool = CardPool = 全部五种。
             var everywhere = ElementMask.All;
-            var tutorials = new[] { "ch1_01", "ch1_02" };
+            var tutorials = new[] { "ch1_01", "ch1_02", "ch3_01" };
 
             var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);
             Assert.IsNotNull(catalog, "找不到 " + RealCatalogPath);

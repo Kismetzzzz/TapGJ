@@ -15,15 +15,18 @@ namespace TapGJ.Tests
     ///
     /// 第三章的设计见 <c>ChapterCatalog.asset</c> 第三章那 5 条：
     ///   1. 把水清光（教「元素消失 → 瓶子涨一格，满 5 格给一张牌」）
-    ///   2. 火瓶产 3 张（容量 2 → 要让 6 个火消失）
-    ///   3. 金瓶 6 张 + 木瓶 6 张（教「瓶子里出来的牌就是下一环的弹药」）
-    ///   4. 水瓶 7 + 土瓶 6 + 火瓶 5（相克链往下走一环）
-    ///   5. 五种各 5 张（五行相克是一个环）
+    ///   2. 火瓶 1 张（容量 5 → 让 5 个火消失）
+    ///   3. 金瓶 1 张 + 木瓶 1 张（教「瓶子里出来的牌就是下一环的弹药」）
+    ///   4. 水瓶 1 + 土瓶 1 + 火瓶 1（相克链往下走一环）
+    ///   5. 五种各 1 张（五行相克是一个环）
     ///
-    /// ⚠ 出牌预算是硬的：一局最多打「回合上限 × 手牌上限」张牌（8 × 5 = 40）。
-    ///   而**牌池是全部五种元素**（除 ch1_01/ch1_02 两个纯教学关），所以某种元素牌
-    ///   一局大概只抽得到「出牌数 ÷ 5」≈ 8 张 —— 这就是 ch3_02（要 6 张水牌）
-    ///   和 ch3_03（要 6 张火牌）把张数压到 6 以内的原因。
+    /// 从 ch3_02 起还**沿用第二章的复合元素/秘术牌**（叠加而不是替换，只有 ch3_01 保持纯教学）：
+    /// 秘术牌权重压到元素牌的 1/10，手牌上限 +1 吸收稀释，回合上限与目标张数一律不动。
+    ///
+    /// ⚠ 出牌预算是硬的：一局最多打「回合上限 × 手牌上限」张牌（12 × 6 = 72）。
+    ///   而**牌池是全部五种元素**（除 ch1_01/ch1_02/ch3_01 三个纯教学关），所以某种元素牌
+    ///   一局大概只抽得到「出牌数 ÷ 5」≈ 14 张 —— 目标压到「各 1 张」（= 各消失 5 次）
+    ///   就是为了留足余量；秘术牌进牌堆后还要再打八折。
     ///   ch3_04 / ch3_05 能吃下更大的张数，是因为它们的链条**自己供牌**
     ///   （杀掉 X 就拿到 X 牌，X 牌正好是杀下一种元素的弹药）。
     /// </summary>
@@ -98,11 +101,13 @@ namespace TapGJ.Tests
             public string Label;
             public float Fill;
             public string Text = "假目标";
+            public bool Win;
+            public string WinMessage = "胜利：假目标达成";
             public string GoalDescription => Text;
             public void OnLevelStart(GameEngine engine) { }
             public void OnRoundStart(GameEngine engine) { }
             public void OnEncounter(GameEngine engine, EncounterInfo info) { }
-            public bool TryExtraWin(GameEngine engine, out string message) { message = null; return false; }
+            public bool TryExtraWin(GameEngine engine, out string message) { message = WinMessage; return Win; }
             public bool TryExtraLose(GameEngine engine, out string message) { message = null; return false; }
             public GoalProgress GetGoalProgress(GameEngine engine)
                 => new GoalProgress { Description = GoalDescription, Fill = Fill, Label = Label };
@@ -135,6 +140,64 @@ namespace TapGJ.Tests
             engine.Rules.RequireAllWinRules = true;
             Assert.AreEqual(0.3f, engine.GetGoalProgress().Fill, 0.001f, "「且」取最差的那条");
             StringAssert.Contains("　且　", engine.GetGoalProgress().Description, "「且」语义下用「且」连接");
+        }
+
+        // ---------------------------------------------------------------- 多目标通关提示
+
+        [Test]
+        public void 多目标的通关提示要把每个条件都说出来()
+        {
+            var rules = new Rules
+            {
+                BoardWidth = 4, BoardHeight = 4,
+                CreepsPerElement = 0, InitialHandSize = 0, HandLimit = 5, RoundLimit = 10,
+                Goal = GoalSpec.Custom(),
+                RequireAllWinRules = true,
+            };
+            var engine = new GameEngine(rules, 1);
+            engine.Start();
+            engine.AttachRule(new StubRule
+            {
+                Text = "金瓶 1 张", Win = true, WinMessage = "胜利：金瓶子已产出 1 张牌（≥ 1）",
+            });
+            engine.AttachRule(new StubRule
+            {
+                Text = "木瓶 1 张", Win = true, WinMessage = "胜利：木瓶子已产出 1 张牌（≥ 1）",
+            });
+
+            Assert.IsTrue(engine.CheckWinCondition(out var reason));
+            StringAssert.Contains("金", reason);
+            StringAssert.Contains("木", reason, "「且」语义的通关提示不能只报第一条：" + reason);
+            Assert.AreEqual(1, reason.Split(new[] { "胜利：" }, System.StringSplitOptions.None).Length - 1,
+                "拼起来之后只该有一个「胜利：」前缀：" + reason);
+        }
+
+        [Test]
+        public void 第三章第三关的通关提示_金瓶和木瓶都要出现()
+        {
+            // 这一关是「金瓶 1 张 且 木瓶 1 张」：当时通关只弹出第一条（金瓶），
+            // 玩家刚打完木瓶却看到金瓶的文案，以为提示错了。
+            var level = AssetDatabase.LoadAssetAtPath<LevelDefinition>("Assets/Levels/ch3_03.asset");
+            Assert.IsNotNull(level, "找不到 ch3_03");
+            Assert.IsNotNull(level.levelPrefab, "ch3_03 必须有关卡预制体");
+
+            var rules = level.rules.Clone();
+            rules.InitialComposites = level.initialComposites ?? new CompositePlacement[0];
+
+            var engine = new GameEngine(rules, level.fixedSeed);
+            foreach (var rule in level.levelPrefab.GetComponentsInChildren<ILevelRule>(true))
+                if (!(rule is MonoBehaviour mb) || mb.enabled) engine.AttachRule(rule);
+            engine.Start();
+
+            // 容量 5：各让 5 个消失 → 各产出 1 张牌
+            for (int i = 0; i < 5; i++)
+                Assert.IsTrue(engine.TryPlaceAndRemoveForTest(Element.Metal), "金瓶还差第 " + (i + 1) + " 个金");
+            for (int i = 0; i < 5; i++)
+                Assert.IsTrue(engine.TryPlaceAndRemoveForTest(Element.Wood), "木瓶还差第 " + (i + 1) + " 个木");
+
+            Assert.IsTrue(engine.CheckWinCondition(out var reason), "两个瓶子都产出了 1 张，应该已经赢了");
+            StringAssert.Contains("金", reason);
+            StringAssert.Contains("木", reason, "通关提示把木瓶那条吞了：" + reason);
         }
 
         // ---------------------------------------------------------------- 真实资产
@@ -175,12 +238,12 @@ namespace TapGJ.Tests
             var expectations = new (string id, int capacity, int roundLimit, (Element el, int count)[] goals)[]
             {
                 ("ch3_01", 5, 6, new (Element, int)[0]),   // 内置目标「水 = 0」，没有瓶产出组件
-                ("ch3_02", 2, 12, new[] { (Element.Fire, 3) }),
-                ("ch3_03", 1, 12, new[] { (Element.Metal, 6), (Element.Wood, 6) }),
-                ("ch3_04", 1, 12, new[] { (Element.Water, 7), (Element.Earth, 6), (Element.Fire, 5) }),
-                ("ch3_05", 1, 8, new[]
+                ("ch3_02", 5, 12, new[] { (Element.Fire, 1) }),
+                ("ch3_03", 5, 12, new[] { (Element.Metal, 1), (Element.Wood, 1) }),
+                ("ch3_04", 5, 12, new[] { (Element.Water, 1), (Element.Earth, 1), (Element.Fire, 1) }),
+                ("ch3_05", 5, 12, new[]
                 {
-                    (Element.Metal, 5), (Element.Wood, 5), (Element.Water, 5), (Element.Fire, 5), (Element.Earth, 5),
+                    (Element.Metal, 1), (Element.Wood, 1), (Element.Water, 1), (Element.Fire, 1), (Element.Earth, 1),
                 }),
             };
 
@@ -217,6 +280,43 @@ namespace TapGJ.Tests
                     Assert.AreEqual(goals[i].el, ruleComps[i].TargetElement, id + " 第 " + (i + 1) + " 个目标看哪个瓶子");
                     Assert.AreEqual(goals[i].count, ruleComps[i].RequiredCount, id + " 第 " + (i + 1) + " 个目标的张数");
                 }
+            }
+        }
+
+        // ---------------------------------------------------------------- 机制叠加
+
+        [Test]
+        public void 第三章从第二关起沿用第二章的秘术牌_第一关仍只教瓶子()
+        {
+            // 叠加规则（第四章同理）：新章节只做加法 —— 第三章 = 小瓶子（本章）+ 复合元素/秘术牌（第二章）。
+            // 唯一的例外是 ch3_01：它的教学前提是「牌池只有土牌」，塞进秘术牌就讲不成了。
+            foreach (var id in new[] { "ch3_01", "ch3_02", "ch3_03", "ch3_04", "ch3_05" })
+            {
+                var level = AssetDatabase.LoadAssetAtPath<LevelDefinition>("Assets/Levels/" + id + ".asset");
+                Assert.IsNotNull(level, "找不到关卡资产 " + id);
+
+                if (id == "ch3_01")
+                {
+                    Assert.IsFalse(level.rules.UseCompositeElements,
+                        "ch3_01 的起手必须还是 5 张土牌 → 不能开秘术牌");
+                    Assert.AreEqual(SpecialCardMask.None, level.rules.SpecialCardPool);
+                    continue;
+                }
+
+                Assert.IsTrue(level.rules.UseCompositeElements, id + " 要沿用第二章的复合元素/秘术牌");
+                Assert.IsTrue(level.rules.HasSpecialCard(CardKind.FusionCard), id + " 要有融合牌");
+                Assert.IsTrue(level.rules.HasSpecialCard(CardKind.DecomposeCard), id + " 要有分解牌");
+                Assert.Greater(level.rules.FusionCardWeight, 0, id + " 融合牌权重不能是 0（等于没开）");
+                Assert.Greater(level.rules.DecomposeCardWeight, 0, id + " 分解牌权重不能是 0（等于没开）");
+
+                // 这一章的主角是瓶子：秘术牌只能当点缀，权重压到元素牌的 1/10。
+                Assert.Less(level.rules.FusionCardWeight, level.rules.ElementCardWeight,
+                    id + " 的秘术牌权重必须低于元素牌，否则瓶子的弹药会被稀释");
+                Assert.Less(level.rules.DecomposeCardWeight, level.rules.ElementCardWeight);
+
+                Assert.AreEqual(6, level.rules.HandLimit,
+                    id + " 牌堆里多了秘术牌 → 手牌上限 +1（否则元素牌会被秘术牌挤出牌堆）");
+                Assert.AreEqual(12, level.rules.RoundLimit, id + " 回合上限保持 12 —— 叠加只动权重与手牌");
             }
         }
 

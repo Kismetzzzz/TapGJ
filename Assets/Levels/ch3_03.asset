@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   levelId: ch3_03
   displayName: "\u91D1\u724C\u4E0E\u6728\u724C"
-  description: "\u4E24\u4E2A\u5B57\uFF1A\u63A5\u529B\u3002\u706B\u724C\u70E7\u6389\u91D1\uFF08\u91D1\u74F6\u7ED9\u4F60\u91D1\u724C\uFF09\uFF0C\u74F6\u5B50\u91CC\u51FA\u6765\u7684\u91D1\u724C\u518D\u53BB\u780D\u6728\u3002\u91D1\u74F6 6 \u5F20 + \u6728\u74F6 6 \u5F20\u3002"
+  description: "\u4E24\u4E2A\u5B57\uFF1A\u63A5\u529B\u3002\u706B\u724C\u70E7\u6389\u91D1\uFF08\u91D1\u74F6\u7ED9\u4F60\u91D1\u724C\uFF09\uFF0C\u74F6\u5B50\u91CC\u51FA\u6765\u7684\u91D1\u724C\u518D\u53BB\u780D\u6728\u3002\u91D1\u74F6 1 \u5F20 + \u6728\u74F6 1 \u5F20\uFF08\u5404\u8BA9 5 \u4E2A\u6D88\u5931\uFF09\u3002"
   previewImage: {fileID: 0}
   outroText: ""
   sceneName: Game
@@ -29,10 +29,10 @@ MonoBehaviour:
     CreepsPerElement: 0
     MaxMoveSteps: 3
     InitialHandSize: 5
-    HandLimit: 5
+    HandLimit: 6
     MaxDiscardsPerRound: 5
     MaxCardsPerRound: 0
-    BottleCapacity: 1
+    BottleCapacity: 5
     BottleMode: 0
     EventIntervalMin: 3
     EventIntervalMax: 6
@@ -45,11 +45,11 @@ MonoBehaviour:
     RequireAllWinRules: 1
     CardEffect: 0
     EmptyCellCard: 0
-    UseCompositeElements: 0
-    SpecialCardPool: 0
+    UseCompositeElements: 1
+    SpecialCardPool: 3
     ElementCardWeight: 10
-    FusionCardWeight: 0
-    DecomposeCardWeight: 0
+    FusionCardWeight: 1
+    DecomposeCardWeight: 1
     CompositeRange: 1
     CompositeIngredientsPerRound: 1
     FusionRequiresAdjacency: 1
