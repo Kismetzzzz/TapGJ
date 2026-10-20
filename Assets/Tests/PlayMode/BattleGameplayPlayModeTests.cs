@@ -620,7 +620,7 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
-        public IEnumerator 秘术牌_显示真实类型并使用独立文字卡面()
+        public IEnumerator 秘术牌_显示真实类型并使用独立水墨卡面()
         {
             var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
             var loader = Object.FindFirstObjectByType<LevelLoader>();
@@ -639,10 +639,12 @@ namespace TapGJ.Tests
                 foreach (var card in hud.Ui.Cards.Where(c => c.gameObject.activeSelf))
                 {
                     Assert.AreEqual(fusion ? CardKind.FusionCard : CardKind.DecomposeCard, card.Kind);
-                    Assert.IsFalse(card.CardFace.gameObject.activeSelf, "秘术牌不得误用金元素卡面");
-                    var frame = card.transform.Find("Artwork/FallbackArtwork/Frame").GetComponent<Image>();
-                    Assert.IsNull(frame.sprite, "文字卡面的底板应为直角矩形，不能复用圆角面板贴图");
-                    Assert.AreEqual(Image.Type.Simple, frame.type);
+                    Assert.IsTrue(card.CardFace.gameObject.activeSelf);
+                    Assert.AreEqual(fusion ? "Fusion" : "Decompose", card.CardFace.sprite.name,
+                        "秘术牌应使用自身卡面，不能误用金元素卡面");
+                    Assert.IsFalse(card.transform.Find("Artwork/FallbackArtwork").gameObject.activeSelf);
+                    Assert.AreSame(card.CardFace, card.Button.targetGraphic);
+                    Assert.IsTrue(card.CardFace.preserveAspect);
                 }
             }
         }
@@ -819,7 +821,7 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
-        public IEnumerator 复合棋子_图案只占一格且保持格心和动画比例()
+        public IEnumerator 复合棋子_图案略放大且保持格心和动画比例()
         {
             var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
             var engine = hud.Session.Engine;
@@ -846,10 +848,13 @@ namespace TapGJ.Tests
             {
                 var piece = composites[i];
                 var image = piece.transform.Find("Artwork").GetComponent<Image>();
-                float height = image.rectTransform.rect.height;
-                Assert.Greater(height, ((RectTransform)piece.transform).rect.height * .8f,
-                    "在单格内尽量用满高度，避免重新缩得过小");
-                AssertArtworkInsideCell(hud.Viewport, image, cells[i]);
+                float height = image.rectTransform.rect.height * piece.transform.localScale.x;
+                float cellHeight = ((RectTransform)piece.transform).rect.height;
+                Assert.Greater(height, cellHeight,
+                    "棋子应比贴合格线时再大一点，便于看清");
+                Assert.Less(height, cellHeight * 1.35f,
+                    "只是稍微放大，不能铺满格子");
+                AssertArtworkCenteredOnCell(hud.Viewport, image, cells[i]);
                 Assert.Less(Vector2.Distance(centers[i], ((RectTransform)piece.transform).anchoredPosition), .001f);
                 Assert.AreEqual(Vector2.zero, image.rectTransform.anchoredPosition);
                 Assert.IsTrue(image.preserveAspect);
@@ -863,7 +868,7 @@ namespace TapGJ.Tests
             source.transform.localScale = originalScale * 1.2f;
             yield return null;
             yield return null;
-            AssertArtworkInsideCell(hud.Viewport, composites[0].transform.Find("Artwork").GetComponent<Image>(), cells[0]);
+            AssertArtworkCenteredOnCell(hud.Viewport, composites[0].transform.Find("Artwork").GetComponent<Image>(), cells[0]);
 
             source.transform.localScale = originalScale * .6f;
             yield return null;
@@ -871,16 +876,12 @@ namespace TapGJ.Tests
             Assert.AreEqual(.6f, composites[0].transform.localScale.x, .001f, "仍应跟随生成和消失的缩放动画");
         }
 
-        static void AssertArtworkInsideCell(BattleBoardViewport viewport, Image image, Pos expected)
+        static void AssertArtworkCenteredOnCell(BattleBoardViewport viewport, Image image, Pos expected)
         {
-            var corners = new Vector3[4];
-            image.rectTransform.GetWorldCorners(corners);
-            foreach (var corner in corners)
-            {
-                var local = (Vector2)viewport.rectTransform.InverseTransformPoint(corner);
-                Assert.IsTrue(viewport.TryCellAtLocalPoint(local, out var actual), "图案四角必须位于棋格内部");
-                Assert.AreEqual(expected, actual, "复合元素图案不能跨到相邻格子");
-            }
+            var center = image.rectTransform.TransformPoint(image.rectTransform.rect.center);
+            var local = (Vector2)viewport.rectTransform.InverseTransformPoint(center);
+            Assert.IsTrue(viewport.TryCellAtLocalPoint(local, out var actual), "棋子中心必须落在棋盘上");
+            Assert.AreEqual(expected, actual, "稍微放大后棋子中心仍应留在原格");
         }
 
         [UnityTest]

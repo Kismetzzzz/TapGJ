@@ -17,3 +17,5 @@ MonoBehaviour:
   water: {fileID: 21300000, guid: 596d0610164566f4db9dea83a4ca4f2e, type: 3}
   fire: {fileID: 21300000, guid: 9f4d1a00071cbe543a1900a083bc8a24, type: 3}
   earth: {fileID: 21300000, guid: 06384373f33add74eade93da3453e782, type: 3}
+  fusion: {fileID: 21300000, guid: e484538f3dab40f78ff39fa8e0b78208, type: 3}
+  decompose: {fileID: 21300000, guid: 6182e7ff609b48d987183752c97c5a86, type: 3}

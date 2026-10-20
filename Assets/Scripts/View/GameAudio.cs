@@ -35,6 +35,12 @@ namespace TapGJ.View
             SetEffectsVolume(PlayerPrefs.GetFloat(EffectsKey, 0.8f));
         }
 
+        void Start()
+        {
+            if (Instance == this && musicSource != null && musicSource.clip != null && !musicSource.isPlaying)
+                musicSource.Play();
+        }
+
         public void SetMusicVolume(float volume)
         {
             MusicVolume = Normalize(volume);

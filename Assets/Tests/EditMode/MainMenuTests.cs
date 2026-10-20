@@ -108,14 +108,24 @@ namespace TapGJ.Tests
                     var modifications = PrefabUtility.GetPropertyModifications(button.gameObject);
                     bool referenceArtwork = buttonPath == "Navigation/EntryPage/EnterButton"
                         || buttonPath.StartsWith("Navigation/UtilityButtons/") || buttonPath == "SettingsPanel/DoneButton"
-                        || buttonPath == "NoticePanel/CloseButton";
+                        || buttonPath == "NoticePanel/CloseButton"
+                        || buttonPath == "Navigation/LevelsPanel/BackButton" || buttonPath == "Navigation/ChapterPanel/BackButton";
                     Assert.IsFalse(modifications.Any(m => m.propertyPath == "m_Sprite" && m.target.name != "Icon" && !referenceArtwork
                         || m.propertyPath.StartsWith("m_SpriteState.") || m.propertyPath == "m_Transition"
                         || m.propertyPath == "m_FontData.m_Font"), buttonPath + " 不应锁死换肤属性");
                 }
                 var navigation = canvas.transform.Find("Navigation");
                 Assert.IsTrue(navigation.Find("EntryPage").gameObject.activeSelf);
+                Assert.IsFalse(navigation.Find("ModePage").gameObject.activeSelf);
                 Assert.IsFalse(navigation.Find("Menu").gameObject.activeSelf);
+                foreach (string modeButton in new[] { "CampaignButton", "EndlessButton", "RankingButton", "ExitButton" })
+                {
+                    var button = navigation.Find("ModePage/" + modeButton).GetComponent<Button>();
+                    Assert.IsNotNull(button.GetComponent<Image>().sprite, modeButton);
+                    Assert.AreSame(button.GetComponent<Image>(), button.targetGraphic, modeButton);
+                    var feedback = new SerializedObject(button.GetComponent<MenuButtonFeedback>());
+                    Assert.AreSame(button.GetComponent<Image>(), feedback.FindProperty("artwork").objectReferenceValue, modeButton);
+                }
                 var catalog = (ChapterCatalog)data.FindProperty("chapterCatalog").objectReferenceValue;
                 Assert.AreEqual("Assets/UI/Data/ChapterCatalog.asset", AssetDatabase.GetAssetPath(catalog));
                 Assert.IsFalse(navigation.Find("ChapterPanel").gameObject.activeSelf);

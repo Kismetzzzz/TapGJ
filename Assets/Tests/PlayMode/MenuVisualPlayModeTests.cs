@@ -25,7 +25,8 @@ namespace TapGJ.Tests
             Assert.IsFalse(background.raycastTarget, "背景不能拦截卡片和按钮点击");
             Assert.IsFalse(background.gameObject.activeSelf, "入口页沿用自己的美术");
             controller.EnterMenu();
-            Assert.IsTrue(background.gameObject.activeInHierarchy, "确认后直接进入章节选择");
+            Assert.IsFalse(background.gameObject.activeInHierarchy, "模式页使用自己的题字画面");
+            Assert.IsTrue(navigation.Find("ModePage").gameObject.activeSelf);
             controller.OpenLevels();
             Assert.IsTrue(background.gameObject.activeInHierarchy);
             Assert.AreEqual(0f, navigation.Find("LevelsPanel").GetComponent<Image>().color.a,
@@ -176,7 +177,9 @@ namespace TapGJ.Tests
         {
             yield return SceneManager.LoadSceneAsync("Assets/Scenes/MainMenu.unity");
             yield return null;
-            Object.FindFirstObjectByType<MainMenuController>().EnterMenu();
+            var menu = Object.FindFirstObjectByType<MainMenuController>();
+            menu.EnterMenu();
+            menu.OpenLevels();
             var canvas = Object.FindFirstObjectByType<Canvas>().transform;
             var entry = canvas.Find("Navigation/LevelsPanel/BackButton").GetComponent<Button>();
             var image = entry.GetComponent<Image>();

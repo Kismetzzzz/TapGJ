@@ -186,7 +186,7 @@ namespace TapGJ.View
             _material = composite;
             composite.mainTexture = _output;
             composite.SetTexture("_CardOpacity", _opacity);
-            composite.SetFloat("_EffectOpacity", selection ? .14f : loop ? .35f : 1);
+            composite.SetFloat("_EffectOpacity", selection ? .32f : loop ? .65f : 1);
             var image = GetComponent<RawImage>();
             if (image != null)
             {

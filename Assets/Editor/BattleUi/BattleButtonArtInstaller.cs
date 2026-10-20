@@ -54,6 +54,7 @@ namespace TapGJ.EditorTools
         {
             var data = new SerializedObject(ui);
             data.FindProperty("endDiscardPhaseSprite").objectReferenceValue = Sprite("EndDiscardPhase");
+            data.FindProperty("advancingSprite").objectReferenceValue = Sprite("Advancing");
             data.ApplyModifiedPropertiesWithoutUndo();
             var composition = ui.transform.Find("Composition");
             ApplyActionButton(composition.Find("Controls/NextRoundButton").GetComponent<Button>(), "EndPlayerPhase");

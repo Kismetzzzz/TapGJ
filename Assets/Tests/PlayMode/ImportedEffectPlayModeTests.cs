@@ -61,6 +61,9 @@ namespace TapGJ.Tests
             Assert.IsFalse(effect.IsRange);
             Assert.IsFalse(effect.GetComponent<RawImage>().raycastTarget);
             var sourceRect = (RectTransform)card.transform.Find("Artwork");
+            Assert.AreEqual(0, sourceRect.Find("SelectedRing").GetComponent<CanvasGroup>().alpha,
+                "已有素材流光时不能再叠加旧矩形选中框");
+            Assert.AreEqual(card.SelectionLift, sourceRect.anchoredPosition.y);
             var effectRect = (RectTransform)effect.transform;
             Assert.Less(Vector3.Distance(sourceRect.TransformPoint(sourceRect.rect.center),
                 effectRect.TransformPoint(effectRect.rect.center)), .001f, "左上角轴心的卡面与边光也必须同心");
@@ -76,6 +79,7 @@ namespace TapGJ.Tests
             yield return new WaitForSecondsRealtime(.3f);
             AssertRendered(effect, "selection");
             card.SetSelected(false);
+            Assert.AreEqual(0, sourceRect.anchoredPosition.y);
             Assert.IsFalse(effect.gameObject.activeSelf);
             yield return null;
             yield return null;

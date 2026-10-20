@@ -88,9 +88,8 @@ namespace TapGJ.EditorTools
             progressFill.fillAmount = 0;
             ApplyTaskPanelArtwork(task);
 
-            var timer = Panel(controls, "TimerPanel", 760, 24, 400, 90);
-            Label(timer, "Heading", "计时器", 24, 12, 100, 62, 26, Ink);
-            var timerLabel = Label(timer, "Time", "00:00", 156, 10, 220, 64, 42, Ink);
+            var timer = Rect(controls, "TimerPanel", 760, 24, 400, 90);
+            var timerLabel = Label(timer, "Time", "00:00", 0, 10, 400, 64, 42, Ink);
             timerLabel.alignment = TextAnchor.MiddleCenter;
             var round = Label(controls, "RoundLabel", "第 01 回合 / 15", 760, 122, 400, 40, 23, Ink);
             round.alignment = TextAnchor.MiddleCenter;
@@ -169,6 +168,8 @@ namespace TapGJ.EditorTools
         {
             string[] names = { "Metal", "Wood", "Water", "Fire", "Earth" };
             foreach (string name in names) ImportSprite(ArtPath + "/Cards/" + name + ".jpg", 4096, true);
+            foreach (string name in new[] { "Fusion", "Decompose" })
+                ImportSprite(ArtPath + "/Cards/" + name + ".png", 2048, true);
             var art = AssetDatabase.LoadAssetAtPath<BattleCardArt>(CardArtPath);
             if (art != null) return art;
             Directory.CreateDirectory("Assets/UI/Data");
@@ -178,6 +179,8 @@ namespace TapGJ.EditorTools
             art.water = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Water.jpg");
             art.fire = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Fire.jpg");
             art.earth = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Earth.jpg");
+            art.fusion = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Fusion.png");
+            art.decompose = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Cards/Decompose.png");
             AssetDatabase.CreateAsset(art, CardArtPath);
             return art;
         }

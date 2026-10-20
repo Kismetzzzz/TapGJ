@@ -33,12 +33,17 @@ namespace TapGJ.View
         [SerializeField] Button nextRoundButton;
         [SerializeField] Image endPlayerPhaseArtwork;
         [SerializeField] Sprite endDiscardPhaseSprite;
+        [SerializeField] Sprite advancingSprite;
         [SerializeField] Button discardButton;
         [SerializeField] Button settingsButton;
         [SerializeField] Button settingsBackdrop;
         [SerializeField] Button closeSettingsButton;
         [SerializeField] GameObject settingsPanel;
         [SerializeField] CanvasGroup controls;
+
+        [Header("音频设置")]
+        [SerializeField] Slider musicSlider;
+        [SerializeField] Text musicValueLabel;
 
         [Header("玩法接入事件（卡牌参数为槽位索引，五行参数为枚举值）")]
         [SerializeField] UnityEvent nextRoundRequested = new UnityEvent();
@@ -82,6 +87,7 @@ namespace TapGJ.View
             settingsButton.onClick.AddListener(OpenSettings);
             settingsBackdrop.onClick.AddListener(CloseSettings);
             closeSettingsButton.onClick.AddListener(CloseSettings);
+            if (musicSlider != null) musicSlider.onValueChanged.AddListener(ChangeMusicVolume);
             SetAdvanceLabel(nextRoundButton.GetComponentInChildren<Text>().text);
             SetRound(Round);
             SetElapsedSeconds(_elapsed);
@@ -98,6 +104,8 @@ namespace TapGJ.View
             settingsButton.onClick.RemoveListener(OpenSettings);
             settingsBackdrop.onClick.RemoveListener(CloseSettings);
             closeSettingsButton.onClick.RemoveListener(CloseSettings);
+            if (musicSlider != null) musicSlider.onValueChanged.RemoveListener(ChangeMusicVolume);
+            if (settingsPanel.activeSelf && GameAudio.Instance != null) GameAudio.Instance.SaveSettings();
         }
 
         void BindCardActions()
@@ -191,7 +199,8 @@ namespace TapGJ.View
             if (endPlayerPhaseArtwork == null) return;
             if (_endPlayerPhaseSprite == null) _endPlayerPhaseSprite = endPlayerPhaseArtwork.sprite;
             var sprite = value == "结束出牌" ? _endPlayerPhaseSprite :
-                value == "结束弃牌" ? endDiscardPhaseSprite : null;
+                value == "结束弃牌" ? endDiscardPhaseSprite :
+                value == "正在推进…" ? advancingSprite : null;
             bool showArtwork = sprite != null;
             if (showArtwork)
             {
@@ -387,6 +396,11 @@ namespace TapGJ.View
         public void OpenSettings()
         {
             if (settingsPanel.activeSelf) return;
+            if (musicSlider != null && GameAudio.Instance != null)
+            {
+                musicSlider.SetValueWithoutNotify(GameAudio.Instance.MusicVolume);
+                RefreshMusicVolumeLabel();
+            }
             _returnFocus = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             controls.interactable = controls.blocksRaycasts = false;
             settingsBackdrop.gameObject.SetActive(true);
@@ -398,12 +412,26 @@ namespace TapGJ.View
         public void CloseSettings()
         {
             if (!settingsPanel.activeSelf) return;
+            if (GameAudio.Instance != null) GameAudio.Instance.SaveSettings();
             settingsBackdrop.gameObject.SetActive(false);
             settingsPanel.SetActive(false);
             SettingsChanged?.Invoke(false);
             controls.interactable = controls.blocksRaycasts = true;
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(
                 _returnFocus != null && _returnFocus.activeInHierarchy ? _returnFocus : settingsButton.gameObject);
+        }
+
+        void ChangeMusicVolume(float value)
+        {
+            if (GameAudio.Instance == null) return;
+            GameAudio.Instance.SetMusicVolume(value);
+            RefreshMusicVolumeLabel();
+        }
+
+        void RefreshMusicVolumeLabel()
+        {
+            if (musicValueLabel != null)
+                musicValueLabel.text = $"{Mathf.RoundToInt(GameAudio.Instance.MusicVolume * 100f)}%";
         }
     }
 }

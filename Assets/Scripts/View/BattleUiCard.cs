@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace TapGJ.View
 {
-    /// <summary>从共享配置读取整张卡面，保留手牌的选中抬起和描边。</summary>
+    /// <summary>从共享配置读取整张卡面，选中时抬起并播放素材流光。</summary>
     [ExecuteAlways, DisallowMultipleComponent]
     public sealed class BattleUiCard : MonoBehaviour
     {
@@ -42,11 +42,15 @@ namespace TapGJ.View
         public Vector2 ArtworkSize => artwork.rect.size;
         public float SelectionLift => selectedLift;
 
-        void OnEnable() => RefreshArt();
+        void OnEnable()
+        {
+            if (selectedRing != null) selectedRing.alpha = 0;
+            RefreshArt();
+        }
         void OnValidate() => _artInitialized = false;
         void LateUpdate()
         {
-            var face = kind == CardKind.ElementCard && cardArt != null ? cardArt.GetFace(element) : null;
+            var face = cardArt != null ? cardArt.GetFace(kind, element) : null;
             if (!_artInitialized || face != _lastFace || element != _lastElement || kind != _lastKind) RefreshArt();
             if (_moving)
             {
@@ -106,7 +110,7 @@ namespace TapGJ.View
         {
             if (cardFace == null || fallbackArtwork == null || fallbackFrame == null
                 || fallbackLabel == null || button == null) return;
-            _lastFace = kind == CardKind.ElementCard && cardArt != null ? cardArt.GetFace(element) : null;
+            _lastFace = cardArt != null ? cardArt.GetFace(kind, element) : null;
             _lastElement = element;
             _lastKind = kind;
             _artInitialized = true;
@@ -128,7 +132,8 @@ namespace TapGJ.View
             if (Selected == selected) return;
             Selected = selected;
             artwork.anchoredPosition = new Vector2(0, selected ? selectedLift : 0);
-            selectedRing.alpha = selected ? 1 : 0;
+            // ponytail: 保留已保存的描边引用，选中反馈统一使用素材流光与抬起。
+            selectedRing.alpha = 0;
             if (selected) transform.SetAsLastSibling();
             else transform.SetSiblingIndex(_handOrder);
             StopSelectionEffect();

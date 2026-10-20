@@ -84,7 +84,7 @@ namespace TapGJ.View
             // 图片使用独立的正向平面，避免随地面四角变成扁平菱形。
             float side = Mathf.Min(Vector2.Distance(corners[0], corners[1]),
                 Vector2.Distance(corners[0], corners[3])) * .95f;
-            // 在透视四边形内尽量用满高度；图案四角与弹出动画都不能越过格线。
+            // 复合元素先取格内最大直立正方形，弹出时收回，避免动画再额外放大。
             if (_source.IsComposite)
             {
                 side = float.PositiveInfinity;
@@ -96,6 +96,8 @@ namespace TapGJ.View
                 }
                 side *= .98f / Mathf.Max(1, animationScale);
             }
+            // 在贴合格线的尺寸上再大约两成，便于辨认；不按格子长边铺满。
+            side *= 1.2f;
             _artwork.rectTransform.sizeDelta = Vector2.one * side;
             _label.gameObject.SetActive(!_source.HasArtwork);
             _label.rectTransform.sizeDelta = new Vector2(size.x * .55f, size.y * .75f);

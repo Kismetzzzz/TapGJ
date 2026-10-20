@@ -40,6 +40,12 @@
 
 关卡卡片的普通边框与焦点边框共用纸面细线素材，选中和悬停时只加深同一条框线。标题、目标和状态在纸栏中居中排布；重复序号与卡内分隔线默认隐藏，避免叠加通用圆角卡片的视觉样式。相关样式均在 `LevelCard.prefab` 中继承，`Number` 和 `CardRule` 对象仍保留供后续换肤。
 
+## 正常流程的水墨面板与返回按钮
+
+`Art/InkUiCompletion/` 保存同一套青绿水墨、暖色纸面的五张透明 PNG。`ChapterBack.png` 用于 `Navigation/LevelsPanel/BackButton`，`LevelBack.png` 用于 `Navigation/ChapterPanel/BackButton`；两者都包含“返回”题字，原有 Label 保留文案但设为透明，避免叠字。按钮仍继承 `MenuButton.prefab`，专用 Sprite 在对应场景实例中覆盖；104 × 46 的点击区域、返回事件与键盘导航保持原有设置。
+
+其余三张为局内设置、胜负共用结算和计时器面板底图，接线保存在 `BattleGameplay.prefab` 与 `BattleUI.unity`。面板只包含纸面和边饰，标题、时间、音量、胜负说明和按钮仍为独立控件。计时器按当前确认保留纯时间文字，底图与“计时器”标签保持隐藏，新纸面素材留作备用。素材、导入配置和修改后的场景均已保存；生成来源、原图、接线脚本与验证截图保存在 `Artifacts/InkUiCompletion/`。
+
 ## 快速换字体
 
 点击菜单 **TapGJ → 打开 UI 字体配置**，把 `.ttf` 或 `.otf` 字体拖到 **界面正文** 槽位，即可统一替换主菜单、局内 UI 和动态卡片的文字。**大标题**、**数字** 可各选一种字体，留空则跟随正文；正文留空则保留原字体。推荐字体文件和许可已放到 `Assets/UI/Fonts/`，直接拖选即可。

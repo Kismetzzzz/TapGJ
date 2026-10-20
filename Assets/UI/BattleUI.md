@@ -7,30 +7,34 @@
 所有界面都是已保存的 uGUI 对象，可在 Hierarchy 中直接调整：
 
 - `BattleUICanvas/Composition/Controls/TaskPanel`：使用提供的任务目标插画 `Assets/UI/Art/Battle/TaskPanel.png`，仅裁去外围透明空白，保持原图比例。图片自带标题，目标说明、实时进度和进度条显示在下方留白中，长文字自动换行并适配字号。
-- `Controls/TimerPanel`：计时；下方显示回合和选牌状态。
+- `Controls/TimerPanel`：按当前确认只显示动态时间，隐藏底图和“计时器”标签；`Art/InkUiCompletion/TimerPanel.png` 的青绿云纹纸面保留为备用素材。下方继续显示回合和选牌状态。
 - `Controls/ElementRail`：金、木、水、火、土五个按钮。
 - `Controls/Hand`：手牌居中排列，五张时卡面约为 171×277 参考像素，牌间保留约 30 像素间隔，倾斜不超过 3 度；选中的牌抬起并显示在最前面，卡面保持在棋盘下方。手牌较多时会自动缩小，避免相互重叠。
-- `Controls/NextRoundButton`、`DiscardButton`：结束出牌、结束弃牌和弃牌使用水墨按钮插画，素材位于 `Assets/UI/Art/Battle/Buttons/`。三种插画的可见外框均为 300×72，右边缘保持 24 的留白；透明点击层均为 300×82。`ActionButtonArtwork` 保持中间题字和两端轮廓的比例，只延展它们之间的空白底纹，因此外框等大、题字与圆角不变形。题字已包含在图片中，不叠加文字；真实对局进入弃牌阶段时切换为 `EndDiscardPhase.png`，下一回合恢复结束出牌插画。
+- `Controls/NextRoundButton`、`DiscardButton`：结束出牌、结束弃牌、正在推进和弃牌使用水墨按钮插画，素材位于 `Assets/UI/Art/Battle/Buttons/`。四种插画的可见外框均为 300×72，右边缘保持 24 的留白；透明点击层均为 300×82。`ActionButtonArtwork` 保持中间题字和两端轮廓的比例，只延展它们之间的空白底纹，因此外框等大、题字与圆角不变形。题字已包含在图片中，不叠加文字；真实对局进入弃牌阶段时切换为 `EndDiscardPhase.png`，自动推进时切换为 `Advancing.png`，下一回合恢复结束出牌插画。
 - `Controls/SettingsButton`：使用与结束出牌按钮配套的宣纸青绿齿轮插画，打开设置遮罩，暂停预览计时；点击继续、遮罩或 Esc 关闭。暂停和结算面板的继续、重开本关、返回菜单、下一关同样使用独立透明插画，保留原有文字数据、点击事件、禁用状态与键盘焦点。编辑器菜单 **TapGJ → 更新局内按钮插画** 可在保存场景并退出运行模式后，更新 BattleUI 场景与 BattleGameplay 预制体的按钮美术。
 - `Composition/BoardContent`：空的棋盘内容容器，位置对应背景上的棋盘。
 
-预览模式只演示 UI：选牌抬起并描边，再点取消；选择后才能弃牌；弃牌隐藏该槽位；下一回合更新回合数字。场景不创建对局控制器，也不执行棋盘规则。未连接玩法时任务进度为示例值。
+预览模式只演示 UI：选牌抬起并播放素材流光，再点取消；选择后才能弃牌；弃牌隐藏该槽位；下一回合更新回合数字。场景不创建对局控制器，也不执行棋盘规则。未连接玩法时任务进度为示例值。
+
+## 设置和结算面板
+
+`Composition/SettingsPanel` 使用 `Art/InkUiCompletion/PausePanel.png`，`Composition/ResultPanel/Dialog` 使用同目录的 `ResultPanel.png`。两张底图沿用任务面板和局内按钮的纸纹、青绿双线边框与淡水墨山云，采用九宫格绘制；保留原有面板尺寸，标题、胜负原因、音量滑块和操作按钮均独立显示。胜利与失败共用结算底图，标题和说明由真实对局更新。局内 UI 预览与实际玩法共用这套素材。
 
 ## 替换手牌
 
-卡面统一配置在 **`Assets/UI/Data/BattleCardArt.asset`**，所有手牌共用这一份。当前已接入提供的金、木、水、火、土五张完整卡面，原图保存于 `Assets/UI/Art/Battle/Cards/`；对应卡面留空时显示该元素的缺图占位。
+卡面统一配置在 **`Assets/UI/Data/BattleCardArt.asset`**，所有手牌共用这一份。当前已接入金、木、水、火、土五张完整卡面，以及水墨风格的 `Fusion.png`（融合）和 `Decompose.png`（分解），原图保存于 `Assets/UI/Art/Battle/Cards/`。按牌种选择秘术牌卡面，避免误读其元素占位值；任一卡面留空时仍显示对应类型的文字占位。
 
 以后换图只需：
 
 1. 把新图片拖进 Project 面板中的 `Assets/UI/Art/Battle/Cards/`（建议与当前卡面接近的竖版比例）。
 2. 选中图片，将 **Texture Type** 设为 **Sprite (2D and UI)**，**Sprite Mode** 设为 **Single**，点击 **Apply**。
-3. 选中 `BattleCardArt.asset`，把图片拖到 Inspector 中对应的 **金 / 木 / 水 / 火 / 土** 槽位。
+3. 选中 `BattleCardArt.asset`，把图片拖到 Inspector 中对应的 **金 / 木 / 水 / 火 / 土 / 融合 / 分解** 槽位。
 
-当前五张图已开启缩小纹理过滤。替换为带细碎纹理的图片时，也可开启 **Generate Mip Maps**，减少小卡面上的噪点。
+当前七张卡面已开启缩小纹理过滤。替换为带细碎纹理的图片时，也可开启 **Generate Mip Maps**，减少小卡面上的噪点。
 
-所有同元素手牌会自动更新，包括编辑器预览与运行中的卡牌；无需逐张修改场景、Prefab 或代码。配置会随工程保存，重新打开仍有效。也可用同名新图片覆盖 `Cards/` 中对应 JPG，保留原 `.meta` 文件，引用会继续生效。
+所有同类手牌会自动更新，包括编辑器预览与运行中的卡牌；无需逐张修改场景、Prefab 或代码。配置会随工程保存，重新打开仍有效。也可用同名新图片覆盖 `Cards/` 中对应 JPG 或 PNG，保留原 `.meta` 文件，引用会继续生效。
 
-`Assets/UI/Prefabs/BattleCard.prefab` 只负责共用尺寸、交互和选中效果：`Artwork/CardFace` 整张显示卡面并保留比例与原色，`FocusRing` 和 `SelectedRing` 是独立描边，`FallbackArtwork` 是缺图占位。新图的比例不同会在现有卡框内完整等比显示。需要统一调整手牌大小或描边时修改此预制体。
+`Assets/UI/Prefabs/BattleCard.prefab` 只负责共用尺寸、交互和选中效果：`Artwork/CardFace` 整张显示卡面并保留比例与原色，选中时抬起并播放特效包中的流光；旧的 `SelectedRing` 保持透明，避免额外叠加矩形框。`FallbackArtwork` 是缺图占位。新图的比例不同会在现有卡框内完整等比显示。需要统一调整手牌大小时修改此预制体。
 
 预览仍是五张手牌，顺序为火、土、水、木、金，五种卡面都能看到。以后换图不会改变手牌元素、回合、选中状态或交互。
 
@@ -57,7 +61,7 @@
 
 `Assets/Scenes/Game.unity` 已使用 `Assets/UI/Prefabs/BattleGameplay.prefab` 运行真实关卡。打开 Game 场景，选中 Levels 下的关卡资产，点击 Inspector 中的“Play 这一关”即可试玩。原 BattleUI 场景仍用于单独预览美术。
 
-`BattleGameplayHud` 通过 `IGameHud` 连接 `GameSession`，从关卡读取目标、进度、回合上限和真实手牌。手牌数量随关卡变化；金木水火土使用共享卡面，融合牌和分解牌暂用带说明的文字卡面。选牌后点击高亮棋盘格出牌；出牌阶段按钮显示“结束出牌”，弃牌阶段显示“结束弃牌”。弃牌阶段先选牌，再点击“弃牌”，达到关卡上限后停止接受弃牌。
+`BattleGameplayHud` 通过 `IGameHud` 连接 `GameSession`，从关卡读取目标、进度、回合上限和真实手牌。手牌数量随关卡变化；五行牌和两种秘术牌均读取共享卡面配置，保留原有选中、出牌和消散效果。选牌后点击高亮棋盘格出牌；出牌阶段按钮显示“结束出牌”，弃牌阶段显示“结束弃牌”，自动推进阶段显示 `Art/Battle/Buttons/Advancing.png` 中的“正在推进…”题字。三种阶段插画保留同一点击区域，等待时按钮禁用；图片已包含题字，独立 Text 仅保留文案数据。弃牌阶段先选牌，再点击“弃牌”，达到关卡上限后停止接受弃牌。
 
 玩法手牌按真实卡牌 ID 保留对应的界面对象。成功出牌或弃牌时，消散停留在该牌原先的选中位置；剩余手牌稍后平滑补到居中位置，卡面不会突然换到其他槽位。手牌数量增加时会缩小整组排布，选中卡面也保留在手牌区域内。
 

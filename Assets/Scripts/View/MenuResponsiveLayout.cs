@@ -12,6 +12,7 @@ namespace TapGJ.View
         [SerializeField] RectTransform levelsPage;
         [SerializeField] RectTransform mainMenu;
         [SerializeField] RectTransform entryPage;
+        [SerializeField] RectTransform modePage;
         [SerializeField] bool referenceArtworkLayout;
         [SerializeField] RectTransform utilityButtons;
         [SerializeField] bool scrollLevelArtwork;
@@ -28,8 +29,8 @@ namespace TapGJ.View
             if (scrollChapterArtwork)
                 chaptersPage.localScale = Vector3.one * Mathf.Min(width / 1280f, height / 720f);
             else
-                LayoutPage(chaptersPage, false, width);
-            LayoutPage(levelsPage, true, width, scrollLevelArtwork);
+                LayoutPage(chaptersPage, false, width, height);
+            LayoutPage(levelsPage, true, width, height, scrollLevelArtwork);
             float left = -Mathf.Min(310, width * .5f - 220);
             foreach (string name in new[] { "Brand", "Title", "Logo", "Subtitle", "StartButton", "LeaderboardButton", "QuitButton" })
                 SetX(mainMenu.Find(name), left);
@@ -47,7 +48,7 @@ namespace TapGJ.View
             {
                 // ponytail: 参考画面采用完整等比构图；其他比例留出画边，避免题字和按钮被裁掉。
                 float scale = Mathf.Min(width / 1280f, height / 720f);
-                entryPage.localScale = utilityButtons.localScale = Vector3.one * scale;
+                entryPage.localScale = utilityButtons.localScale = modePage.localScale = Vector3.one * scale;
                 canvasRect.Find("SettingsPanel").localScale = Vector3.one * scale;
                 canvasRect.Find("NoticePanel").localScale = Vector3.one * scale;
             }
@@ -59,14 +60,14 @@ namespace TapGJ.View
             }
         }
 
-        static void LayoutPage(RectTransform page, bool levels, float canvasWidth, bool scrollArtwork = false)
+        static void LayoutPage(RectTransform page, bool levels, float canvasWidth, float canvasHeight, bool scrollArtwork = false)
         {
             float width = Mathf.Min(1160, canvasWidth - 64);
             page.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
             float left = -width * .5f, right = width * .5f;
             if (levels && scrollArtwork)
             {
-                LayoutScrollPage(page, width);
+                LayoutScrollPage(page, width, canvasHeight);
                 return;
             }
             SetRect(page.Find("Title"), left + 40, width - 230, true);
@@ -91,19 +92,20 @@ namespace TapGJ.View
             }
         }
 
-        static void LayoutScrollPage(RectTransform page, float width)
+        static void LayoutScrollPage(RectTransform page, float width, float canvasHeight)
         {
             // ponytail: 卷轴只作为装饰，卡片数量和可滚动宽度继续由配置决定。
             float artWidth = width - 40;
             float artHeight = artWidth * 430f / 925f;
             var art = (RectTransform)page.Find("ScrollArtwork");
             art.sizeDelta = new Vector2(artWidth, artHeight);
+            float headerY = Mathf.Min(310, canvasHeight * .5f - 40);
             SetRect(page.Find("Title"), -width * .5f + 40, width - 230, true);
-            SetY(page.Find("Title"), 310);
+            SetY(page.Find("Title"), headerY);
             SetRect(page.Find("Subtitle"), -width * .5f + 40, width - 170, true);
-            SetY(page.Find("Subtitle"), 277);
+            SetY(page.Find("Subtitle"), headerY - 33);
             SetX(page.Find("BackButton"), width * .5f - 72);
-            SetY(page.Find("BackButton"), 310);
+            SetY(page.Find("BackButton"), headerY);
             var scroll = page.Find("ScrollView").GetComponent<ScrollRect>();
             SetX(scroll.transform, artWidth * .085f);
             SetWidth(scroll.transform, artWidth * .715f);

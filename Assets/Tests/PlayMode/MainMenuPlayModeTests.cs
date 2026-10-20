@@ -38,6 +38,7 @@ namespace TapGJ.Tests
             yield return null;
             _canvas = Object.FindFirstObjectByType<Canvas>().transform;
             Button("EntryPage/EnterButton").onClick.Invoke();
+            Button("ModePage/CampaignButton").onClick.Invoke();
         }
 
         [UnityTearDown]
@@ -62,12 +63,13 @@ namespace TapGJ.Tests
             Assert.IsFalse(Find("Menu").gameObject.activeSelf);
             Assert.IsFalse(Find("EntryPage").gameObject.activeSelf);
             controller.Back();
-            Assert.IsTrue(Find("EntryPage").gameObject.activeSelf);
+            Assert.IsTrue(Find("ModePage").gameObject.activeSelf);
             Assert.IsFalse(Find("Menu").gameObject.activeSelf);
-            Assert.AreEqual(Button("EntryPage/EnterButton").gameObject, EventSystem.current.currentSelectedGameObject);
-            Button("EntryPage/EnterButton").onClick.Invoke();
+            Assert.IsFalse(Find("EntryPage").gameObject.activeSelf);
+            Assert.AreEqual(Button("ModePage/CampaignButton").gameObject, EventSystem.current.currentSelectedGameObject);
+            Button("ModePage/CampaignButton").onClick.Invoke();
             Assert.IsTrue(Find("LevelsPanel").gameObject.activeSelf);
-            Assert.IsFalse(Find("Menu").gameObject.activeSelf);
+            Assert.IsFalse(Find("ModePage").gameObject.activeSelf);
             Assert.IsFalse(Find("EntryPage").gameObject.activeSelf);
             Assert.IsFalse(Find("UtilityButtons").gameObject.activeSelf);
             var catalog = controller.Catalog;
@@ -106,9 +108,37 @@ namespace TapGJ.Tests
                     EventSystem.current.currentSelectedGameObject);
             }
             Button("LevelsPanel/BackButton").onClick.Invoke();
-            Assert.IsTrue(Find("EntryPage").gameObject.activeSelf);
+            Assert.IsTrue(Find("ModePage").gameObject.activeSelf);
             Assert.IsFalse(Find("Menu").gameObject.activeSelf);
+            Assert.AreEqual(Button("ModePage/CampaignButton").gameObject, EventSystem.current.currentSelectedGameObject);
+            controller.Back();
+            Assert.IsTrue(Find("EntryPage").gameObject.activeSelf);
             Assert.AreEqual(Button("EntryPage/EnterButton").gameObject, EventSystem.current.currentSelectedGameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator 模式页_闯关进入章节_无尽和排行榜点击停留原页()
+        {
+            var controller = Object.FindFirstObjectByType<MainMenuController>();
+            controller.Back();
+            Assert.IsTrue(Find("ModePage").gameObject.activeSelf);
+            Assert.IsFalse(Find("LevelsPanel").gameObject.activeSelf);
+            var endless = Button("ModePage/EndlessButton");
+            var pointer = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left };
+            endless.GetComponent<MenuButtonFeedback>().OnPointerEnter(pointer);
+            yield return new WaitForSecondsRealtime(.15f);
+            Assert.Greater(endless.GetComponent<Image>().material.GetColor("_Color").r, 1f, "悬停应提亮按钮");
+            endless.GetComponent<MenuButtonFeedback>().OnPointerExit(pointer);
+            endless.onClick.Invoke();
+            Button("ModePage/RankingButton").onClick.Invoke();
+            Assert.IsTrue(Find("ModePage").gameObject.activeSelf);
+            Assert.IsFalse(Find("LevelsPanel").gameObject.activeSelf);
+            Assert.IsFalse(Find("LeaderboardPanel").gameObject.activeSelf);
+            Assert.AreEqual("MainMenu", SceneManager.GetActiveScene().name);
+            Button("ModePage/CampaignButton").onClick.Invoke();
+            Assert.IsTrue(Find("LevelsPanel").gameObject.activeSelf);
+            Assert.IsFalse(Find("ModePage").gameObject.activeSelf);
             yield return null;
         }
 
@@ -403,7 +433,9 @@ namespace TapGJ.Tests
         [UnityTest]
         public IEnumerator 设置与公告_遮挡背景_关闭恢复当前页面和焦点()
         {
-            Object.FindFirstObjectByType<MainMenuController>().Back();
+            var controller = Object.FindFirstObjectByType<MainMenuController>();
+            controller.Back();
+            controller.Back();
             var navigation = Find("Navigation").GetComponent<CanvasGroup>();
             var settingsButton = Button("UtilityButtons/SettingsButton");
             EventSystem.current.SetSelectedGameObject(settingsButton.gameObject);

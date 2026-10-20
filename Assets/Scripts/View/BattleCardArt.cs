@@ -12,6 +12,19 @@ namespace TapGJ.View
         [InspectorName("水")] public Sprite water;
         [InspectorName("火")] public Sprite fire;
         [InspectorName("土")] public Sprite earth;
+        [InspectorName("融合")] public Sprite fusion;
+        [InspectorName("分解")] public Sprite decompose;
+
+        public Sprite GetFace(CardKind kind, Element element)
+        {
+            switch (kind)
+            {
+                case CardKind.ElementCard: return GetFace(element);
+                case CardKind.FusionCard: return fusion;
+                case CardKind.DecomposeCard: return decompose;
+                default: return null;
+            }
+        }
 
         public Sprite GetFace(Element element)
         {

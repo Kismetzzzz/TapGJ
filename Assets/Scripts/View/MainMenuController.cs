@@ -13,10 +13,15 @@ namespace TapGJ.View
     {
         [Header("页面流程")]
         [SerializeField] GameObject entryPage;
+        [SerializeField] GameObject modePage;
         [SerializeField] GameObject mainMenuPage;
         [SerializeField] GameObject utilityButtons;
         [SerializeField] GameObject selectionBackground;
         [SerializeField] Button enterButton;
+        [SerializeField] Button campaignButton;
+        [SerializeField] Button endlessButton;
+        [SerializeField] Button rankingButton;
+        [SerializeField] Button exitButton;
         [Header("章节与关卡（数量由配置数组决定）")]
         [SerializeField] ChapterCatalog chapterCatalog;
         [SerializeField] GameObject chapterPanel;
@@ -85,6 +90,8 @@ namespace TapGJ.View
             _noticeTitle = noticeTitleLabel.text;
             _noticeBody = noticeBodyLabel.text;
             enterButton.onClick.AddListener(EnterMenu);
+            campaignButton.onClick.AddListener(OpenLevels);
+            exitButton.onClick.AddListener(QuitGame);
             startButton.onClick.AddListener(OpenLevels);
             leaderboardButton.onClick.AddListener(OpenLeaderboard);
             userButton.onClick.AddListener(OpenLeaderboard);
@@ -112,6 +119,8 @@ namespace TapGJ.View
         void OnDisable()
         {
             enterButton.onClick.RemoveListener(EnterMenu);
+            campaignButton.onClick.RemoveListener(OpenLevels);
+            exitButton.onClick.RemoveListener(QuitGame);
             startButton.onClick.RemoveListener(OpenLevels);
             leaderboardButton.onClick.RemoveListener(OpenLeaderboard);
             userButton.onClick.RemoveListener(OpenLeaderboard);
@@ -147,7 +156,7 @@ namespace TapGJ.View
         public void EnterMenu()
         {
             if (_loading || !menuGroup.interactable) return;
-            OpenLevels();
+            ShowPage(modePage, campaignButton.gameObject);
         }
 
         public void OpenLevels()
@@ -255,6 +264,7 @@ namespace TapGJ.View
         void ShowPage(GameObject page, GameObject firstSelected)
         {
             entryPage.SetActive(page == entryPage);
+            modePage.SetActive(page == modePage);
             mainMenuPage.SetActive(page == mainMenuPage);
             levelsPanel.SetActive(page == levelsPanel);
             utilityButtons.SetActive(page == entryPage || page == mainMenuPage);
@@ -283,7 +293,8 @@ namespace TapGJ.View
                 return;
             }
             if (chapterPanel.activeSelf) OpenLevels();
-            else if (levelsPanel.activeSelf || mainMenuPage.activeSelf)
+            else if (levelsPanel.activeSelf) ShowPage(modePage, campaignButton.gameObject);
+            else if (modePage.activeSelf || mainMenuPage.activeSelf)
                 ShowPage(entryPage, enterButton.gameObject);
         }
 
@@ -367,6 +378,7 @@ namespace TapGJ.View
             menuGroup.interactable = true;
             menuGroup.blocksRaycasts = true;
             GameObject fallback = entryPage.activeSelf ? enterButton.gameObject :
+                modePage.activeSelf ? campaignButton.gameObject :
                 mainMenuPage.activeSelf ? startButton.gameObject :
                 levelsPanel.activeSelf ? ChapterFocus() :
                 chapterPanel.activeSelf && _levelButtons.Count > 0 ? _levelButtons[0].gameObject : closeChapterButton.gameObject;

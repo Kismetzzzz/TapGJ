@@ -8,7 +8,7 @@ namespace TapGJ.View
     [DisallowMultipleComponent, RequireComponent(typeof(Image))]
     public sealed class ActionButtonArtwork : BaseMeshEffect
     {
-        // ponytail: 切分按现有三张插画的题字与端部留白标定；替换素材时需重新核对。
+        // ponytail: 切分按现有操作插画的题字与端部留白标定；替换素材时需重新核对。
         static readonly float[] SourceCuts = { 0, .18f, .20f, .80f, .82f, 1 };
         readonly float[] _positions = new float[6];
         readonly UIVertex[] _quad = new UIVertex[4];
