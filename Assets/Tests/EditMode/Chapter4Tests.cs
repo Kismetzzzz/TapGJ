@@ -207,6 +207,24 @@ namespace TapGJ.Tests
         }
 
         [Test]
+        public void 所有正式关卡的元素都会自己移动()
+        {
+            // 图1 的准备阶段就是「每只小怪随机方向走 0~3 格」——这是玩法的核心，不是可选装饰。
+            // 关掉 MaxMoveSteps（=0）会让整局变成静止棋盘：元素永远不动、不会自己相生相克、
+            // 玩家看到的只是一个摆好的谜题，而不是那个「会动的五行战场」。
+            // 所以定成硬约定：正式关卡 MaxMoveSteps ≥ 1。
+            var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);
+            Assert.IsNotNull(catalog, "找不到 " + RealCatalogPath);
+
+            foreach (var level in catalog.levels)
+            {
+                Assert.IsNotNull(level, "目录里有空槽位");
+                Assert.GreaterOrEqual(level.rules.MaxMoveSteps, 1,
+                    level.levelId + " 的 MaxMoveSteps = 0 —— 元素不会自己走了（图1 的准备阶段被关掉了）");
+            }
+        }
+
+        [Test]
         public void 关卡目录一共20关_第四章排在最后()
         {
             var catalog = AssetDatabase.LoadAssetAtPath<LevelCatalog>(RealCatalogPath);

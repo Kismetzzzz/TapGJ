@@ -26,7 +26,7 @@ MonoBehaviour:
     ElementPool: 13
     CardPool: 12
     CreepsPerElement: 0
-    MaxMoveSteps: 0
+    MaxMoveSteps: 3
     InitialHandSize: 5
     HandLimit: 5
     MaxDiscardsPerRound: 5
