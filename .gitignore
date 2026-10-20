@@ -32,6 +32,7 @@ ExportedObj/
 
 # Unity / IDE 自动生成的解决方案与工程文件：每台机器的绝对路径都不同，不该进仓库
 *.csproj
+!/Tools/LevelPlaythrough/LevelPlaythrough.csproj
 *.unityproj
 *.sln
 *.suo
@@ -88,6 +89,9 @@ crashlytics-build.properties
 /.mimosa/
 /.v2c/
 /.video_agent/
+/.workbuddy-ai/
+/Tools/**/bin/
+/Tools/**/obj/
 
 # ---------------------------------------------------------------- 本地设计文档（策划原件与参考资料，不进仓库；只收 .md 开发笔记）
 /docs/*

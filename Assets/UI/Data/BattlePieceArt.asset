@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb04db6620554a5898710c517418dca3, type: 3}
+  m_Name: BattlePieceArt
+  m_EditorClassIdentifier: 
+  metal: {fileID: 21300000, guid: 24bc2f28e0a947c2a65148fe9fb60c2a, type: 3}
+  wood: {fileID: 21300000, guid: 7775d6914c204f248a8ba86c782db655, type: 3}
+  water: {fileID: 21300000, guid: 222cb1fe94c042db9584d0402ec6fb58, type: 3}
+  fire: {fileID: 21300000, guid: 1c892af23d7e448581d27af3176ea6a6, type: 3}
+  earth: {fileID: 21300000, guid: 21c987f7ede848d0be6cc4ec3af7e489, type: 3}
+  ember: {fileID: 21300000, guid: 8253425b823d427bb1e794b04d634b4b, type: 3}
+  lava: {fileID: 21300000, guid: 3ebec1ce93594960bde9602572a08e2e, type: 3}
+  ore: {fileID: 21300000, guid: af0cf83882c549bf92cc7b34e161083f, type: 3}
+  coldSteel: {fileID: 21300000, guid: 570c89ad3c704d2db01ef95b16519053, type: 3}
+  spiritSpring: {fileID: 21300000, guid: 6167123e96fb4b8590d7674f39791bd2, type: 3}

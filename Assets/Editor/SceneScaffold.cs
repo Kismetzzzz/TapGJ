@@ -100,6 +100,8 @@ namespace TapGJ.EditorTools
 
             // ---- Anchors（已存在的锚点保持原位，不动它）
             var board = FindOrCreate<BoardView>(anchors, "BoardAnchor", BoardAnchorPos);
+            if (board.PieceArt == null)
+                board.PieceArt = AssetDatabase.LoadAssetAtPath<BattlePieceArt>("Assets/UI/Data/BattlePieceArt.asset");
             var hand = FindOrCreate<HandView>(anchors, "HandAnchor", HandAnchorPos);
 
             // ---- 相机

@@ -1,0 +1,144 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: houqi
+  m_Shader: {fileID: 4800000, guid: 5b739e600ec1b0449b3375ab46404917, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _COLORSTYLE_NORMAL
+  m_InvalidKeywords:
+  - _IFBLURFACTOR_ON
+  - _IFLINEUVSCALE_ON
+  - _IFREDBLUEFACTOR_ON
+  - _IFZHENFU_ON
+  - _IFZHENPIN_ON
+  - _TEXAR_ON
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailAlbedoMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Logo:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1.5, y: 1.5}
+        m_Offset: {x: -0.23, y: 0.34}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Tex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 300, y: 300}
+        m_Offset: {x: 0, y: 0}
+    - _texcoord:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BlurFactor: 0
+    - _BlurFactorK: 0
+    - _BumpScale: 1
+    - _ColorStyle: 0
+    - _Cutoff: 0.5
+    - _DetailNormalMapScale: 1
+    - _DstBlend: 0
+    - _GlossMapScale: 1
+    - _Glossiness: 0.5
+    - _GlossyReflections: 1
+    - _IfBlurFactor: 1
+    - _IfLineUVScale: 1
+    - _IfMainAlpha: 0
+    - _IfRedBlueFactor: 1
+    - _IfStepFactor: 0
+    - _IfVignettePower: 0
+    - _IfVignetteScale: 0
+    - _Ifzhenfu: 1
+    - _Ifzhenpin: 1
+    - _LineColorScale: 0
+    - _LineOffset: 2.22
+    - _LineTilingU: 3.49
+    - _LineTilingV: 8.85
+    - _LineUVScale: 0
+    - _LineUVScaleK: 0
+    - _LogoAR: 0
+    - _LogoAlpha: 0
+    - _MainAlpha: 0.8
+    - _MainAlphaK: 1
+    - _Metallic: 0
+    - _Mode: 0
+    - _OcclusionStrength: 1
+    - _Parallax: 0.02
+    - _RedBlueFactor: 0
+    - _RedBlueFactorK: 0
+    - _SmoothnessTextureChannel: 0
+    - _Soft: 0.5
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _StepFactor: 0.6
+    - _StepFactorK: 0.5
+    - _TexAR: 1
+    - _TexAlpha: 0
+    - _TexRotator: 0.075
+    - _UVSec: 0
+    - _VignettePower: 3
+    - _VignettePowerK: 1
+    - _VignetteScale: 2.1
+    - _VignetteScaleK: 0
+    - _ZWrite: 1
+    - _centerU: 0.5
+    - _centerV: 0.897
+    - _zhenfu: 0
+    - _zhenfuK: 0
+    - _zhenpin: 0
+    - _zhenpinK: 0
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Color1: {r: 1, g: 1, b: 1, a: 0}
+    - _Color2: {r: 0, g: 0, b: 0, a: 0}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []

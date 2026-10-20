@@ -107,7 +107,10 @@ namespace TapGJ.Tests
                     Assert.IsFalse(ring.GetComponent<Image>().raycastTarget);
                     // 底图、状态图和字体跟随 Prefab；入口可单独配置图标。
                     var modifications = PrefabUtility.GetPropertyModifications(button.gameObject);
-                    Assert.IsFalse(modifications.Any(m => m.propertyPath == "m_Sprite" && m.target.name != "Icon"
+                    bool referenceArtwork = buttonPath == "Navigation/EntryPage/EnterButton"
+                        || buttonPath.StartsWith("Navigation/UtilityButtons/") || buttonPath == "SettingsPanel/DoneButton"
+                        || buttonPath == "NoticePanel/CloseButton";
+                    Assert.IsFalse(modifications.Any(m => m.propertyPath == "m_Sprite" && m.target.name != "Icon" && !referenceArtwork
                         || m.propertyPath.StartsWith("m_SpriteState.") || m.propertyPath == "m_Transition"
                         || m.propertyPath == "m_FontData.m_Font"), buttonPath + " 不应锁死换肤属性");
                 }

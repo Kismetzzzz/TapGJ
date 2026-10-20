@@ -28,7 +28,7 @@ namespace TapGJ.View
         [Header("背景格线校准（由下到上，坐标范围 0–1）")]
         [Tooltip("每条横向格线的高度，以及这条线上从左到右的纵向格线位置。留空时使用原梯形布局。")]
         [SerializeField] CalibrationRow[] calibrationRows = Array.Empty<CalibrationRow>();
-        [Tooltip("菱形棋盘四角，依次为逻辑左下、右下、右上、左上；使用容器内的 0–1 坐标。")]
+        [Tooltip("背景棋盘四角，依次为逻辑左下、右下、右上、左上；使用容器内的 0–1 坐标。")]
         [SerializeField] Vector2[] calibrationCorners = Array.Empty<Vector2>();
         GameSession _session;
         UiFontTheme _fontTheme;

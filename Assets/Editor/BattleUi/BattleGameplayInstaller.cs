@@ -62,11 +62,11 @@ namespace TapGJ.EditorTools
             var objective = composition.Find("Controls/TaskPanel/Objective").GetComponent<Text>();
             objective.resizeTextForBestFit = true;
             objective.resizeTextMinSize = 18;
-            objective.resizeTextMaxSize = 30;
+            objective.resizeTextMaxSize = 26;
             var progress = composition.Find("Controls/TaskPanel/Progress").GetComponent<Text>();
             progress.resizeTextForBestFit = true;
-            progress.resizeTextMinSize = 15;
-            progress.resizeTextMaxSize = 23;
+            progress.resizeTextMinSize = 16;
+            progress.resizeTextMaxSize = 20;
             var viewport = ui.BoardContent.gameObject.AddComponent<BattleBoardViewport>();
             viewport.color = Color.white;
             viewport.raycastTarget = true;
@@ -145,19 +145,19 @@ namespace TapGJ.EditorTools
 
         static void ApplyBackgroundBoardCalibration(BattleBoardViewport viewport)
         {
-            // 原图 2278×1280，完整等比显示在 1920×1080 内；四角取自背景棋盘边缘。
-            const float left = 340, top = 200, width = 1300, height = 530;
+            // 原图 1024×575，完整等比显示在 1920×1080 内。四角是正面梯形棋盘的外框：近左、近右、远右、远左。
+            const float left = 160, top = 60, width = 1620, height = 730;
             var rect = viewport.rectTransform;
             rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0, 1);
             rect.anchoredPosition = new Vector2(left, -top);
             rect.sizeDelta = new Vector2(width, height);
             var imageCorners = new[]
             {
-                new Vector2(1136, 855), new Vector2(1849, 505),
-                new Vector2(1129, 252), new Vector2(412, 518)
+                new Vector2(105.379f, 399.343f), new Vector2(927.837f, 402.636f),
+                new Vector2(828.874f, 48.475f), new Vector2(200.039f, 52.060f)
             };
-            const float scale = 1920f / 2278;
-            float imageTop = (1080 - 1280 * scale) * .5f;
+            const float scale = 1920f / 1024f;
+            float imageTop = (1080 - 575 * scale) * .5f;
             viewport.SetCornerCalibration(imageCorners.Select(p => new Vector2(
                 (p.x * scale - left) / width, (top + height - imageTop - p.y * scale) / height)).ToArray());
         }

@@ -3,12 +3,13 @@ using UnityEngine.UI;
 
 namespace TapGJ.View
 {
-    /// <summary>色块四角贴合棋盘透视，文字正向显示；配色和动画跟随原有表现对象。</summary>
+    /// <summary>动物棋子保持直立比例，元素色块贴合棋盘透视；动画跟随原有表现对象。</summary>
     public sealed class BattleBoardPieceView : MaskableGraphic
     {
         CreepView _source;
         RectTransform _rect;
         Text _label;
+        Image _artwork;
         readonly Vector2[] _corners = new Vector2[4];
         readonly UIVertex[] _quad = new UIVertex[4];
 
@@ -22,6 +23,13 @@ namespace TapGJ.View
             piece._source = source;
             piece._rect = (RectTransform)root.transform;
             piece._rect.anchorMin = piece._rect.anchorMax = parent.pivot;
+            var artwork = new GameObject("Artwork", typeof(RectTransform), typeof(Image));
+            artwork.layer = root.layer;
+            artwork.transform.SetParent(root.transform, false);
+            piece._artwork = artwork.GetComponent<Image>();
+            piece._artwork.preserveAspect = true;
+            piece._artwork.raycastTarget = false;
+            artwork.SetActive(false);
             var label = new GameObject("Label", typeof(RectTransform), typeof(Text));
             label.layer = root.layer;
             label.transform.SetParent(root.transform, false);
@@ -39,7 +47,7 @@ namespace TapGJ.View
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
             mesh.Clear();
-            if (_source == null) return;
+            if (_source == null || _source.HasArtwork) return;
             if (_source.Ring != null && _source.Ring.enabled) AddQuad(mesh, _source.Ring.color, 1.08f);
             AddQuad(mesh, color, 1);
         }
@@ -70,6 +78,14 @@ namespace TapGJ.View
             var size = max - min;
             _rect.sizeDelta = size;
             color = _source.Body.color;
+            _artwork.gameObject.SetActive(_source.HasArtwork);
+            _artwork.sprite = _source.HasArtwork ? _source.Body.sprite : null;
+            _artwork.color = color;
+            // 图片使用独立的正向平面，避免随地面四角变成扁平菱形。
+            float side = Mathf.Min(Vector2.Distance(corners[0], corners[1]),
+                Vector2.Distance(corners[0], corners[3])) * .95f;
+            _artwork.rectTransform.sizeDelta = Vector2.one * side;
+            _label.gameObject.SetActive(!_source.HasArtwork);
             _label.rectTransform.sizeDelta = new Vector2(size.x * .55f, size.y * .75f);
             _label.text = _source.Label.text;
             _label.fontStyle = _source.Label.fontStyle;

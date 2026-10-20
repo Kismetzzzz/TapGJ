@@ -31,6 +31,7 @@ namespace TapGJ.View
         [SerializeField] CanvasGroup[] elementSelections;
         [SerializeField] BattleUiCard[] cards;
         [SerializeField] Button nextRoundButton;
+        [SerializeField] Image endPlayerPhaseArtwork;
         [SerializeField] Button discardButton;
         [SerializeField] Button settingsButton;
         [SerializeField] Button settingsBackdrop;
@@ -79,6 +80,7 @@ namespace TapGJ.View
             settingsButton.onClick.AddListener(OpenSettings);
             settingsBackdrop.onClick.AddListener(CloseSettings);
             closeSettingsButton.onClick.AddListener(CloseSettings);
+            SetAdvanceLabel(nextRoundButton.GetComponentInChildren<Text>().text);
             SetRound(Round);
             SetElapsedSeconds(_elapsed);
             RefreshActions();
@@ -176,8 +178,21 @@ namespace TapGJ.View
             _advanceEnabled = advance;
             _discardEnabled = discard;
             _actionsEnabled = select;
-            nextRoundButton.GetComponentInChildren<Text>().text = advanceLabel;
+            SetAdvanceLabel(advanceLabel);
             RefreshActions();
+        }
+
+        void SetAdvanceLabel(string value)
+        {
+            var label = nextRoundButton.GetComponentInChildren<Text>();
+            label.text = value;
+            if (endPlayerPhaseArtwork == null) return;
+            bool showArtwork = value == "结束出牌";
+            label.enabled = !showArtwork;
+            endPlayerPhaseArtwork.gameObject.SetActive(showArtwork);
+            var background = nextRoundButton.GetComponent<Image>();
+            background.enabled = !showArtwork;
+            nextRoundButton.targetGraphic = showArtwork ? endPlayerPhaseArtwork : background;
         }
 
         public void SetModalBlocked(bool blocked) => controls.interactable = controls.blocksRaycasts = !blocked;

@@ -1,6 +1,44 @@
 # 主菜单美术替换
 
-场景：`Assets/Scenes/MainMenu.unity`。美术资源放到 `Assets/UI/Art/`。页面和卡片模板保存为 uGUI 对象，运行时按 `Assets/UI/Data/ChapterCatalog.asset` 的数组数量复制卡片；页面控制器只填名称、目标、状态，不覆盖 Sprite 或颜色。字体统一由 `Assets/UI/Data/UiFontTheme.asset` 控制。
+场景：`Assets/Scenes/MainMenu.unity`。美术资源放到 `Assets/UI/Art/`。页面和卡片模板保存为 uGUI 对象，运行时按 `Assets/UI/Data/ChapterCatalog.asset` 的数组数量复制卡片；控制器填写文案并绑定每章的插画，模板的底图与文字样式继续继承。字体统一由 `Assets/UI/Data/UiFontTheme.asset` 控制。
+
+## 开始与设置参考布局
+
+入口和设置页使用 `Art/ReferenceMenu/` 中从用户参考图提取的美术。入口背景保存山水、题字、适龄标识与健康游戏提示；开始、公告、用户、设置按钮均有独立 Sprite。设置背景保留面板、题字和静态标签，返回、账号、帮助、关于与双滑块均为独立场景控件，背景中已清除固定的滑块刻度。
+
+`Navigation/EntryPage/ReferenceArtwork` 是入口背景，`SettingsPanel` 的 Image 是设置背景。两页按 1280 × 720 的参考坐标等比缩放，完整显示构图；其他比例的画边继续使用原场景背景。右上工具栏与入口使用相同缩放。
+
+这些参考按钮保留 `MenuButton.prefab` 关联，但底图在场景实例中有意覆盖；此处替换 Sprite 应编辑具体按钮。按钮内的 `Label` 保留名称和文案，文字颜色为透明，避免与图片上的书法文字重叠；换成无字底图时把 Label 颜色恢复即可。入口开始按钮关闭了 `FocusRing` 子对象，聚焦时改用按钮本身变色，避免叠加额外圆角外框；其他按钮继续使用各自的焦点反馈。用户和账号保持不可操作，不会进入未开放的排行服务。
+
+音量滑块使用 `SliderTrack`、`SliderFill`、`SliderHandle` 三张独立素材，位置读取保存的真实音量；不要改成整张固定刻度图。帮助和关于关闭后回到设置，最终返回时恢复原页面和焦点。修改后的场景已保存，日常调整直接编辑对象即可。一次性布局脚本、素材提取脚本与验证截图存于 `Artifacts/ReferenceMenu/`。
+
+## 独立菜单素材
+
+用户补充的 7 张 PNG 原图完整保存在 `Art/MenuElements/`，导入为保留透明通道的 Sprite。导入区域裁掉透明留边，原始 PNG 不改写；返回按钮区域忽略透明度为 1 的孤立噪点。纹理尺寸上限为 4096，保留原始分辨率。
+
+| 素材 | 场景用途 |
+|---|---|
+| `StartButton.png` | `Navigation/EntryPage/EnterButton`，点击开始游戏 |
+| `ReturnButton.png` | `SettingsPanel/DoneButton` 与 `NoticePanel/CloseButton`，统一返回按钮样式 |
+| `SettingsButton.png`、`UserButton.png`、`NoticeButton.png` | `Navigation/UtilityButtons` 下的对应按钮 |
+| `NoticeArtwork.png` | `NoticePanel/ReferenceArtwork`，公告山水背景及题字 |
+| `DialogPanel.png` | `NoticePanel/InformationArtwork`，帮助与关于的通用绿色面板 |
+
+公告、帮助与关于共用现有窗口流程，按内容切换两种背景。公告隐藏重复标题文字，帮助与关于显示各自标题。返回按钮采用与设置页相同的红金色素材和尺寸，放在面板内底部，正文与按钮之间留出间距，避免压住底层入口图的健康游戏提示文字。按钮隐藏重复文字及额外焦点外框，以按钮本身变色提示选中；关闭后仍按原流程恢复页面和焦点。正文、返回按钮与点击区域保持独立；背景装饰不拦截点击。公告窗口同入口、设置页按 1280 × 720 构图等比适配宽度和高度。用户入口继续保持未开放。素材来源记录、处理前场景备份和运行截图位于 `Artifacts/MenuElements/`。
+
+## 四章插画与卷轴
+
+章节选择页 `Navigation/LevelsPanel` 按用户提供的卷轴及四张独立插画组成。原始 PNG 完整保存在 `Art/ChapterSelection/`；卡片仅在导入设置中裁掉透明留边，未改动原图像素。`ScrollArtwork` 显示背景，四张插画分别来自 `ChapterCatalog.asset` 中对应章节的 `Artwork`，调整章节顺序时插画随配置一起移动。
+
+章节卡片模板 `ChapterCard.prefab` 的 `Artwork` 是独立 Image，`ArtworkHitArea` 负责插画的点击区域。有插画时隐藏通用底图与重复文案，保留独立焦点描边；没有插画时显示原有名称、说明和状态文字。四章按 1280 × 720 构图等比缩放，在窄屏上仍同时显示全部四张；新增章节继续横向滚动，键盘选中屏外章节时自动滚动。返回和自由试玩入口保留在卷轴之外，章内关卡与解锁流程沿用现有配置。运行截图和一次性安装脚本位于 `Artifacts/ChapterSelection/`。
+
+章节插画由 `MenuButtonFeedback` 提供轻量视觉反馈：悬停或键盘聚焦时提亮约 4.5% 并显示纸色描边，按下时在 0.1 秒内缩至 97%，松开后恢复。`ArtworkHitArea` 是固定的透明点击区域，插画与描边的微缩不会移动点击边界；不要删除这个对象。动画使用独立于游戏时间的计时，禁用按钮或离开页面会立即复位。其他菜单按钮保持原有反馈。
+
+## 章内关卡卷轴背景
+
+关卡选择页当前使用用户提供的卷轴图：`Art/LevelSelection/ParchmentScroll.png` 已去掉外部白底和固定的四个框，保留纸张、题字与折痕；场景入口为 `Navigation/ChapterPanel/ScrollArtwork`。关卡的边框与墨色文字统一在 `LevelCard.prefab` 中编辑，图中四格不限制实际关卡数量。内容继续横向滚动，窄屏减少可见卡片数，键盘选中屏外关卡会自动滚到该卡片。背景装饰不拦截点击，章节配置、解锁和进入关卡的规则不变。处理脚本及运行截图位于 `Artifacts/ScrollLevelSelection/`。
+
+关卡卡片的普通边框与焦点边框共用纸面细线素材，选中和悬停时只加深同一条框线。标题、目标和状态在纸栏中居中排布；重复序号与卡内分隔线默认隐藏，避免叠加通用圆角卡片的视觉样式。相关样式均在 `LevelCard.prefab` 中继承，`Number` 和 `CardRule` 对象仍保留供后续换肤。
 
 ## 快速换字体
 
@@ -15,12 +53,12 @@
 | Prefab | 用途 | 专用文字 |
 |---|---|---|
 | `Assets/UI/Prefabs/MenuButton.prefab` | 入口、主菜单、工具栏、返回、关闭、设置和排行榜的普通按钮 | Label |
-| `Assets/UI/Prefabs/ChapterCard.prefab` | 章节卡片 | Number、Label、Description、Availability |
+| `Assets/UI/Prefabs/ChapterCard.prefab` | 章节卡片 | Artwork；无图时显示 Label、Description、Availability |
 | `Assets/UI/Prefabs/LevelCard.prefab` | 关卡卡片 | Number、Label、Description、Availability |
 
 两类卡片的场景实例位于 `Navigation/CardTemplates`，运行时按配置数量复制它们。统一更换章节或关卡素材时编辑相应 Prefab；场景模板保留 Prefab 的素材和文字样式继承。章节/关卡的名称、目标、数量仍在 `ChapterCatalog.asset` 中编辑，Prefab 不绑定具体关卡或场景回调。
 
-1. 图片导入为 **Sprite (2D and UI)**，按钮底图建议是没有文字的 PNG。开始按钮为 350 × 60，完成按钮为 240 × 52，章节卡片模板为 242 × 292，关卡卡片模板为 188 × 292；底图建议设置 Sprite Editor 的 **Border**，用九宫格保留边角。
+1. 图片导入为 **Sprite (2D and UI)**，按钮底图建议是没有文字的 PNG。开始按钮为 350 × 60，完成按钮为 240 × 52，章节卡片槽为 196 × 400，关卡卡片模板为 188 × 292；底图建议设置 Sprite Editor 的 **Border**，用九宫格保留边角。章节插画按 Sprite 的原始尺寸与 Pixels Per Unit 显示，本次四张原图采用约 177.97 PPU。
 2. 底图使用 **Image Type = Sliced**。彩色素材通常把 Image 的 **Color 改成白色**，避免被当前占位色染暗。开始游戏和完成按钮保留了单独的绿色 Color 覆盖，换彩色图时也把这两处 Color 改成白色，或右键该属性选择 Revert。
 3. 只有一张底图时保留 **Button → Transition = Color Tint**，设置高亮、按下和选中颜色。美术提供多张状态图时改成 **Sprite Swap**，设置 Highlighted / Pressed / Selected / Disabled Sprite；普通状态使用 Image 的 Source Image。给键盘导航的 Selected 状态留出明显反馈。
 4. `Label` 是独立的 Text，大小、颜色、排版可在对应 Prefab 中统一调整；字体在 `UiFontTheme.asset` 中统一选择。卡片的序号、目标和状态文字也在各自 Prefab 中编辑样式。运行时只填配置文案。开始游戏和完成按钮的文字颜色有单独覆盖，换字体颜色时可分别调整或 Revert。
@@ -45,9 +83,11 @@
 | `Navigation/EntryPage/ArtIllustration` | 入口中央插画 | 320 × 320；替换后启用，并关闭同级 `ElementSeal` |
 | `Navigation/EntryPage/Logo` | 入口 Logo | 500 × 100；默认隐藏；启用后关闭同级 `Title`，需要时关闭 `Brand` |
 | `Atmosphere` | 细线占位背景装饰 | 可整组关闭，使用全屏 Background 正式素材 |
-| `LevelsPanel`、`ChapterPanel` | 章节和关卡页底图 | 最大 1160 × 560；窄屏按可见宽度缩窄；Image Type = Sliced |
-| `SettingsPanel`、`NoticePanel` | 弹窗底图 | 640 × 400；Image Type = Sliced |
-| `Navigation/EntryPage/WelcomeBar` | 公告横条 | 800 × 54；公告标签与正文独立 |
+| `LevelsPanel/ScrollArtwork` | 四章卷轴背景 | 1280 × 720 整体构图；等比缩放 |
+| `ChapterPanel` | 章内关卡页底图 | 最大 1160 × 560；窄屏按可见宽度缩窄；Image Type = Sliced |
+| `SettingsPanel` | 设置页背景 | 1280 × 720；按参考画面等比适配；Image Type = Sliced |
+| `NoticePanel` | 公告背景与帮助、关于的通用面板 | 1280 × 720 构图；背景见其下两个 Artwork 对象 |
+| `Navigation/EntryPage/WelcomeBar` | 保留的公告横条 | 当前参考布局隐藏；公告由右上按钮打开 |
 | `LeaderboardPanel` | 排行榜弹窗底图 | 960 × 620；Image Type = Sliced |
 | `LeaderboardPanel/AccountCard` | 个人成绩和登录区域底图 | 896 × 102；最快用时、排名、登录状态均为独立 Text |
 | `LeaderboardPanel/ScrollView/Viewport/Content/Row01`～`Row10` | 榜单行底图、排名、昵称、用时 | 每行 896 × 48；可统一替换底图；装饰图片不要开启 Raycast Target |
@@ -55,16 +95,16 @@
 | `Navigation/CardTemplates/ChapterCard`、`LevelCard` | 动态卡片模板 | 默认隐藏；底图为 Sliced；Number、Label、Description、Availability 分别是序号、名称、目标和状态。修改模板样式后，动态复制的卡片保留该样式 |
 | `LevelsPanel/ScrollView`、`ChapterPanel/ScrollView` | 横向滚动区 | HorizontalLayoutGroup 与 ContentSizeFitter 按卡片数量排布；支持滚轮、触摸与键盘自动滚动 |
 | 两个选择页的 `BackButton` | 返回按钮底图 | 104 × 46；保留 Button 与控制器引用 |
-| `SettingsPanel/MusicSlider/Track`、`EffectsSlider/Track` | 音量轨道底图 | 276 × 8；Sliced |
+| `SettingsPanel/MusicSlider/Track`、`EffectsSlider/Track` | 音量轨道底图 | 208 × 14；Sliced |
 | 两条 Slider 的 `FillArea/Fill` | 已填充部分 | Sliced；保留 Slider 的 Fill Rect 引用 |
-| 两条 Slider 的 `HandleArea/Handle` | 滑块手柄 | 22 × 22；Simple + Preserve Aspect，保留较大的拖动区域；不要删除 Handle Rect 和 Target Graphic 引用 |
+| 两条 Slider 的 `HandleArea/Handle` | 滑块手柄 | 36 × 36；Simple + Preserve Aspect，根控件高 48；不要删除 Handle Rect 和 Target Graphic 引用 |
 | `TopAccent` | 顶部装饰线 | 可换图、改色或直接关闭 |
 
 装饰文字、Logo、Icon 不拦截点击（Raycast Target 关闭）。按钮、面板遮挡和 Slider 根对象负责点击，换图时保留这些控件及其引用。
 
 当前圆角、圆阵和细线都是可替换的占位资源，没有接入付费素材生成。`UiSurface`、`UiFocus`、`UiRing`、`UiDisc` 是普通 Sprite；正式底图直接替换对应 Source Image 即可。圆阵由普通 Image/Text 构成，可关闭整组，用预留插画插槽替换。不要把带文字的整页美术图盖在动态章节区域上，避免配置数量变化后与真实按钮不对应。
 
-屏幕适配由 CanvasScaler 按高度保持字号，`MenuResponsiveLayout` 调整页面边距和滚动区宽度。卡片尺寸与正文样式来自模板，4:3 下通过横向滚动容纳更多卡片。它不覆盖 Source Image、字体或颜色；需要手工重排整个页面时，可禁用该组件。
+屏幕适配由 CanvasScaler 与 `MenuResponsiveLayout` 共同处理。章节卷轴整体等比缩放，四张插画保持完整；章内关卡页按可见宽度调整滚动区。卡片正文样式来自模板，章节插画来自章节配置。布局组件不覆盖 Source Image、字体或颜色；需要手工重排整个页面时，可禁用该组件。
 
 ## 换完后检查
 

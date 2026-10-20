@@ -35,6 +35,8 @@ namespace TapGJ.View
         {
             public string title;
             [TextArea(2, 6)] public string description;
+            [Tooltip("章节插画；留空时使用文字卡片。")]
+            public Sprite artwork;
             public Level[] levels = Array.Empty<Level>();
         }
 

@@ -73,6 +73,10 @@ namespace TapGJ.Tests
             var rail = _hud.transform.Find("Composition/Controls/ElementRail");
             Assert.IsNotNull(rail.GetComponent<ElementAbacusView>());
             Assert.AreEqual(5, rail.GetComponentsInChildren<Button>().Length);
+            var paper = rail.GetComponent<Image>();
+            Assert.IsNotNull(paper, "标题和说明应有独立底色，避免山石背景干扰阅读");
+            Assert.IsFalse(paper.raycastTarget);
+            Assert.AreEqual(1, paper.color.a);
             Canvas.ForceUpdateCanvases();
             foreach (var label in rail.GetComponentsInChildren<Text>())
                 Assert.Greater(label.cachedTextGenerator.vertexCount, 0, $"{label.name}的文字应正常显示");
@@ -84,6 +88,11 @@ namespace TapGJ.Tests
                 var button = column.GetComponent<Button>();
                 Assert.IsTrue(button.IsInteractable());
                 Assert.IsNotNull(column.Find("Progress").GetComponent<Text>());
+                var progress = column.Find("Progress").GetComponent<Text>();
+                Assert.AreEqual(FontStyle.Bold, progress.fontStyle);
+                Assert.GreaterOrEqual(progress.fontSize, 24, "720p 下进度数字应保留可读字号");
+                Assert.AreEqual(1, column.Find("ProgressBacking").GetComponent<Image>().color.a);
+                Assert.IsFalse(column.Find("ProgressBacking").GetComponent<Image>().raycastTarget);
                 var screenPoint = RectTransformUtility.WorldToScreenPoint(null,
                     column.TransformPoint(new Vector3(28, -200)));
                 var hits = new List<RaycastResult>();

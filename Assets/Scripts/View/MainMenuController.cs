@@ -54,6 +54,13 @@ namespace TapGJ.View
         [SerializeField] Button closeSettingsButton;
         [SerializeField] Button closeLeaderboardButton;
         [SerializeField] Button closeNoticeButton;
+        [SerializeField] Button settingsBackButton;
+        [SerializeField] Button settingsHelpButton;
+        [SerializeField] Button settingsAboutButton;
+        [SerializeField] Text noticeTitleLabel;
+        [SerializeField] Text noticeBodyLabel;
+        [SerializeField] GameObject noticeArtwork;
+        [SerializeField] GameObject informationArtwork;
 
         [Header("音频设置")]
         [SerializeField] GameAudio audioSettings;
@@ -69,6 +76,9 @@ namespace TapGJ.View
         readonly List<int> _chapterIndices = new List<int>();
         readonly List<Button> _levelButtons = new List<Button>();
         GameObject _lastSelected;
+        bool _noticeReturnsToSettings;
+        GameObject _settingsNoticeFocus;
+        string _noticeTitle, _noticeBody;
 
         public ChapterCatalog Catalog => chapterCatalog;
 
@@ -76,6 +86,8 @@ namespace TapGJ.View
 
         void OnEnable()
         {
+            _noticeTitle = noticeTitleLabel.text;
+            _noticeBody = noticeBodyLabel.text;
             enterButton.onClick.AddListener(EnterMenu);
             startButton.onClick.AddListener(OpenLevels);
             leaderboardButton.onClick.AddListener(OpenLeaderboard);
@@ -87,6 +99,9 @@ namespace TapGJ.View
             playLevelButton.onClick.AddListener(StartGame);
             closeLevelsButton.onClick.AddListener(Back);
             closeSettingsButton.onClick.AddListener(ClosePanels);
+            settingsBackButton.onClick.AddListener(ClosePanels);
+            settingsHelpButton.onClick.AddListener(OpenSettingsHelp);
+            settingsAboutButton.onClick.AddListener(OpenSettingsAbout);
             closeLeaderboardButton.onClick.AddListener(ClosePanels);
             closeNoticeButton.onClick.AddListener(ClosePanels);
             closeChapterButton.onClick.AddListener(Back);
@@ -112,6 +127,9 @@ namespace TapGJ.View
             playLevelButton.onClick.RemoveListener(StartGame);
             closeLevelsButton.onClick.RemoveListener(Back);
             closeSettingsButton.onClick.RemoveListener(ClosePanels);
+            settingsBackButton.onClick.RemoveListener(ClosePanels);
+            settingsHelpButton.onClick.RemoveListener(OpenSettingsHelp);
+            settingsAboutButton.onClick.RemoveListener(OpenSettingsAbout);
             closeLeaderboardButton.onClick.RemoveListener(ClosePanels);
             closeNoticeButton.onClick.RemoveListener(ClosePanels);
             closeChapterButton.onClick.RemoveListener(Back);
@@ -277,6 +295,32 @@ namespace TapGJ.View
         public void OpenNotice()
         {
             if (_loading) return;
+            _noticeReturnsToSettings = false;
+            noticeTitleLabel.text = _noticeTitle;
+            noticeBodyLabel.text = _noticeBody;
+            ShowNoticeArtwork(true);
+            OpenPanel(noticePanel, closeNoticeButton.gameObject);
+        }
+
+        void ShowNoticeArtwork(bool announcement)
+        {
+            noticeArtwork.SetActive(announcement);
+            informationArtwork.SetActive(!announcement);
+            noticeTitleLabel.enabled = !announcement;
+        }
+
+        void OpenSettingsHelp() => OpenSettingsNotice("帮助", "拖动「音效」或「音乐」滑块调整音量，滑到最左侧即可静音。\n\n点击左上角返回、底部「返回游戏」或按 Esc，保存设置并返回原页面。", settingsHelpButton);
+
+        void OpenSettingsAbout() => OpenSettingsNotice("关于", "元素丕定\n\n五行元素卡牌对战\n相生相克，尽在一局之间。", settingsAboutButton);
+
+        void OpenSettingsNotice(string title, string body, Button origin)
+        {
+            if (_loading || !settingsPanel.activeSelf) return;
+            _noticeReturnsToSettings = true;
+            _settingsNoticeFocus = origin.gameObject;
+            noticeTitleLabel.text = title;
+            noticeBodyLabel.text = body;
+            ShowNoticeArtwork(false);
             OpenPanel(noticePanel, closeNoticeButton.gameObject);
         }
 
@@ -312,6 +356,14 @@ namespace TapGJ.View
         public void ClosePanels()
         {
             if (_loading) return;
+            if (_noticeReturnsToSettings && noticePanel.activeSelf)
+            {
+                _noticeReturnsToSettings = false;
+                OpenSettings();
+                if (CanSelect(_settingsNoticeFocus)) Select(_settingsNoticeFocus);
+                _settingsNoticeFocus = null;
+                return;
+            }
             if (settingsPanel.activeSelf && Audio != null) Audio.SaveSettings();
             settingsPanel.SetActive(false);
             leaderboardPanel.gameObject.SetActive(false);
@@ -392,7 +444,7 @@ namespace TapGJ.View
                     levelCount += chapterLevelCount;
                     var button = CreateCard(chapterCardTemplate, chaptersScroll.content, "Chapter" + (i + 1).ToString("00") + "Button",
                         CardTitle(chapter.title, "未命名章节"), chapter.description,
-                        chapterLevelCount > 0 ? $"{chapterLevelCount} 个关卡 · 查看 →" : "暂无关卡 · 查看 →", i);
+                        chapterLevelCount > 0 ? $"{chapterLevelCount} 个关卡 · 查看 →" : "暂无关卡 · 查看 →", i, chapter.artwork);
                     button.onClick.AddListener(() => OpenChapter(chapterIndex));
                     _chapterButtons.Add(button);
                     _chapterIndices.Add(chapterIndex);
@@ -445,7 +497,8 @@ namespace TapGJ.View
                 };
         }
 
-        static Button CreateCard(Button template, RectTransform content, string name, string title, string goal, string availability, int index)
+        static Button CreateCard(Button template, RectTransform content, string name, string title, string goal, string availability, int index,
+            Sprite artwork = null)
         {
             var templateRect = template.GetComponent<RectTransform>();
             var slot = new GameObject(name + "Slot", typeof(RectTransform), typeof(LayoutElement));
@@ -461,6 +514,25 @@ namespace TapGJ.View
             button.transform.Find("Availability").GetComponent<Text>().text = availability;
             var number = button.transform.Find("Number");
             if (number != null) number.GetComponent<Text>().text = (index + 1).ToString("00");
+            var illustration = button.transform.Find("Artwork");
+            if (illustration != null && artwork != null)
+            {
+                var image = illustration.GetComponent<Image>();
+                image.sprite = artwork;
+                image.SetNativeSize();
+                illustration.gameObject.SetActive(true);
+                button.GetComponent<Image>().enabled = false;
+                var hitArea = (RectTransform)button.transform.Find("ArtworkHitArea");
+                hitArea.sizeDelta = image.rectTransform.sizeDelta;
+                hitArea.gameObject.SetActive(true);
+                foreach (var binding in button.GetComponentsInChildren<UiFontBinding>(true)) binding.Refresh();
+                foreach (Transform child in button.transform)
+                    if (child != illustration && child != hitArea && child.name != "FocusRing") child.gameObject.SetActive(false);
+                var focus = (RectTransform)button.transform.Find("FocusRing");
+                focus.anchorMin = focus.anchorMax = focus.pivot = new Vector2(.5f, .5f);
+                focus.anchoredPosition = image.rectTransform.anchoredPosition;
+                focus.sizeDelta = image.rectTransform.sizeDelta + Vector2.one * 6;
+            }
             button.gameObject.SetActive(true);
             return button;
         }

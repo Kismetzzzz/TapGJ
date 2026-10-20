@@ -15,6 +15,7 @@ MonoBehaviour:
   chapters:
   - title: "\u7B2C\u4E00\u7AE0"
     description: "\u57FA\u7840\u6559\u5B66\n\u65E0\u4E8B\u4EF6\n\u65E0\u590D\u5408\u5143\u7D20\n\u65E0\u5143\u7D20\u74F6"
+    artwork: {fileID: 6737931286570045389, guid: cbe578aa729c8be43b22f89ebf84b9bd, type: 3}
     levels:
     - title: "\u7B2C 1 \u5173"
       goal: "\u76F8\u514B\u6559\u5B66"
@@ -33,6 +34,7 @@ MonoBehaviour:
       definition: {fileID: 11400000, guid: 3f4cf79864bc41129e6a37f871f47aa4, type: 2}
   - title: "\u7B2C\u4E8C\u7AE0"
     description: "\u590D\u5408\u5143\u7D20\u6559\u5B66\n\u65E0\u74F6\u5B50\u4E8B\u4EF6"
+    artwork: {fileID: -6719798404145532951, guid: 26c210ac880e96b45ae2da0c42f4f5d2, type: 3}
     levels:
     - title: "\u7B2C 1 \u5173"
       goal: "\u5408\u6210\u6559\u5B66\n\u6210\u529F\u5408\u6210 1 \u4E2A\u590D\u5408\u5143\u7D20\uFF0C\u5E76\u8BA9\u573A\u4E0A\u53EA\u5269\u4E24\u79CD\u5143\u7D20"
@@ -51,6 +53,7 @@ MonoBehaviour:
       definition: {fileID: 11400000, guid: 281c04dd34124279b3c7cbcdec6d0a9f, type: 2}
   - title: "\u7B2C\u4E09\u7AE0"
     description: "\u5C0F\u74F6\u5B50\u6559\u5B66\n\u65E0\u4E8B\u4EF6"
+    artwork: {fileID: 1707703078071773952, guid: e23a4d53006f5a342b2b463471cd6017, type: 3}
     levels:
     - title: "\u7B2C 1 \u5173"
       goal: "\u5C0F\u74F6\u5B50\u6559\u5B66\n\u901A\u8FC7\u6761\u4EF6\uFF1A\u628A\u573A\u4E0A\u7684\u6C34\u5168\u90E8\u6E05\u6389"
@@ -70,6 +73,7 @@ MonoBehaviour:
       definition: {fileID: 11400000, guid: f7e5073899abbcdde0f4051627384905, type: 2}
   - title: "\u7B2C\u56DB\u7AE0"
     description: "\u52A0\u5165\u4E8B\u4EF6\u724C"
+    artwork: {fileID: 3875188700636784452, guid: fa54ffb2288174d499aff53e280a52d3, type: 3}
     levels:
     - title: "\u7B2C 1 \u5173"
       goal: "\u53D1\u724C\u4E8B\u4EF6\n\u8FD0\u7528\u968F\u673A\u5206\u89E3\u4E24\u79CD\u590D\u5408\u5143\u7D20"

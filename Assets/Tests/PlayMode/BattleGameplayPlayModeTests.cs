@@ -366,7 +366,11 @@ namespace TapGJ.Tests
             Assert.That(firstView.Body.color.a, Is.InRange(.1f, .9f));
             Assert.AreEqual(firstView.Body.color.a, secondView.Body.color.a, .001f, "两个原棋子应一起淡出");
             Assert.That(composite.Body.color.a, Is.InRange(.1f, .9f), "复合棋子应同时淡入");
-            Assert.AreEqual(composite.Body.color.a * .55f, composite.Ring.color.a, .001f);
+            Assert.IsTrue(composite.HasArtwork);
+            Assert.AreSame(session.Board.PieceArt.coldSteel, composite.Body.sprite, "金水融合应显示寒钢素材");
+            var compositeImage = hud.Viewport.GetComponentsInChildren<BattleBoardPieceView>()
+                .Single(p => p.name == "DiamondPiece_" + composite.Uid).transform.Find("Artwork").GetComponent<Image>();
+            Assert.AreEqual(composite.Body.color.a, compositeImage.color.a, .05f, "复合素材应随融合动画淡入");
             yield return WaitForAction();
             Assert.Less(Time.unscaledTime - startedAt, CardDissolveEffect.Duration + .35f, "多个棋子不能排队拖长总时长");
             Assert.IsTrue(firstView == null && secondView == null);
@@ -380,7 +384,7 @@ namespace TapGJ.Tests
             yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration * .5f);
             Assert.That(composite.Body.color.a, Is.InRange(.1f, .9f));
             Assert.AreEqual(composite.Body.color.a, composite.Label.color.a, 1f / 255);
-            Assert.AreEqual(composite.Body.color.a * .55f, composite.Ring.color.a, .001f);
+            Assert.AreEqual(composite.Body.color.a, compositeImage.color.a, .05f, "分解时素材应同步淡出");
             yield return WaitForAction();
             Assert.Less(Time.unscaledTime - startedAt, CardDissolveEffect.Duration + .35f);
             Assert.IsTrue(composite == null);
@@ -652,8 +656,8 @@ namespace TapGJ.Tests
             var composition = hud.transform.Find("Composition");
             var compositionRect = (RectTransform)composition;
             var background = composition.Find("Background").GetComponent<Image>();
-            Assert.AreEqual(2278, background.sprite.texture.width, "应使用新背景的原始分辨率");
-            Assert.AreEqual(1280, background.sprite.texture.height);
+            Assert.AreEqual(1024, background.sprite.texture.width, "应使用新背景的原始分辨率");
+            Assert.AreEqual(575, background.sprite.texture.height);
             Assert.IsTrue(background.preserveAspect);
             Assert.IsFalse(background.raycastTarget, "背景图片不能遮挡棋盘点击");
             var viewport = hud.Viewport;
@@ -678,9 +682,9 @@ namespace TapGJ.Tests
             // 独立读图标记的前排、后排与中间格子中心，容许手绘边缘的小幅不规则。
             var cells = new[] { new Pos(0, 0), new Pos(7, 0), new Pos(0, 7), new Pos(7, 7),
                 new Pos(3, 3), new Pos(4, 4), new Pos(0, 3), new Pos(7, 3) };
-            var backgroundCenters = new[] { new Vector2(957, 680), new Vector2(1483, 427),
-                new Vector2(424, 436), new Vector2(952, 238), new Vector2(954, 463), new Vector2(954, 401),
-                new Vector2(711, 568), new Vector2(1240, 340) };
+            var backgroundCenters = new[] { new Vector2(304.39f, 697.91f), new Vector2(1628.22f, 702.18f),
+                new Vector2(440.01f, 129.83f), new Vector2(1487.08f, 124.35f), new Vector2(874.85f, 421.26f),
+                new Vector2(1041.87f, 340.26f), new Vector2(370.32f, 421.71f), new Vector2(1559.45f, 420.65f) };
             for (int i = 0; i < cells.Length; i++)
             {
                 var p = cells[i];
@@ -700,37 +704,34 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
-        public IEnumerator 菱形棋子_四角贴合格子且跟随移动和消散状态()
+        public IEnumerator 棋子素材_保持比例且跟随移动和消散状态()
         {
             var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
             var board = hud.Session.Board;
             yield return null;
             Canvas.ForceUpdateCanvases();
             var pieces = hud.Viewport.GetComponentsInChildren<BattleBoardPieceView>();
-            Assert.AreEqual(board.CreepObjectCount, pieces.Length, "每只占格者应恰好显示一枚菱形棋子");
+            Assert.AreEqual(board.CreepObjectCount, pieces.Length, "每只占格者应恰好显示一枚棋子");
             foreach (var source in board.CreepViews)
             {
                 var piece = pieces.Single(p => p.name == "DiamondPiece_" + source.Uid);
                 var label = piece.transform.Find("Label").GetComponent<Text>();
+                var image = piece.transform.Find("Artwork").GetComponent<Image>();
                 var fontBinding = label.GetComponent<UiFontBinding>();
                 Assert.IsNotNull(fontBinding, "棋子文字也应参与统一换字体");
                 Assert.IsNotNull(fontBinding.Theme);
                 Assert.AreSame(fontBinding.Theme.GetFont(UiFontRole.Body), label.font,
                     "棋子刷新不能覆盖默认 UI 字体");
                 var mesh = piece.canvasRenderer.GetMesh();
-                Assert.IsNotNull(mesh);
-                Assert.AreEqual(4, mesh.vertexCount);
-                var position = board.transform.InverseTransformPoint(source.transform.position);
-                var uv = new Vector2(position.x / board.BoardWidthWorld + .5f, position.y / board.BoardHeightWorld + .5f);
-                var half = new Vector2(board.CellSize / board.BoardWidthWorld, board.CellSize / board.BoardHeightWorld) * .5f;
-                foreach (var corner in new[] { uv - half, uv + new Vector2(-half.x, half.y),
-                    uv + half, uv + new Vector2(half.x, -half.y) })
-                {
-                    var expected = hud.Viewport.BoardUvToLocal(corner);
-                    Assert.IsTrue(mesh.vertices.Any(v => Vector2.Distance(expected,
-                        hud.Viewport.rectTransform.InverseTransformPoint(piece.transform.TransformPoint(v))) < .01f),
-                        "棋子实际渲染的四角必须贴合对应格子的四角，不能固定旋转 45 度");
-                }
+                Assert.IsTrue(source.HasArtwork, "真实游戏场景应接好棋子素材");
+                Assert.IsTrue(mesh == null || mesh.vertexCount == 0, "动物图下不应叠加原有地面色块");
+                Assert.AreSame(source.Body.sprite, image.sprite);
+                Assert.IsTrue(image.preserveAspect);
+                Assert.AreEqual(image.rectTransform.rect.width, image.rectTransform.rect.height, .001f);
+                Assert.Greater(image.rectTransform.rect.width, 0);
+                Assert.IsFalse(image.raycastTarget, "图片不能拦截棋盘点击");
+                Assert.IsFalse(label.gameObject.activeSelf);
+                Assert.Less(Quaternion.Angle(Quaternion.identity, image.transform.localRotation), .01f);
                 Assert.Less(Quaternion.Angle(Quaternion.identity, label.transform.localRotation), .01f,
                     "元素文字应正向显示");
                 Assert.AreEqual(source.Label.text, label.text);
@@ -756,6 +757,7 @@ namespace TapGJ.Tests
                 Assert.IsTrue(hud.Viewport.TryCellAtLocalPoint(((RectTransform)movingPiece.transform).anchoredPosition, out var actual));
                 Assert.AreEqual(target, actual, "棋子应跟随动画中的实际位置");
                 Assert.AreEqual(.35f, movingPiece.color.a, .001f);
+                Assert.AreEqual(.35f, movingPiece.transform.Find("Artwork").GetComponent<Image>().color.a, .001f);
             }
             finally
             {
@@ -770,11 +772,22 @@ namespace TapGJ.Tests
             var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
             hud.Session.Engine.ForceHandForTest(new[] { Element.Metal, Element.Wood, Element.Water, Element.Fire, Element.Earth });
             hud.Ui.ResetHand();
+            hud.Session.Engine.ClearBoard();
+            for (int i = 0; i < ElementDefs.Count; i++)
+            {
+                hud.Session.Engine.PlaceCreep(ElementDefs.All[i], new Pos(i + 1, 2));
+                hud.Session.Engine.PlaceComposite(CompositeDefs.All[i], new Pos(i + 1, 5));
+            }
+            hud.Session.Board.Sync();
             yield return null;
+            yield return null;
+            var pieces = hud.Viewport.GetComponentsInChildren<BattleBoardPieceView>();
+            Assert.AreEqual(10, pieces.Length, "两组棋子应全部显示");
+            Assert.AreEqual(10, pieces.Select(p => p.transform.Find("Artwork").GetComponent<Image>().sprite).Distinct().Count());
             var canvas = hud.GetComponent<Canvas>();
             var camera = Camera.main;
             int previousMask = camera.cullingMask;
-            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Artifacts", "HandSpacing"));
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Artifacts", "AnimalPieces"));
             Directory.CreateDirectory(directory);
             foreach (var size in new[] { new Vector2Int(1920, 1080), new Vector2Int(1280, 720) })
             {

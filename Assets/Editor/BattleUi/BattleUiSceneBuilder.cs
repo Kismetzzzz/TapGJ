@@ -86,6 +86,7 @@ namespace TapGJ.EditorTools
             progressFill.type = Image.Type.Filled;
             progressFill.fillMethod = Image.FillMethod.Horizontal;
             progressFill.fillAmount = 0;
+            ApplyTaskPanelArtwork(task);
 
             var timer = Panel(controls, "TimerPanel", 760, 24, 400, 90);
             Label(timer, "Heading", "计时器", 24, 12, 100, 62, 26, Ink);
@@ -145,6 +146,7 @@ namespace TapGJ.EditorTools
             BindArray(data, "cards", cards);
             data.ApplyModifiedPropertiesWithoutUndo();
             abacus.Setup(controller);
+            ApplyActionButtonArtwork(controller);
             controller.ArrangeHand();
             foreach (var card in cards) PrefabUtility.RecordPrefabInstancePropertyModifications(card.transform);
             var layout = canvas.AddComponent<BattleUiLayout>();
@@ -182,6 +184,94 @@ namespace TapGJ.EditorTools
         static void ImportArt()
         {
             ImportSprite(ArtPath + "/BattleBackground.png", 4096);
+            ImportSprite(ArtPath + "/TaskPanel.png", 2048);
+            ImportSprite(ArtPath + "/Buttons/EndPlayerPhase.png", 4096);
+            ImportSprite(ArtPath + "/Buttons/Discard.png", 4096);
+        }
+
+        static void ApplyTaskPanelArtwork(RectTransform panel)
+        {
+            var image = panel.GetComponent<Image>();
+            image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/TaskPanel.png");
+            image.color = Color.white;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            panel.sizeDelta = new Vector2(360, 360 * image.sprite.rect.height / image.sprite.rect.width);
+            panel.GetComponent<Outline>().enabled = false;
+            panel.Find("Heading").GetComponent<Text>().enabled = false;
+            ConfigureTaskText(panel.Find("Objective").GetComponent<Text>(), 80, 58, 26, 18);
+            ConfigureTaskText(panel.Find("Progress").GetComponent<Text>(), 144, 44, 20, 16);
+            foreach (string name in new[] { "ProgressTrack", "ProgressFill" })
+            {
+                var bar = (RectTransform)panel.Find(name);
+                bar.anchoredPosition = new Vector2(40, -196);
+                bar.sizeDelta = new Vector2(280, 8);
+                bar.GetComponent<Image>().color = name == "ProgressFill" ?
+                    new Color(.25f, .43f, .34f, .9f) : new Color(.2f, .35f, .28f, .18f);
+            }
+        }
+
+        static void ConfigureTaskText(Text text, float top, float height, int size, int minSize)
+        {
+            text.rectTransform.anchoredPosition = new Vector2(36, -top);
+            text.rectTransform.sizeDelta = new Vector2(288, height);
+            text.fontSize = text.resizeTextMaxSize = size;
+            text.resizeTextMinSize = minSize;
+            text.resizeTextForBestFit = true;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = new Color(.12f, .25f, .20f);
+        }
+
+        static void ApplyActionButtonArtwork(BattleUiController controller)
+        {
+            var controls = controller.transform.Find("Composition/Controls");
+            var next = controls.Find("NextRoundButton").GetComponent<Button>();
+            var existing = next.transform.Find("Artwork");
+            var artwork = existing != null ? existing.GetComponent<Image>() :
+                Picture(next.transform, "Artwork", 0, 0, 230, 82, Color.white, null);
+            artwork.gameObject.layer = next.gameObject.layer;
+            artwork.rectTransform.anchorMin = Vector2.zero;
+            artwork.rectTransform.anchorMax = Vector2.one;
+            artwork.rectTransform.offsetMin = artwork.rectTransform.offsetMax = Vector2.zero;
+            artwork.rectTransform.pivot = Vector2.one * .5f;
+            artwork.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Buttons/EndPlayerPhase.png");
+            artwork.type = Image.Type.Simple;
+            artwork.preserveAspect = artwork.raycastTarget = true;
+            artwork.transform.SetAsFirstSibling();
+            SizeActionButton(next, artwork.sprite);
+            next.GetComponent<Image>().enabled = false;
+            next.targetGraphic = artwork;
+            var label = next.GetComponentInChildren<Text>();
+            label.text = "结束出牌";
+            label.enabled = false;
+            var data = new SerializedObject(controller);
+            Bind(data, "endPlayerPhaseArtwork", artwork);
+            data.ApplyModifiedPropertiesWithoutUndo();
+            data = new SerializedObject(next.GetComponent<MenuButtonFeedback>());
+            Bind(data, "artwork", artwork);
+            data.ApplyModifiedPropertiesWithoutUndo();
+            if (next.TryGetComponent<Outline>(out var nextOutline)) nextOutline.enabled = false;
+
+            var discard = controls.Find("DiscardButton").GetComponent<Button>();
+            var image = discard.GetComponent<Image>();
+            image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(ArtPath + "/Buttons/Discard.png");
+            image.color = Color.white;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            SizeActionButton(discard, image.sprite);
+            discard.GetComponentInChildren<Text>().enabled = false;
+            if (discard.TryGetComponent<Outline>(out var discardOutline)) discardOutline.enabled = false;
+        }
+
+        static void SizeActionButton(Button button, Sprite sprite)
+        {
+            const float artworkHeight = 72, rightEdge = 1896;
+            var rect = (RectTransform)button.transform;
+            float width = artworkHeight * sprite.rect.width / sprite.rect.height;
+            rect.sizeDelta = new Vector2(width, 82);
+            rect.anchoredPosition = new Vector2(rightEdge - width, rect.anchoredPosition.y);
+            ((RectTransform)button.transform.Find("Label")).sizeDelta = rect.sizeDelta - Vector2.one * 8;
+            ((RectTransform)button.transform.Find("FocusRing")).sizeDelta = rect.sizeDelta + Vector2.one * 6;
         }
 
         static void ImportSprite(string path, int maxSize, bool mipmaps = false)

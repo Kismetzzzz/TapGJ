@@ -171,6 +171,7 @@ MonoBehaviour:
   PreviewWidth: 8
   PreviewHeight: 8
   TransparentCells: 1
+  PieceArt: {fileID: 11400000, guid: 58db7d7c878d4dc590ab1fecb66f12dd, type: 2}
   InteractionEnabled: 1
 --- !u!1 &168417538
 GameObject:

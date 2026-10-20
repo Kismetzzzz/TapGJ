@@ -2,15 +2,15 @@
 
 双击 `Assets/Scenes/BattleUI.unity`，按 Play 可独立预览。也可通过菜单 **TapGJ → 打开独立局内 UI** 打开。场景已单独加入构建列表。
 
-背景使用提供的水墨山崖棋盘原图，保存于 `Assets/UI/Art/Battle/BattleBackground.png`，保留 2278×1280 原始文件，没有裁切或修改。界面以 1920×1080 为基准，背景、控件与棋盘容器整体等比适配安全区域；宽屏和竖屏会留边。
+背景使用提供的水墨山水棋盘原图，保存于 `Assets/UI/Art/Battle/BattleBackground.png`，保留 1024×575 原始文件，没有裁切或修改。界面以 1920×1080 为基准，背景、控件与棋盘容器整体等比适配安全区域；宽屏和竖屏会留边。
 
 所有界面都是已保存的 uGUI 对象，可在 Hierarchy 中直接调整：
 
-- `BattleUICanvas/Composition/Controls/TaskPanel`：任务目标、进度文字和进度条。
+- `BattleUICanvas/Composition/Controls/TaskPanel`：使用提供的任务目标插画 `Assets/UI/Art/Battle/TaskPanel.png`，仅裁去外围透明空白，保持原图比例。图片自带标题，目标说明、实时进度和进度条显示在下方留白中，长文字自动换行并适配字号。
 - `Controls/TimerPanel`：计时；下方显示回合和选牌状态。
 - `Controls/ElementRail`：金、木、水、火、土五个按钮。
 - `Controls/Hand`：手牌居中排列，五张时卡面约为 171×277 参考像素，牌间保留约 30 像素间隔，倾斜不超过 3 度；选中的牌抬起并显示在最前面，卡面保持在棋盘下方。手牌较多时会自动缩小，避免相互重叠。
-- `Controls/NextRoundButton`、`DiscardButton`：下一回合、弃牌。
+- `Controls/NextRoundButton`、`DiscardButton`：结束出牌、弃牌，使用提供的水墨按钮插画，素材位于 `Assets/UI/Art/Battle/Buttons/`，只裁去外围透明空白并保留原图比例。两张插画统一显示高度为 72 参考像素，宽度随原图比例变化，右边缘对齐；点击区域保持 82 参考像素高。题字已包含在图片中，不叠加文字；真实对局进入弃牌阶段时，推进按钮恢复文字“结束弃牌”，下一回合恢复插画。
 - `Controls/SettingsButton`：打开设置遮罩，暂停预览计时；点击继续、遮罩或 Esc 关闭。
 - `Composition/BoardContent`：空的棋盘内容容器，位置对应背景上的棋盘。
 
@@ -69,11 +69,11 @@
 
 素材位于 `Assets/UI/Art/ElementAbacus/`，均保留原图颜色和透明通道。编辑器菜单 **TapGJ → 更新五行算盘** 只更新 BattleUI 预览场景与 BattleGameplay 玩法预制体的五行区域。设置面板暂停对局和计时，并提供重开与返回菜单。结算后显示胜负原因，可重开、返回菜单；通关时可进入下一关。菜单原有的“试玩当前对局”入口也会进入接入后的 Game 场景；章节中尚未实现的关卡项仍保持待开放。
 
-背景保留完整原图，不可见的逻辑棋盘负责布局。`BattleBoardViewport` 使用背景棋盘四角的透视校准，元素、移动动画、复合元素、高亮和点击共用同一份映射，贴合斜向菱形格线。格子中心会考虑 CellGap 的半个边距，棋盘接缝和菱形外的点击不触发出牌。当前保存的校准对应背景中的 8×8 格子，逻辑棋盘尺寸仍来自关卡；其他尺寸的关卡会铺满同一区域，需要相应背景才能逐格匹配。
+背景保留完整原图，不可见的逻辑棋盘负责布局。`BattleBoardViewport` 使用背景棋盘四角的透视校准，元素、移动动画、复合元素、高亮和点击共用同一份映射，贴合画面里近大远小的 8×8 方格。格子中心会考虑 CellGap 的半个边距，棋盘接缝和棋盘外的点击不触发出牌。当前保存的校准对应背景中的 8×8 格子，逻辑棋盘尺寸仍来自关卡；其他尺寸的关卡会铺满同一区域，需要相应背景才能逐格匹配。
 
-局内棋子使用贴合格子的透视菱形色块，四个角和斜边跟随对应格子的方向与远近变化，格子之间保留间隙。元素文字居中正向显示。棋子沿用原有移动、缩放和淡出动画；复合元素保留外圈。菱形和文字不拦截点击，出牌仍按原有棋盘格判定。
+局内棋子使用贴合格子的透视色块，四个角跟随对应格子的方向与远近变化，格子之间保留间隙。元素文字居中正向显示。棋子沿用原有移动、缩放和淡出动画；复合元素保留外圈。色块和文字不拦截点击，出牌仍按原有棋盘格判定。
 
-以后覆盖 `Assets/UI/Art/Battle/BattleBackground.png` 并保留 `.meta`，预览和玩法界面都会换图；也可在 BattleGameplay 预制体的 `Composition/Background` 更换 Sprite。背景的棋盘区域变化时，在 `Composition/BoardContent` 调整 RectTransform 位置与尺寸，然后调整 viewport 的 Calibration Corners：依次对应逻辑左下、右下、右上、左上，使用容器内从左到右、从下到上的 0–1 坐标。当前四角在图片上依次为下端、右端、上端、左端。元素与点击自动使用更新后的数据。校准时可暂时关闭 BoardView 的 Transparent Cells 查看真实格子，完成后重新开启，让底板隐藏、背景透出。四角数据留空时仍支持原有逐行格线校准与 Top Inset 梯形布局。
+以后覆盖 `Assets/UI/Art/Battle/BattleBackground.png` 并保留 `.meta`，预览和玩法界面都会换图；也可在 BattleGameplay 预制体的 `Composition/Background` 更换 Sprite。背景的棋盘区域变化时，在 `Composition/BoardContent` 调整 RectTransform 位置与尺寸，然后调整 viewport 的 Calibration Corners：依次对应逻辑左下、右下、右上、左上，使用容器内从左到右、从下到上的 0–1 坐标。当前四角在图片上依次为近端左下、近端右下、远端右上、远端左上。元素与点击自动使用更新后的数据。校准时可暂时关闭 BoardView 的 Transparent Cells 查看真实格子，完成后重新开启，让底板隐藏、背景透出。四角数据留空时仍支持原有逐行格线校准与 Top Inset 梯形布局。
 
 编辑器菜单 **TapGJ → 接入现有局内 UI** 可从 BattleUI 重新生成玩法预制体并接线。首次接入前的 Game 场景保存在 `Artifacts/BattleUiIntegration/Game-before-integration.unity`。重新接入会更新玩法 UI 的布局和接线，先保存当前场景。
 

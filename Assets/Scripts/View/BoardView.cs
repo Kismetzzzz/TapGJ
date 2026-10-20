@@ -40,6 +40,9 @@ namespace TapGJ.View
         [Tooltip("让背景中的棋盘透出；墙与合法目标高亮仍保留。")]
         public bool TransparentCells;
 
+        [Header("棋子美术")]
+        public BattlePieceArt PieceArt;
+
         readonly List<CellView> _cells = new List<CellView>();
         readonly Dictionary<int, CellView> _cellByKey = new Dictionary<int, CellView>();
 
@@ -302,7 +305,7 @@ namespace TapGJ.View
             go.transform.SetParent(_creepRoot.transform, false);
             go.transform.localScale = Vector3.one * (CellSize * CreepView.BodyScale);
             var view = go.AddComponent<CreepView>();
-            view.Build(uid, _font);
+            view.Build(uid, _font, PieceArt);
             _creeps[uid] = go;
             return view;
         }
@@ -931,12 +934,8 @@ namespace TapGJ.View
     }
 
     /// <summary>
-    /// 一只小怪（或一个复合元素）的显示对象：色块底板 + 元素字。
-    /// 元素字是**子物体**，所以色块在哪字就在哪，移动 / 生成 / 消失的缩放动画也自动联动 ——
-    /// 不会再出现「色块还在字没了」或者「字还在色块没了」这种两边不同步的情况。
-    ///
-    /// 复合元素复用同一个显示对象：多一层「光环」ring 把它和普通元素区分开
-    /// （它是静态的、不会被反应吃掉，视觉上应该一眼看得出不一样）。
+    /// 一只小怪或复合元素的显示对象：使用对应素材，缺图时显示色块和元素字。
+    /// 移动、生成和消失动画沿用同一个节点；复合元素缺图时再补充光环。
     /// </summary>
     public sealed class CreepView : MonoBehaviour
     {
@@ -964,10 +963,13 @@ namespace TapGJ.View
         /// <summary>复合元素的光环；普通元素上没有这个对象。</summary>
         public SpriteRenderer Ring { get; private set; }
         public TextMesh Label { get; private set; }
+        public bool HasArtwork { get; private set; }
+        BattlePieceArt _art;
 
-        public void Build(int uid, Font font)
+        public void Build(int uid, Font font, BattlePieceArt art = null)
         {
             Uid = uid;
+            _art = art;
 
             Body = gameObject.AddComponent<SpriteRenderer>();
             Body.sprite = BoardView.SpriteOf(Color.white);
@@ -984,11 +986,14 @@ namespace TapGJ.View
             Element = creep.Element;
             if (Body == null) return;
 
-            Body.color = ElementDefs.Tint(creep.Element);
-            Body.sprite = BoardView.SpriteOf(Color.white);
+            var sprite = _art != null ? _art.GetSprite(creep.Element) : null;
+            HasArtwork = sprite != null;
+            Body.color = HasArtwork ? Color.white : ElementDefs.Tint(creep.Element);
+            Body.sprite = sprite != null ? sprite : BoardView.SpriteOf(Color.white);
 
             string text = ElementDefs.Name(creep.Element);
             if (Label != null && Label.text != text) Label.text = text;
+            if (Label != null) Label.gameObject.SetActive(!HasArtwork);
 
             if (Ring != null) Ring.enabled = false;
         }
@@ -1001,16 +1006,19 @@ namespace TapGJ.View
             if (Body == null) return;
 
             var tint = CompositeDefs.Tint(composite.Kind);
-            Body.color = tint;
-            Body.sprite = BoardView.SpriteOf(Color.white);
+            var sprite = _art != null ? _art.GetSprite(composite.Kind) : null;
+            HasArtwork = sprite != null;
+            Body.color = HasArtwork ? Color.white : tint;
+            Body.sprite = sprite != null ? sprite : BoardView.SpriteOf(Color.white);
 
             string text = CompositeDefs.Name(composite.Kind);
             if (Label != null && Label.text != text) Label.text = text;
+            if (Label != null) Label.gameObject.SetActive(!HasArtwork);
 
-            EnsureRing();
+            if (!HasArtwork) EnsureRing();
             if (Ring != null)
             {
-                Ring.enabled = true;
+                Ring.enabled = !HasArtwork;
                 Ring.color = new Color(tint.r, tint.g, tint.b, 0.55f);
             }
         }

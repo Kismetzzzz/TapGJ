@@ -15,7 +15,7 @@ namespace TapGJ.EditorTools
     {
         const string Art = "Assets/UI/Art/ElementAbacus/";
         const string PrefabPath = "Assets/UI/Prefabs/BattleGameplay.prefab";
-        static readonly Color Ink = new Color(.21f, .27f, .31f);
+        static readonly Color Ink = new Color(.10f, .13f, .16f);
 
         [MenuItem("TapGJ/更新五行算盘", false, 7)]
         public static void Install()
@@ -69,8 +69,14 @@ namespace TapGJ.EditorTools
             rail.anchorMin = rail.anchorMax = rail.pivot = Vector2.zero;
             rail.anchoredPosition = new Vector2(24, 24);
             rail.localScale = new Vector3(.8f, .8f, 1);
-            Label(rail, "Heading", "五行算盘", 0, 0, 384, 36, 27);
-            var hint = Label(rail, "Hint", "集齐 5 点，生成对应元素牌", 0, 36, 384, 28, 20);
+            var paper = rail.gameObject.AddComponent<Image>();
+            paper.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Art/UiSurface.png");
+            paper.type = Image.Type.Sliced;
+            paper.color = new Color(.98f, .95f, .86f);
+            paper.raycastTarget = false;
+            Label(rail, "Heading", "五行算盘", 0, 2, 384, 38, 32).fontStyle = FontStyle.Bold;
+            var hint = Label(rail, "Hint", "集齐 5 点，生成对应元素牌", 0, 40, 384, 32, 24);
+            hint.fontStyle = FontStyle.Bold;
             var backing = Picture(rail, "Backing", null, 2, 80, 380, 317);
             backing.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/UI/Art/UiSurface.png");
             backing.type = Image.Type.Sliced;
@@ -105,10 +111,15 @@ namespace TapGJ.EditorTools
                     upperBeads[i * 2 + bead] = Bead(column, "UpperBead" + bead, name, 53 - bead * 32);
                     upperBeads[i * 2 + bead].GetComponent<Image>().color = new Color(1, 1, 1, .25f);
                 }
-                var icon = Picture(column, "Icon", "Icon" + name, 6, 92, 44, 34);
+                var icon = Picture(column, "Icon", "Icon" + name, 6, 82, 44, 32);
                 icon.preserveAspect = true;
                 icons[i] = icon;
-                counters[i] = Label(column, "Progress", "0/5", 0, 126, 56, 18, 16);
+                var counterBacking = Picture(column, "ProgressBacking", null, 0, 116, 56, 28);
+                counterBacking.sprite = paper.sprite;
+                counterBacking.type = Image.Type.Sliced;
+                counterBacking.color = paper.color;
+                counters[i] = Label(column, "Progress", "0/5", 0, 116, 56, 28, 24);
+                counters[i].fontStyle = FontStyle.Bold;
                 var flash = Picture(column, "ChargeFlash", null, -4, 82, 64, 64);
                 flash.sprite = focusSprite;
                 flash.color = new Color(1f, .95f, .36f);
