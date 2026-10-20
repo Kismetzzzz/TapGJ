@@ -5,6 +5,8 @@ Shader "TapGJ/CardEffectComposite"
         [PerRendererData] _MainTex ("Rendered effect", 2D) = "white" {}
         _CardOpacity ("Rendered card opacity", 2D) = "black" {}
         _ZTest ("Depth test", Float) = 4
+        _EffectOpacity ("Effect opacity", Range(0, 1)) = 1
+        [Toggle] _UseRenderedAlpha ("Use rendered alpha", Float) = 0
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
         _StencilOp ("Stencil Operation", Float) = 0
@@ -33,6 +35,8 @@ Shader "TapGJ/CardEffectComposite"
             struct v2f { float4 vertex : SV_POSITION; float2 uv : TEXCOORD0; float4 local : TEXCOORD1; fixed4 color : COLOR; };
             sampler2D _MainTex, _CardOpacity;
             float4 _ClipRect;
+            half _EffectOpacity;
+            half _UseRenderedAlpha;
             v2f vert(appdata v)
             {
                 v2f o;
@@ -46,9 +50,9 @@ Shader "TapGJ/CardEffectComposite"
             {
                 half4 color = tex2D(_MainTex, i.uv);
                 // 原卡面的单粒子使用 SrcAlpha 混合；还原 alpha，火星保留加法颜色。
-                color.a = sqrt(saturate(tex2D(_CardOpacity, i.uv).a));
-                color.rgb *= i.color.rgb * i.color.a;
-                color.a *= i.color.a;
+                color.a = lerp(sqrt(saturate(tex2D(_CardOpacity, i.uv).a)), color.a, _UseRenderedAlpha);
+                color.rgb *= i.color.rgb * i.color.a * _EffectOpacity;
+                color.a *= i.color.a * _EffectOpacity;
                 #ifdef UNITY_UI_CLIP_RECT
                     color *= UnityGet2DClipping(i.local.xy, _ClipRect);
                 #endif

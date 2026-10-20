@@ -84,6 +84,18 @@ namespace TapGJ.View
             // 图片使用独立的正向平面，避免随地面四角变成扁平菱形。
             float side = Mathf.Min(Vector2.Distance(corners[0], corners[1]),
                 Vector2.Distance(corners[0], corners[3])) * .95f;
+            // 在透视四边形内尽量用满高度；图案四角与弹出动画都不能越过格线。
+            if (_source.IsComposite)
+            {
+                side = float.PositiveInfinity;
+                for (int i = 0; i < 4; i++)
+                {
+                    var edge = _corners[(i + 1) % 4] - _corners[i];
+                    float distance = Mathf.Abs(edge.x * _corners[i].y - edge.y * _corners[i].x);
+                    side = Mathf.Min(side, 2 * distance / Mathf.Max(.001f, Mathf.Abs(edge.x) + Mathf.Abs(edge.y)));
+                }
+                side *= .98f / Mathf.Max(1, animationScale);
+            }
             _artwork.rectTransform.sizeDelta = Vector2.one * side;
             _label.gameObject.SetActive(!_source.HasArtwork);
             _label.rectTransform.sizeDelta = new Vector2(size.x * .55f, size.y * .75f);

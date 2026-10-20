@@ -32,6 +32,7 @@ namespace TapGJ.View
         [SerializeField] BattleUiCard[] cards;
         [SerializeField] Button nextRoundButton;
         [SerializeField] Image endPlayerPhaseArtwork;
+        [SerializeField] Sprite endDiscardPhaseSprite;
         [SerializeField] Button discardButton;
         [SerializeField] Button settingsButton;
         [SerializeField] Button settingsBackdrop;
@@ -47,6 +48,7 @@ namespace TapGJ.View
 
         UnityAction[] _cardActions, _elementActions;
         GameObject _returnFocus;
+        Sprite _endPlayerPhaseSprite;
         float _elapsed;
         float _handLayoutReadyAt;
         bool _timerRunning = true, _actionsEnabled = true;
@@ -187,7 +189,20 @@ namespace TapGJ.View
             var label = nextRoundButton.GetComponentInChildren<Text>();
             label.text = value;
             if (endPlayerPhaseArtwork == null) return;
-            bool showArtwork = value == "结束出牌";
+            if (_endPlayerPhaseSprite == null) _endPlayerPhaseSprite = endPlayerPhaseArtwork.sprite;
+            var sprite = value == "结束出牌" ? _endPlayerPhaseSprite :
+                value == "结束弃牌" ? endDiscardPhaseSprite : null;
+            bool showArtwork = sprite != null;
+            if (showArtwork)
+            {
+                endPlayerPhaseArtwork.sprite = sprite;
+                var rect = endPlayerPhaseArtwork.rectTransform;
+                float height = Mathf.Max(1, ((RectTransform)nextRoundButton.transform).rect.height - 10);
+                rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1, .5f);
+                rect.anchoredPosition = Vector2.zero;
+                rect.sizeDelta = new Vector2(((RectTransform)nextRoundButton.transform).rect.width, height);
+                endPlayerPhaseArtwork.preserveAspect = true;
+            }
             label.enabled = !showArtwork;
             endPlayerPhaseArtwork.gameObject.SetActive(showArtwork);
             var background = nextRoundButton.GetComponent<Image>();

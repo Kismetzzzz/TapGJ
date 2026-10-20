@@ -7,6 +7,7 @@ namespace TapGJ.View
     public sealed class CardDissolveProfile : ScriptableObject
     {
         public GameObject prefab;
+        public GameObject normalPrefab;
         public Material compositeMaterial;
         [Tooltip("原包相机的泛光配置；由接入层显式绑定，避免沿用预制体内失效的引用。")]
         public PostProcessProfile postProcessProfile;

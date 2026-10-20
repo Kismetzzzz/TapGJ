@@ -319,6 +319,8 @@ namespace TapGJ.Tests
                 Is.InRange(session.Board.CellSize * CreepView.BodyScale * .85f, session.Board.CellSize * CreepView.BodyScale));
             Assert.AreEqual(creep.Body.color.a, creep.Label.color.a, 1f / 255);
             Assert.AreEqual(1, hud.GetComponentsInChildren<CardDissolveEffect>().Length);
+            Assert.Greater(hud.GetComponentInChildren<CardDissolveEffect>().CardParticles.particleCount, 0,
+                "棋子生成到中途时卡面仍应可见，不能只保留粒子空对象");
             float opacityBeforePause = creep.Body.color.a;
             hud.Ui.OpenSettings();
             yield return new WaitForSecondsRealtime(.3f);
@@ -656,8 +658,8 @@ namespace TapGJ.Tests
             var composition = hud.transform.Find("Composition");
             var compositionRect = (RectTransform)composition;
             var background = composition.Find("Background").GetComponent<Image>();
-            Assert.AreEqual(1024, background.sprite.texture.width, "应使用新背景的原始分辨率");
-            Assert.AreEqual(575, background.sprite.texture.height);
+            Assert.AreEqual(1123, background.sprite.texture.width, "所有关卡共用指定棋盘原图");
+            Assert.AreEqual(633, background.sprite.texture.height);
             Assert.IsTrue(background.preserveAspect);
             Assert.IsFalse(background.raycastTarget, "背景图片不能遮挡棋盘点击");
             var viewport = hud.Viewport;
@@ -682,9 +684,11 @@ namespace TapGJ.Tests
             // 独立读图标记的前排、后排与中间格子中心，容许手绘边缘的小幅不规则。
             var cells = new[] { new Pos(0, 0), new Pos(7, 0), new Pos(0, 7), new Pos(7, 7),
                 new Pos(3, 3), new Pos(4, 4), new Pos(0, 3), new Pos(7, 3) };
-            var backgroundCenters = new[] { new Vector2(304.39f, 697.91f), new Vector2(1628.22f, 702.18f),
-                new Vector2(440.01f, 129.83f), new Vector2(1487.08f, 124.35f), new Vector2(874.85f, 421.26f),
-                new Vector2(1041.87f, 340.26f), new Vector2(370.32f, 421.71f), new Vector2(1559.45f, 420.65f) };
+            var backgroundCenters = new[] { new Vector2(151, 434), new Vector2(980, 434),
+                new Vector2(266, 132), new Vector2(871, 132), new Vector2(516, 282),
+                new Vector2(616, 240), new Vector2(209, 282), new Vector2(925, 282) };
+            float imageScale = Mathf.Min(1920f / 1123, 1080f / 633);
+            var imageOffset = new Vector2((1920 - 1123 * imageScale) * .5f, (1080 - 633 * imageScale) * .5f);
             for (int i = 0; i < cells.Length; i++)
             {
                 var p = cells[i];
@@ -692,7 +696,8 @@ namespace TapGJ.Tests
                     (p.Y * (board.CellSize + board.CellGap) + board.CellSize / 2) / board.BoardHeightWorld);
                 var position = composition.InverseTransformPoint(viewport.rectTransform.TransformPoint(viewport.BoardUvToLocal(uv)));
                 var imagePosition = new Vector2(position.x - compositionRect.rect.xMin, compositionRect.rect.yMax - position.y);
-                Assert.Less(Vector2.Distance(backgroundCenters[i], imagePosition), 5, $"背景格子 {p} 的中心应重合");
+                Assert.Less(Vector2.Distance(imageOffset + backgroundCenters[i] * imageScale, imagePosition), 5,
+                    $"背景格子 {p} 的中心应重合");
             }
             for (int i = 0; i < 7; i++)
             {
@@ -701,6 +706,53 @@ namespace TapGJ.Tests
                 Assert.IsFalse(viewport.TryCellAtLocalPoint(viewport.BoardUvToLocal(uv), out _), "格子接缝处不得落入相邻格");
             }
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator 全部关卡_共用同一棋盘图片与八乘八落子区域()
+        {
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var loader = Object.FindFirstObjectByType<LevelLoader>();
+            var catalog = Resources.FindObjectsOfTypeAll<LevelCatalog>()
+                .Single(c => c.levels != null && c.levels.Contains(loader.CurrentLevel));
+            var background = hud.transform.Find("Composition/Background").GetComponent<Image>();
+            var sprite = background.sprite;
+            Assert.AreEqual(1123, sprite.texture.width);
+            Assert.AreEqual(633, sprite.texture.height);
+            var expectedCenters = new Vector2[64];
+            var board = hud.Session.Board;
+            for (int y = 0; y < 8; y++)
+                for (int x = 0; x < 8; x++)
+                {
+                    var uv = new Vector2((x * (board.CellSize + board.CellGap) + board.CellSize / 2) / board.BoardWidthWorld,
+                        (y * (board.CellSize + board.CellGap) + board.CellSize / 2) / board.BoardHeightWorld);
+                    expectedCenters[y * 8 + x] = hud.Viewport.BoardUvToLocal(uv);
+                }
+            int checkedLevels = 0;
+            try
+            {
+                foreach (var level in catalog.levels.Where(l => l != null))
+                {
+                    loader.LoadLevel(level, 4242);
+                    hud.Session.Paused = true;
+                    yield return null;
+                    Canvas.ForceUpdateCanvases();
+                    Assert.AreEqual(8, hud.Session.Engine.Board.Width, level.levelId);
+                    Assert.AreEqual(8, hud.Session.Engine.Board.Height, level.levelId);
+                    Assert.AreSame(sprite, background.sprite, level.levelId + " 不能切换棋盘底图");
+                    for (int y = 0; y < 8; y++)
+                        for (int x = 0; x < 8; x++)
+                        {
+                            Assert.IsTrue(hud.Viewport.TryCellAtLocalPoint(expectedCenters[y * 8 + x], out var cell), level.levelId);
+                            Assert.AreEqual(new Pos(x, y), cell, level.levelId + " 的落子区域必须保持不变");
+                        }
+                    checkedLevels++;
+                }
+            }
+            finally { hud.Session.Paused = false; }
+            Assert.Greater(checkedLevels, 0);
+            yield return WaitForAction();
+            yield return BattleActionButtonArtPlayModeTests.Capture(hud.Ui, "last-level", "SharedBattleBoard");
         }
 
         [UnityTest]
@@ -767,6 +819,71 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 复合棋子_图案只占一格且保持格心和动画比例()
+        {
+            var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
+            var engine = hud.Session.Engine;
+            var board = hud.Session.Board;
+            var cells = new[] { 0, engine.Board.Height - 1 }
+                .SelectMany(y => Enumerable.Range(0, engine.Board.Width).Select(x => new Pos(x, y))).ToArray();
+            engine.ClearBoard();
+            foreach (var cell in cells) engine.PlaceCreep(Element.Metal, cell);
+            board.Sync();
+            yield return null;
+            yield return null;
+            var ordinary = cells.Select(cell => hud.Viewport.GetComponentsInChildren<BattleBoardPieceView>()
+                .Single(p => p.name == "DiamondPiece_" + board.CreepViewAt(cell).Uid)).ToArray();
+            var centers = ordinary.Select(p => ((RectTransform)p.transform).anchoredPosition).ToArray();
+
+            engine.ClearBoard();
+            for (int i = 0; i < cells.Length; i++) engine.PlaceComposite(CompositeDefs.All[i % 5], cells[i]);
+            board.Sync();
+            yield return null;
+            yield return null;
+            var composites = cells.Select(cell => hud.Viewport.GetComponentsInChildren<BattleBoardPieceView>()
+                .Single(p => p.name == "DiamondPiece_" + board.CompositeViewAt(cell).Uid)).ToArray();
+            for (int i = 0; i < composites.Length; i++)
+            {
+                var piece = composites[i];
+                var image = piece.transform.Find("Artwork").GetComponent<Image>();
+                float height = image.rectTransform.rect.height;
+                Assert.Greater(height, ((RectTransform)piece.transform).rect.height * .8f,
+                    "在单格内尽量用满高度，避免重新缩得过小");
+                AssertArtworkInsideCell(hud.Viewport, image, cells[i]);
+                Assert.Less(Vector2.Distance(centers[i], ((RectTransform)piece.transform).anchoredPosition), .001f);
+                Assert.AreEqual(Vector2.zero, image.rectTransform.anchoredPosition);
+                Assert.IsTrue(image.preserveAspect);
+                Assert.IsFalse(image.raycastTarget);
+                Assert.IsTrue(hud.Viewport.TryCellAtLocalPoint(centers[i], out var cell));
+                Assert.AreEqual(cells[i], cell, "放大图案不能改变点击所对应的格子");
+            }
+
+            var source = board.CompositeViewAt(cells[0]);
+            var originalScale = source.transform.localScale;
+            source.transform.localScale = originalScale * 1.2f;
+            yield return null;
+            yield return null;
+            AssertArtworkInsideCell(hud.Viewport, composites[0].transform.Find("Artwork").GetComponent<Image>(), cells[0]);
+
+            source.transform.localScale = originalScale * .6f;
+            yield return null;
+            yield return null;
+            Assert.AreEqual(.6f, composites[0].transform.localScale.x, .001f, "仍应跟随生成和消失的缩放动画");
+        }
+
+        static void AssertArtworkInsideCell(BattleBoardViewport viewport, Image image, Pos expected)
+        {
+            var corners = new Vector3[4];
+            image.rectTransform.GetWorldCorners(corners);
+            foreach (var corner in corners)
+            {
+                var local = (Vector2)viewport.rectTransform.InverseTransformPoint(corner);
+                Assert.IsTrue(viewport.TryCellAtLocalPoint(local, out var actual), "图案四角必须位于棋格内部");
+                Assert.AreEqual(expected, actual, "复合元素图案不能跨到相邻格子");
+            }
+        }
+
+        [UnityTest]
         public IEnumerator 真实界面_保存两种尺寸的渲染预览()
         {
             var hud = Object.FindFirstObjectByType<BattleGameplayHud>();
@@ -775,7 +892,7 @@ namespace TapGJ.Tests
             hud.Session.Engine.ClearBoard();
             for (int i = 0; i < ElementDefs.Count; i++)
             {
-                hud.Session.Engine.PlaceCreep(ElementDefs.All[i], new Pos(i + 1, 2));
+                hud.Session.Engine.PlaceCreep(ElementDefs.All[i], new Pos(i + 1, 4));
                 hud.Session.Engine.PlaceComposite(CompositeDefs.All[i], new Pos(i + 1, 5));
             }
             hud.Session.Board.Sync();

@@ -147,6 +147,7 @@ namespace TapGJ.EditorTools
             data.ApplyModifiedPropertiesWithoutUndo();
             abacus.Setup(controller);
             ApplyActionButtonArtwork(controller);
+            BattleButtonArtInstaller.Apply(controller);
             controller.ArrangeHand();
             foreach (var card in cards) PrefabUtility.RecordPrefabInstancePropertyModifications(card.transform);
             var layout = canvas.AddComponent<BattleUiLayout>();

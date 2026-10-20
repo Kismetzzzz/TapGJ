@@ -70,6 +70,7 @@ namespace TapGJ.EditorTools
             var viewport = ui.BoardContent.gameObject.AddComponent<BattleBoardViewport>();
             viewport.color = Color.white;
             viewport.raycastTarget = true;
+            viewport.material = AssetDatabase.LoadAssetAtPath<Material>("Assets/UI/BoardEffectComposite.mat");
             ApplyBackgroundBoardCalibration(viewport);
             var hud = copy.AddComponent<BattleGameplayHud>();
             SetRef(hud, "ui", ui);
@@ -96,6 +97,7 @@ namespace TapGJ.EditorTools
             SetRef(hud, "nextLevelButton", Button(panel, "NextLevelButton", "下一关", 252, 278, 195, 72));
             SetRef(hud, "resultMenuButton", Button(panel, "MenuButton", "返回菜单", 469, 278, 195, 72));
             result.gameObject.SetActive(false);
+            BattleButtonArtInstaller.Apply(ui);
 
             // 预制体只保存界面内部引用；场景中的对局与相机在实例上接线。
             var prefab = PrefabUtility.SaveAsPrefabAsset(copy, PrefabPath);
@@ -145,21 +147,22 @@ namespace TapGJ.EditorTools
 
         static void ApplyBackgroundBoardCalibration(BattleBoardViewport viewport)
         {
-            // 原图 1024×575，完整等比显示在 1920×1080 内。四角是正面梯形棋盘的外框：近左、近右、远右、远左。
-            const float left = 160, top = 60, width = 1620, height = 730;
+            // 共用原图 1123×633，四角按可落子格线内沿标定：近左、近右、远右、远左。
+            const float left = 100, top = 150, width = 1720, height = 670;
             var rect = viewport.rectTransform;
             rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0, 1);
             rect.anchoredPosition = new Vector2(left, -top);
             rect.sizeDelta = new Vector2(width, height);
             var imageCorners = new[]
             {
-                new Vector2(105.379f, 399.343f), new Vector2(927.837f, 402.636f),
-                new Vector2(828.874f, 48.475f), new Vector2(200.039f, 52.060f)
+                new Vector2(79, 465), new Vector2(1051, 465),
+                new Vector2(908, 117), new Vector2(229, 117)
             };
-            const float scale = 1920f / 1024f;
-            float imageTop = (1080 - 575 * scale) * .5f;
+            float scale = Mathf.Min(1920f / 1123, 1080f / 633);
+            float imageLeft = (1920 - 1123 * scale) * .5f;
+            float imageTop = (1080 - 633 * scale) * .5f;
             viewport.SetCornerCalibration(imageCorners.Select(p => new Vector2(
-                (p.x * scale - left) / width, (top + height - imageTop - p.y * scale) / height)).ToArray());
+                (imageLeft + p.x * scale - left) / width, (top + height - imageTop - p.y * scale) / height)).ToArray());
         }
 
         public static void RefreshHandLayout()

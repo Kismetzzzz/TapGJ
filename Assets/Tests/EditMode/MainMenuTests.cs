@@ -59,7 +59,6 @@ namespace TapGJ.Tests
                         Assert.IsNotNull(leaderboardProperties.objectReferenceValue,
                             "排行榜引用未绑定：" + leaderboardProperties.propertyPath);
                 Assert.IsFalse(((Button)data.FindProperty("backdropButton").objectReferenceValue).gameObject.activeSelf);
-                Assert.AreEqual("Assets/Scenes/Game.unity", data.FindProperty("gameplayScenePath").stringValue);
 
                 foreach (var label in canvas.GetComponentsInChildren<Text>(true))
                 {
@@ -72,7 +71,7 @@ namespace TapGJ.Tests
                     "Navigation/EntryPage/EnterButton", "Navigation/Menu/StartButton", "Navigation/Menu/QuitButton",
                     "Navigation/Menu/LeaderboardButton", "Navigation/UtilityButtons/SettingsButton",
                     "Navigation/UtilityButtons/UserButton", "Navigation/UtilityButtons/NoticeButton",
-                    "Navigation/LevelsPanel/PrototypeButton", "SettingsPanel/DoneButton",
+                    "SettingsPanel/DoneButton",
                     "LeaderboardPanel/AccountCard/LoginButton", "LeaderboardPanel/GlobalButton",
                     "LeaderboardPanel/FriendsButton", "LeaderboardPanel/RefreshButton",
                     "LeaderboardPanel/CloseButton", "Navigation/LevelsPanel/BackButton",

@@ -28,7 +28,8 @@ namespace TapGJ.Tests
             ExecuteEvents.Execute(button.gameObject, new BaseEventData(EventSystem.current), ExecuteEvents.submitHandler);
             yield return null;
             Assert.AreEqual(1, clicks);
-            Assert.IsTrue(canvas.Find("Navigation/Menu").gameObject.activeSelf);
+            Assert.IsFalse(canvas.Find("Navigation/Menu").gameObject.activeSelf);
+            Assert.IsTrue(canvas.Find("Navigation/LevelsPanel").gameObject.activeSelf);
         }
 
         [UnityTest]
@@ -42,7 +43,11 @@ namespace TapGJ.Tests
             AssertArtwork(entry.GetComponent<Image>(), "StartButton");
             Click(entry);
             yield return null;
-            Assert.IsTrue(canvas.Find("Navigation/Menu").gameObject.activeSelf);
+            Assert.IsFalse(canvas.Find("Navigation/Menu").gameObject.activeSelf);
+            Assert.IsTrue(canvas.Find("Navigation/LevelsPanel").gameObject.activeSelf);
+            controller.Back();
+            yield return null;
+            Assert.IsTrue(canvas.Find("Navigation/EntryPage").gameObject.activeSelf);
             var utility = canvas.Find("Navigation/UtilityButtons");
             foreach (string name in new[] { "SettingsButton", "UserButton", "NoticeButton" })
                 AssertArtwork(utility.Find(name).GetComponent<Image>(), name);

@@ -13,6 +13,57 @@ namespace TapGJ.Tests
     public sealed class MenuVisualPlayModeTests
     {
         [UnityTest]
+        public IEnumerator 选择页山水背景_只在章节关卡显示_宽窄屏铺满且不挡点击()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/MainMenu.unity");
+            yield return null;
+            var canvas = Object.FindFirstObjectByType<Canvas>();
+            var controller = Object.FindFirstObjectByType<MainMenuController>();
+            var navigation = canvas.transform.Find("Navigation");
+            var background = navigation.Find("SelectionBackground").GetComponent<Image>();
+            Assert.IsNotNull(background.sprite);
+            Assert.IsFalse(background.raycastTarget, "背景不能拦截卡片和按钮点击");
+            Assert.IsFalse(background.gameObject.activeSelf, "入口页沿用自己的美术");
+            controller.EnterMenu();
+            Assert.IsTrue(background.gameObject.activeInHierarchy, "确认后直接进入章节选择");
+            controller.OpenLevels();
+            Assert.IsTrue(background.gameObject.activeInHierarchy);
+            Assert.AreEqual(0f, navigation.Find("LevelsPanel").GetComponent<Image>().color.a,
+                "章节页不能用白底遮住山水");
+            Assert.Less(background.transform.GetSiblingIndex(), navigation.Find("LevelsPanel").GetSiblingIndex());
+            Assert.Less(background.transform.GetSiblingIndex(), navigation.Find("ChapterPanel").GetSiblingIndex());
+
+            canvas.GetComponent<CanvasScaler>().enabled = false;
+            canvas.renderMode = RenderMode.WorldSpace;
+            var canvasRect = (RectTransform)canvas.transform;
+            foreach (var size in new[] { new Vector2(1280, 720), new Vector2(960, 720),
+                new Vector2(1560, 720), new Vector2(1280, 540) })
+            {
+                canvasRect.sizeDelta = size;
+                yield return null;
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+                var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(canvasRect, background.transform);
+                Assert.LessOrEqual(bounds.min.x, canvasRect.rect.xMin + 1, "背景左侧不能留白");
+                Assert.GreaterOrEqual(bounds.max.x, canvasRect.rect.xMax - 1, "背景右侧不能留白");
+                Assert.LessOrEqual(bounds.min.y, canvasRect.rect.yMin + 1, "背景下侧不能留白");
+                Assert.GreaterOrEqual(bounds.max.y, canvasRect.rect.yMax - 1, "背景上侧不能留白");
+                Assert.AreEqual(background.sprite.rect.width / background.sprite.rect.height,
+                    background.rectTransform.rect.width / background.rectTransform.rect.height, .002f,
+                    "背景必须等比铺满");
+            }
+            controller.OpenChapter(0);
+            Assert.IsTrue(background.gameObject.activeInHierarchy);
+            controller.OpenSettings();
+            controller.ClosePanels();
+            Assert.IsTrue(background.gameObject.activeInHierarchy, "关闭弹窗后保留选择页背景");
+            controller.Back();
+            Assert.IsTrue(background.gameObject.activeInHierarchy);
+            controller.Back();
+            Assert.IsFalse(background.gameObject.activeSelf, "返回入口后隐藏选择页背景");
+        }
+
+        [UnityTest]
         public IEnumerator 章节插画反馈_悬停提亮_按下微缩_点击区域和美术配置保持稳定()
         {
             yield return SceneManager.LoadSceneAsync("Assets/Scenes/MainMenu.unity");
@@ -44,7 +95,7 @@ namespace TapGJ.Tests
                 feedback.OnPointerEnter(pointer);
                 yield return new WaitForSecondsRealtime(.15f);
                 Assert.Greater(art.material.GetColor("_Color").r, originalTint.r, "悬停应轻微提亮");
-                Assert.AreEqual(.65f, ring.alpha, .001f);
+                Assert.AreEqual(0f, ring.alpha, .001f, "悬停不能叠圆角外框");
                 Assert.AreEqual(originalScale, art.rectTransform.localScale);
 
                 feedback.OnPointerDown(new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Right });
@@ -108,7 +159,7 @@ namespace TapGJ.Tests
             button.onClick.AddListener(() => clicks++);
             EventSystem.current.SetSelectedGameObject(button.gameObject);
             yield return new WaitForSecondsRealtime(.15f);
-            Assert.AreEqual(1f, button.transform.Find("FocusRing").GetComponent<CanvasGroup>().alpha);
+            Assert.AreEqual(0f, button.transform.Find("FocusRing").GetComponent<CanvasGroup>().alpha, "聚焦不能叠圆角外框");
             Assert.Greater(art.material.GetColor("_Color").r, 1f);
             ExecuteEvents.Execute(button.gameObject, new BaseEventData(EventSystem.current), ExecuteEvents.submitHandler);
             Assert.AreEqual(1, clicks, "反馈不能重复触发 Button 的确认事件");
@@ -127,13 +178,13 @@ namespace TapGJ.Tests
             yield return null;
             Object.FindFirstObjectByType<MainMenuController>().EnterMenu();
             var canvas = Object.FindFirstObjectByType<Canvas>().transform;
-            var entry = canvas.Find("Navigation/Menu/StartButton").GetComponent<Button>();
+            var entry = canvas.Find("Navigation/LevelsPanel/BackButton").GetComponent<Button>();
             var image = entry.GetComponent<Image>();
             var ring = entry.transform.Find("FocusRing").GetComponent<CanvasGroup>();
             image.color = Color.yellow;
             EventSystem.current.SetSelectedGameObject(entry.gameObject);
             yield return null;
-            Assert.AreEqual(1f, ring.alpha);
+            Assert.AreEqual(0f, ring.alpha, "聚焦不能叠圆角外框");
             Assert.AreEqual(Color.yellow, image.color);
             EventSystem.current.SetSelectedGameObject(null);
             yield return null;

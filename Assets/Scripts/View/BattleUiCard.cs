@@ -28,6 +28,7 @@ namespace TapGJ.View
         float _angleFrom, _angleTo, _scaleFrom, _scaleTo, _poseTime;
         int _handOrder;
         bool _poseInitialized, _moving;
+        ImportedParticleEffect _selectionEffect;
 
         public Element Element => element;
         public int CardId { get; private set; } = -1;
@@ -68,6 +69,7 @@ namespace TapGJ.View
 
         public void ClearBinding()
         {
+            SetSelected(false);
             CardId = -1;
             _poseInitialized = _moving = false;
         }
@@ -129,14 +131,33 @@ namespace TapGJ.View
             selectedRing.alpha = selected ? 1 : 0;
             if (selected) transform.SetAsLastSibling();
             else transform.SetSiblingIndex(_handOrder);
+            StopSelectionEffect();
+            if (selected) _selectionEffect = ImportedParticleEffect.PlaySelection(artwork.gameObject, ArtworkSize);
+        }
+
+        void StopSelectionEffect()
+        {
+            if (_selectionEffect == null) return;
+            _selectionEffect.gameObject.SetActive(false);
+            _selectionEffect = null;
+        }
+
+        void OnDisable()
+        {
+            StopSelectionEffect();
+            Selected = false;
+            if (selectedRing != null) selectedRing.alpha = 0;
+            if (artwork != null) artwork.anchoredPosition = Vector2.zero;
         }
 
         /// <summary>玩法确认消耗成功后调用；视觉副本独立播完，原槽位立即停止交互。</summary>
         public CardDissolveEffect PlayDissolve()
         {
             if (!gameObject.activeInHierarchy) return null;
+            StopSelectionEffect();
             selectedRing.alpha = 0;
-            var effect = CardDissolveEffect.Play(artwork.gameObject, ElementDefs.Tint(element));
+            var effect = CardDissolveEffect.Play(artwork.gameObject, ElementDefs.Tint(element),
+                kind == CardKind.ElementCard && element == Element.Fire);
             SetSelected(false);
             gameObject.SetActive(false);
             return effect;

@@ -25,14 +25,13 @@ namespace TapGJ.View
         public ParticleSystem SparkParticles => _sparks;
         public Texture OutputTexture => _output;
 
-        public static CardDissolveEffect Play(GameObject source, Color tint)
+        public static CardDissolveEffect Play(GameObject source, Color tint, bool fire = true)
         {
             if (!Application.isPlaying || source == null || !source.activeInHierarchy) return null;
             var profile = Resources.Load<CardDissolveProfile>("CardDissolve");
-            var cardTemplate = profile != null && profile.prefab != null
-                ? profile.prefab.transform.Find("bofang/kapai_01") : null;
-            var sparkTemplate = profile != null && profile.prefab != null
-                ? profile.prefab.transform.Find("bofang/lizi") : null;
+            var prefab = profile != null ? (!fire && profile.normalPrefab != null ? profile.normalPrefab : profile.prefab) : null;
+            var cardTemplate = prefab != null ? prefab.transform.Find("bofang/kapai_01") : null;
+            var sparkTemplate = prefab != null ? prefab.transform.Find("bofang/lizi") : null;
             if (cardTemplate == null || sparkTemplate == null || profile.compositeMaterial == null)
             {
                 Debug.LogWarning("原包卡牌消散资源未配置，保留即时移除。", source);
@@ -194,6 +193,8 @@ namespace TapGJ.View
             else GetComponent<MeshRenderer>().sharedMaterial = composite;
             var main = _card.main;
             main.useUnscaledTime = true;
+            // 按卡面原始寿命映射到棋盘共用时长，保留普通牌与火牌各自的溶解曲线。
+            main.simulationSpeed = main.startLifetime.constantMax / Duration;
             main = _sparks.main;
             main.useUnscaledTime = true;
             _card.Simulate(.0001f, false, true, false);
@@ -289,7 +290,7 @@ namespace TapGJ.View
         {
             _elapsed += Time.unscaledDeltaTime;
             RenderEffect();
-            if (_elapsed > .1f && !_card.IsAlive(false) && !_sparks.IsAlive(false)) Destroy(gameObject);
+            if (_elapsed >= Duration) Destroy(gameObject);
         }
 
         void RenderEffect()

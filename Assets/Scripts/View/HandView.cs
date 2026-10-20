@@ -99,7 +99,8 @@ namespace TapGJ.View
                 if (Engine.FindCard(_cards[i].CardId) == null)
                 {
                     if (Application.isPlaying && animateRemoval
-                        && CardDissolveEffect.Play(_cards[i].gameObject, ElementDefs.Tint(_cards[i].Element)) != null)
+                        && CardDissolveEffect.Play(_cards[i].gameObject, ElementDefs.Tint(_cards[i].Element),
+                            _cards[i].Kind == CardKind.ElementCard && _cards[i].Element == Element.Fire) != null)
                         dissolveDuration = CardDissolveEffect.Duration;
                     _cards[i].gameObject.SetActive(false);
                     BoardView.Kill(_cards[i].gameObject);
@@ -225,6 +226,8 @@ namespace TapGJ.View
         [SerializeField] TextMesh text;
 
         float _w = 1.15f, _h = 1.62f;
+        bool _selected;
+        ImportedParticleEffect _selectionEffect;
 
         /// <summary>元素字的世界高度 ≈ (fontSize/10) × glyphScale = 110/10 × 0.10 = 1.1 个「手牌单位」。</summary>
         const int TextFontSize = 110;
@@ -312,6 +315,18 @@ namespace TapGJ.View
         {
             if (ring == null) return;
             ring.color = selected ? new Color(1f, 0.95f, 0.55f, 1f) : new Color(1f, 1f, 1f, 0f);
+            if (_selected == selected) return;
+            _selected = selected;
+            if (_selectionEffect != null) _selectionEffect.gameObject.SetActive(false);
+            _selectionEffect = selected ? ImportedParticleEffect.PlaySelection(gameObject, new Vector2(_w, _h)) : null;
+        }
+
+        void OnDisable()
+        {
+            if (_selectionEffect != null) _selectionEffect.gameObject.SetActive(false);
+            _selectionEffect = null;
+            _selected = false;
+            if (ring != null) ring.color = Color.clear;
         }
     }
 }

@@ -76,6 +76,33 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
+        public IEnumerator 普通牌与火牌_卡面持续到共享消散中途_结束一起回收()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/BattleUI.unity");
+            yield return null;
+            var source = Object.FindFirstObjectByType<BattleUiController>().Cards[0].transform.Find("Artwork").gameObject;
+            var normal = CardDissolveEffect.Play(source, Color.white, false);
+            var fire = CardDissolveEffect.Play(source, Color.white, true);
+            Assert.IsNotNull(normal);
+            Assert.IsNotNull(fire);
+            Time.timeScale = 0;
+            yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration * .5f);
+            foreach (var effect in new[] { normal, fire })
+            {
+                Assert.IsTrue(effect != null, "普通牌和火牌不能早于棋盘过渡结束回收");
+                var particles = new ParticleSystem.Particle[1];
+                Assert.AreEqual(1, effect.CardParticles.GetParticles(particles),
+                    "共享时间线中途必须仍有卡面，不能只剩尾部火星或空对象");
+                Assert.AreEqual(1 - effect.Progress,
+                    particles[0].remainingLifetime / particles[0].startLifetime, .05f,
+                    "卡面实际播放进度应与棋盘共用的时间线一致");
+            }
+            yield return new WaitForSecondsRealtime(CardDissolveEffect.Duration * .5f + .2f);
+            Assert.IsTrue(normal == null);
+            Assert.IsTrue(fire == null);
+        }
+
+        [UnityTest]
         public IEnumerator 弃牌同样消散_关闭动画时即时移除()
         {
             var engine = Engine();

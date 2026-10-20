@@ -56,6 +56,8 @@ namespace TapGJ.View
 
         GameObject _cellRoot;
         GameObject _creepRoot;
+        Transform _effectRoot;
+        readonly Dictionary<int, ImportedParticleEffect> _ranges = new Dictionary<int, ImportedParticleEffect>();
         bool _selectedCellDirty;
         Pos _selectedCell = Pos.None;
         Font _font;
@@ -120,6 +122,7 @@ namespace TapGJ.View
             _cellByKey.Clear();
             _creeps.Clear();
             _frozen.Clear();
+            _ranges.Clear();
             _selectedCell = Pos.None;
 
             Build();
@@ -209,6 +212,9 @@ namespace TapGJ.View
             _cellRoot.transform.SetParent(transform, false);
             _creepRoot = new GameObject("Creeps");
             _creepRoot.transform.SetParent(transform, false);
+            _effectRoot = new GameObject("Effects").transform;
+            _effectRoot.SetParent(transform, false);
+            _effectRoot.gameObject.layer = gameObject.layer;
 
             for (int y = 0; y < Engine.Board.Height; y++)
             {
@@ -276,6 +282,7 @@ namespace TapGJ.View
                 var view = EnsureCreepView(composite.Uid);
                 view.ShowComposite(composite);
                 view.transform.localPosition = CellLocalPos(composite.Pos);
+                EnsureRange(composite);
             }
 
             // 二、清掉引擎里已经没有的
@@ -285,6 +292,7 @@ namespace TapGJ.View
 
             for (int i = 0; i < _stale.Count; i++)
             {
+                StopRange(_stale[i]);
                 Kill(_creeps[_stale[i]]);
                 _creeps.Remove(_stale[i]);
             }
@@ -482,6 +490,7 @@ namespace TapGJ.View
         public IEnumerator<object> PlayStep(StepRecord step, float stepDuration, float cardEffectDuration = 0)
         {
             if (step == null) yield break;
+            if (stepDuration > 0 || cardEffectDuration > 0) PlayImportedEvents(step);
             if (cardEffectDuration > 0)
             {
                 yield return PlayCardEffects(step, cardEffectDuration);
@@ -574,6 +583,7 @@ namespace TapGJ.View
                     view = EnsureCreepView(composite.Uid);
                     view.ShowComposite(composite);
                     view.transform.localPosition = CellLocalPos(composite.Pos);
+                    EnsureRange(composite);
                 }
                 if (view == null || !_frozen.Add(view.Uid)) continue;
                 transitions.Add((view, vanish));
@@ -739,6 +749,7 @@ namespace TapGJ.View
             var view = EnsureCreepView(composite.Uid);
             view.ShowComposite(composite);
             view.transform.localPosition = CellLocalPos(composite.Pos);
+            EnsureRange(composite);
 
             var cell = CellAt(composite.Pos);
             if (cell != null && cell.Highlight != null)
@@ -792,6 +803,7 @@ namespace TapGJ.View
         /// <summary>把所有小怪瞬间归位（跳过动画、重开局时用）。</summary>
         public void SnapAll()
         {
+            ClearEffects();
             _frozen.Clear();
             foreach (var kv in _creeps)
                 if (kv.Value != null) Kill(kv.Value);
@@ -804,6 +816,58 @@ namespace TapGJ.View
 
             Sync();
         }
+
+        void EnsureRange(Composite composite)
+        {
+            if (!Application.isPlaying || _effectRoot == null) return;
+            if (_ranges.TryGetValue(composite.Uid, out var existing) && existing != null) return;
+            float diameter = (2 * Mathf.Max(1, Engine.Rules.CompositeRange) + 1) * (CellSize + CellGap);
+            var effect = ImportedParticleEffect.PlayComposite(_effectRoot, CellLocalPos(composite.Pos), composite.Kind, diameter, true);
+            if (effect != null) _ranges[composite.Uid] = effect;
+        }
+
+        void StopRange(int uid)
+        {
+            if (!_ranges.TryGetValue(uid, out var effect)) return;
+            if (effect != null) effect.gameObject.SetActive(false);
+            _ranges.Remove(uid);
+        }
+
+        void PlayImportedEvents(StepRecord step)
+        {
+            foreach (var e in step.Events)
+            {
+                CompositeKind kind;
+                Pos position;
+                if (e.Type == GameEventType.CompositeSpawn)
+                {
+                    var composite = FindComposite(e.Uid);
+                    if (composite == null) continue;
+                    kind = composite.Kind;
+                    position = composite.Pos;
+                }
+                else if (e.Type == GameEventType.CompositeVanish)
+                {
+                    var view = CreepViewOf(e.Uid);
+                    if (view == null || !view.IsComposite) continue;
+                    kind = view.CompositeKind;
+                    position = e.From;
+                    StopRange(e.Uid);
+                }
+                else continue;
+                ImportedParticleEffect.PlayComposite(_effectRoot, CellLocalPos(position), kind, (CellSize + CellGap) * 2.4f, false);
+            }
+        }
+
+        void ClearEffects()
+        {
+            _ranges.Clear();
+            if (_effectRoot == null) return;
+            for (int i = _effectRoot.childCount - 1; i >= 0; i--) _effectRoot.GetChild(i).gameObject.SetActive(false);
+        }
+
+        void OnDisable() => ClearEffects();
+        void OnEnable() { if (Engine != null && _effectRoot != null) Sync(); }
 
         // ------------------------------------------------------------ 点击与高亮
 

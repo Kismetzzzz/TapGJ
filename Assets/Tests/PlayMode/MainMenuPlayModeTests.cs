@@ -58,16 +58,17 @@ namespace TapGJ.Tests
         {
             Assert.IsNull(Object.FindFirstObjectByType<GameSession>(), "菜单场景不能启动棋盘");
             var controller = Object.FindFirstObjectByType<MainMenuController>();
+            Assert.IsTrue(Find("LevelsPanel").gameObject.activeSelf);
+            Assert.IsFalse(Find("Menu").gameObject.activeSelf);
+            Assert.IsFalse(Find("EntryPage").gameObject.activeSelf);
             controller.Back();
             Assert.IsTrue(Find("EntryPage").gameObject.activeSelf);
             Assert.IsFalse(Find("Menu").gameObject.activeSelf);
             Assert.AreEqual(Button("EntryPage/EnterButton").gameObject, EventSystem.current.currentSelectedGameObject);
             Button("EntryPage/EnterButton").onClick.Invoke();
-            Assert.IsTrue(Find("Menu").gameObject.activeSelf);
-            Assert.IsFalse(Find("EntryPage").gameObject.activeSelf);
-            Button("Menu/StartButton").onClick.Invoke();
             Assert.IsTrue(Find("LevelsPanel").gameObject.activeSelf);
             Assert.IsFalse(Find("Menu").gameObject.activeSelf);
+            Assert.IsFalse(Find("EntryPage").gameObject.activeSelf);
             Assert.IsFalse(Find("UtilityButtons").gameObject.activeSelf);
             var catalog = controller.Catalog;
             for (int c = 1; c <= catalog.chapters.Length; c++)
@@ -105,8 +106,9 @@ namespace TapGJ.Tests
                     EventSystem.current.currentSelectedGameObject);
             }
             Button("LevelsPanel/BackButton").onClick.Invoke();
-            Assert.IsTrue(Find("Menu").gameObject.activeSelf);
-            Assert.AreEqual(Button("Menu/StartButton").gameObject, EventSystem.current.currentSelectedGameObject);
+            Assert.IsTrue(Find("EntryPage").gameObject.activeSelf);
+            Assert.IsFalse(Find("Menu").gameObject.activeSelf);
+            Assert.AreEqual(Button("EntryPage/EnterButton").gameObject, EventSystem.current.currentSelectedGameObject);
             yield return null;
         }
 
@@ -341,7 +343,7 @@ namespace TapGJ.Tests
         }
 
         [UnityTest]
-        public IEnumerator 卡片键盘导航_可到达末尾返回和试玩_数量减少后重置滚动()
+        public IEnumerator 卡片键盘导航_可到达末尾返回_数量减少后重置滚动()
         {
             var controller = Object.FindFirstObjectByType<MainMenuController>();
             var catalog = controller.Catalog;
@@ -358,7 +360,7 @@ namespace TapGJ.Tests
                 var firstChapter = Button("LevelsPanel/Chapter01Button");
                 var lastChapter = Button("LevelsPanel/Chapter09Button");
                 Assert.AreEqual(Button("LevelsPanel/BackButton"), firstChapter.navigation.selectOnLeft);
-                Assert.AreEqual(Button("LevelsPanel/PrototypeButton"), lastChapter.navigation.selectOnRight);
+                Assert.AreEqual(Button("LevelsPanel/BackButton"), lastChapter.navigation.selectOnRight);
                 for (int i = 1; i < 9; i++) MoveSelectedRight();
                 Assert.AreEqual(lastChapter.gameObject, EventSystem.current.currentSelectedGameObject);
                 yield return null;
@@ -401,6 +403,7 @@ namespace TapGJ.Tests
         [UnityTest]
         public IEnumerator 设置与公告_遮挡背景_关闭恢复当前页面和焦点()
         {
+            Object.FindFirstObjectByType<MainMenuController>().Back();
             var navigation = Find("Navigation").GetComponent<CanvasGroup>();
             var settingsButton = Button("UtilityButtons/SettingsButton");
             EventSystem.current.SetSelectedGameObject(settingsButton.gameObject);
@@ -431,14 +434,16 @@ namespace TapGJ.Tests
         [UnityTest]
         public IEnumerator 排行榜_暂时锁定_鼠标键盘和其他入口都不能进入()
         {
+            Assert.IsFalse(Find("Menu").gameObject.activeSelf);
             var entry = Button("Menu/LeaderboardButton");
             var panel = Find("LeaderboardPanel").gameObject;
             var menu = Find("Navigation").GetComponent<CanvasGroup>();
+            Object.FindFirstObjectByType<MainMenuController>().Back();
             var focus = EventSystem.current.currentSelectedGameObject;
             Assert.IsFalse(entry.interactable);
             Assert.AreEqual(Navigation.Mode.None, entry.navigation.mode);
             var icon = entry.transform.Find("Icon").GetComponent<Image>();
-            Assert.IsTrue(icon.gameObject.activeInHierarchy);
+            Assert.IsTrue(icon.gameObject.activeSelf);
             Assert.IsNotNull(icon.sprite, "锁定入口必须显示锁图标");
             Assert.IsFalse(icon.raycastTarget);
             StringAssert.Contains("暂未开放", entry.transform.Find("Label").GetComponent<Text>().text);
@@ -457,14 +462,6 @@ namespace TapGJ.Tests
             Assert.AreSame(focus, EventSystem.current.currentSelectedGameObject);
 
             var settings = Button("UtilityButtons/SettingsButton");
-            foreach (var direction in new[] { MoveDirection.Up, MoveDirection.Left })
-            {
-                EventSystem.current.SetSelectedGameObject(settings.gameObject);
-                ExecuteEvents.Execute(settings.gameObject,
-                    new AxisEventData(EventSystem.current) { moveDir = direction }, ExecuteEvents.moveHandler);
-                Assert.AreEqual(Button("Menu/StartButton").gameObject,
-                    EventSystem.current.currentSelectedGameObject, "键盘导航应跳过锁定入口");
-            }
             settings.onClick.Invoke();
             Assert.IsTrue(Find("SettingsPanel").gameObject.activeSelf);
         }
@@ -472,8 +469,10 @@ namespace TapGJ.Tests
         [UnityTest]
         public IEnumerator 排行榜_打开关闭恢复焦点_无服务时不伪造登录和成绩()
         {
-            var entry = Button("Menu/LeaderboardButton");
+            Object.FindFirstObjectByType<MainMenuController>().Back();
+            var entry = Button("UtilityButtons/UserButton");
             entry.interactable = true; // 开放后继续验证已有面板行为。
+            Button("Menu/LeaderboardButton").interactable = true;
             var panel = Find("LeaderboardPanel").gameObject;
             var menu = Find("Navigation").GetComponent<CanvasGroup>();
             EventSystem.current.SetSelectedGameObject(entry.gameObject);
@@ -683,29 +682,6 @@ namespace TapGJ.Tests
                 Object.Destroy(sprite);
                 Object.Destroy(texture);
             }
-        }
-
-        [UnityTest]
-        public IEnumerator 试玩入口_进入已有游戏场景且保留音量()
-        {
-            Button("Menu/StartButton").onClick.Invoke();
-            Assert.AreEqual("MainMenu", SceneManager.GetActiveScene().name);
-            Button("LevelsPanel/PrototypeButton").onClick.Invoke();
-            yield return WaitForScene("Game");
-            Assert.IsNotNull(Object.FindFirstObjectByType<GameSession>());
-            Assert.IsNotNull(GameAudio.Instance);
-            Assert.AreEqual(0.7f, GameAudio.Instance.MusicVolume, 0.001f);
-
-            yield return SceneManager.LoadSceneAsync(MenuPath);
-            yield return null;
-            _canvas = Object.FindFirstObjectByType<Canvas>().transform;
-            Assert.IsNull(Object.FindFirstObjectByType<GameSession>());
-            Assert.AreEqual(1, Object.FindObjectsByType<GameAudio>(FindObjectsSortMode.None).Length);
-            Button("EntryPage/EnterButton").onClick.Invoke();
-            Button("Menu/StartButton").onClick.Invoke();
-            Button("LevelsPanel/PrototypeButton").onClick.Invoke();
-            yield return WaitForScene("Game");
-            Assert.IsNotNull(Object.FindFirstObjectByType<GameSession>());
         }
 
         Transform Find(string path) => _canvas.Find(path) ?? _canvas.Find("Navigation/" + path);

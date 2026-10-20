@@ -130,7 +130,7 @@ namespace TapGJ.Tests
 #if UNITY_EDITOR
                     var volume = referenceCamera.GetComponents<MonoBehaviour>().First(s => s != null && s.GetType().Name == "PostProcessVolume");
                     var profileField = volume.GetType().GetField("sharedProfile");
-                    profileField.SetValue(volume, UnityEditor.AssetDatabase.LoadAssetAtPath<ScriptableObject>("Assets/yuansupai/texiao/Camera Profile 1.asset"));
+                    profileField.SetValue(volume, UnityEditor.AssetDatabase.LoadAssetAtPath<ScriptableObject>("Assets/shader/texiao/Camera Profile 1.asset"));
                     volume.enabled = false;
                     volume.enabled = true;
                     referenceCamera.Render();
@@ -191,9 +191,12 @@ namespace TapGJ.Tests
         static void SetTime(ParticleSystem particles, float time, uint seed)
         {
             particles.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = particles.main;
+            main.useUnscaledTime = true;
             particles.useAutoRandomSeed = false;
             particles.randomSeed = seed;
             particles.Simulate(Mathf.Max(.0001f, time), false, true, time > 0);
+            particles.Pause(false);
         }
 
         static Color[] ReadAndSave(RenderTexture target, Texture2D pixels, string path)

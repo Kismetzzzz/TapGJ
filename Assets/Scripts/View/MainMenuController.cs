@@ -3,7 +3,6 @@ using System.Globalization;
 using TapGJ.Flow;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace TapGJ.View
@@ -12,13 +11,11 @@ namespace TapGJ.View
     [DisallowMultipleComponent]
     public sealed class MainMenuController : MonoBehaviour
     {
-        [Header("游戏入口（Build Settings 中的场景路径）")]
-        [SerializeField] string gameplayScenePath = "Assets/Scenes/Game.unity";
-
         [Header("页面流程")]
         [SerializeField] GameObject entryPage;
         [SerializeField] GameObject mainMenuPage;
         [SerializeField] GameObject utilityButtons;
+        [SerializeField] GameObject selectionBackground;
         [SerializeField] Button enterButton;
         [Header("章节与关卡（数量由配置数组决定）")]
         [SerializeField] ChapterCatalog chapterCatalog;
@@ -49,7 +46,6 @@ namespace TapGJ.View
         [SerializeField] GameObject settingsPanel;
         [SerializeField] GameObject noticePanel;
         [SerializeField] LeaderboardPanel leaderboardPanel;
-        [SerializeField] Button playLevelButton;
         [SerializeField] Button closeLevelsButton;
         [SerializeField] Button closeSettingsButton;
         [SerializeField] Button closeLeaderboardButton;
@@ -96,7 +92,6 @@ namespace TapGJ.View
             settingsButton.onClick.AddListener(OpenSettings);
             quitButton.onClick.AddListener(QuitGame);
             backdropButton.onClick.AddListener(ClosePanels);
-            playLevelButton.onClick.AddListener(StartGame);
             closeLevelsButton.onClick.AddListener(Back);
             closeSettingsButton.onClick.AddListener(ClosePanels);
             settingsBackButton.onClick.AddListener(ClosePanels);
@@ -124,7 +119,6 @@ namespace TapGJ.View
             settingsButton.onClick.RemoveListener(OpenSettings);
             quitButton.onClick.RemoveListener(QuitGame);
             backdropButton.onClick.RemoveListener(ClosePanels);
-            playLevelButton.onClick.RemoveListener(StartGame);
             closeLevelsButton.onClick.RemoveListener(Back);
             closeSettingsButton.onClick.RemoveListener(ClosePanels);
             settingsBackButton.onClick.RemoveListener(ClosePanels);
@@ -153,7 +147,7 @@ namespace TapGJ.View
         public void EnterMenu()
         {
             if (_loading || !menuGroup.interactable) return;
-            ShowPage(mainMenuPage, startButton.gameObject);
+            OpenLevels();
         }
 
         public void OpenLevels()
@@ -265,6 +259,7 @@ namespace TapGJ.View
             levelsPanel.SetActive(page == levelsPanel);
             utilityButtons.SetActive(page == entryPage || page == mainMenuPage);
             chapterPanel.SetActive(page == chapterPanel);
+            selectionBackground.SetActive(page == levelsPanel || page == chapterPanel);
             statusLabel.text = "";
             ScrollRect scroll = page == levelsPanel ? chaptersScroll : page == chapterPanel ? levelsScroll : null;
             if (scroll != null)
@@ -288,8 +283,8 @@ namespace TapGJ.View
                 return;
             }
             if (chapterPanel.activeSelf) OpenLevels();
-            else if (levelsPanel.activeSelf) EnterMenu();
-            else if (mainMenuPage.activeSelf) ShowPage(entryPage, enterButton.gameObject);
+            else if (levelsPanel.activeSelf || mainMenuPage.activeSelf)
+                ShowPage(entryPage, enterButton.gameObject);
         }
 
         public void OpenNotice()
@@ -397,25 +392,6 @@ namespace TapGJ.View
             effectsValueLabel.text = $"{Mathf.RoundToInt(Audio.EffectsVolume * 100f)}%";
         }
 
-        public void StartGame()
-        {
-            if (_loading || !menuGroup.interactable) return;
-            int sceneIndex = SceneUtility.GetBuildIndexByScenePath(gameplayScenePath);
-            if (sceneIndex < 0 || !Application.CanStreamedLevelBeLoaded(sceneIndex))
-            {
-                statusLabel.text = "关卡暂不可用，请检查构建场景。";
-                Debug.LogError($"[TapGJ] 游戏场景未加入 Build Settings：{gameplayScenePath}", this);
-                return;
-            }
-
-            ClosePanels();
-            Audio.SaveSettings();
-            _loading = true;
-            menuGroup.interactable = false;
-            statusLabel.text = "正在进入游戏…";
-            SceneManager.LoadSceneAsync(sceneIndex, LoadSceneMode.Single);
-        }
-
         public void QuitGame()
         {
             if (_loading) return;
@@ -451,7 +427,7 @@ namespace TapGJ.View
                 }
             chaptersSummaryLabel.text = _chapterButtons.Count > 0
                 ? $"{_chapterButtons.Count} 个章节 · {levelCount} 个关卡 · 可横向滑动" : "暂无章节配置";
-            ConfigureCardNavigation(_chapterButtons, closeLevelsButton, playLevelButton);
+            ConfigureCardNavigation(_chapterButtons, closeLevelsButton);
         }
 
         GameObject ChapterFocus()
@@ -463,7 +439,7 @@ namespace TapGJ.View
 
         static string CardTitle(string value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
-        static void ConfigureCardNavigation(List<Button> cards, Button back, Button extra = null)
+        static void ConfigureCardNavigation(List<Button> cards, Button back)
         {
             for (int i = 0; i < cards.Count; i++)
             {
@@ -471,30 +447,21 @@ namespace TapGJ.View
                 {
                     mode = Navigation.Mode.Explicit,
                     selectOnLeft = i > 0 ? cards[i - 1] : back,
-                    selectOnRight = i + 1 < cards.Count ? cards[i + 1] : extra != null ? extra : back,
+                    selectOnRight = i + 1 < cards.Count ? cards[i + 1] : back,
                     selectOnUp = back,
-                    selectOnDown = extra != null ? extra : back
+                    selectOnDown = back
                 };
             }
-            var first = cards.Count > 0 ? cards[0] : extra;
-            var last = cards.Count > 0 ? cards[cards.Count - 1] : extra;
+            var first = cards.Count > 0 ? cards[0] : null;
+            var last = cards.Count > 0 ? cards[cards.Count - 1] : null;
             back.navigation = new Navigation
             {
                 mode = Navigation.Mode.Explicit,
-                selectOnLeft = extra != null ? extra : last,
+                selectOnLeft = last,
                 selectOnRight = first,
                 selectOnUp = last,
                 selectOnDown = first
             };
-            if (extra != null)
-                extra.navigation = new Navigation
-                {
-                    mode = Navigation.Mode.Explicit,
-                    selectOnLeft = cards.Count > 0 ? last : back,
-                    selectOnRight = back,
-                    selectOnUp = cards.Count > 0 ? first : back,
-                    selectOnDown = back
-                };
         }
 
         static Button CreateCard(Button template, RectTransform content, string name, string title, string goal, string availability, int index,

@@ -87,8 +87,7 @@ namespace TapGJ.View
             }
             else
             {
-                SetRect(page.Find("Availability"), left + 40, width - 450, true);
-                SetX(page.Find("PrototypeButton"), right - 215);
+                SetRect(page.Find("Availability"), left + 40, width - 80, true);
             }
         }
 

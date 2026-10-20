@@ -101,8 +101,8 @@ namespace TapGJ.View
 
         void Refresh()
         {
-            if (focusRing == null) return;
-            focusRing.alpha = Interactable ? (Pressed ? .45f : _selected ? 1f : _hovered ? .65f : 0f) : 0f;
+            // 按钮不叠加圆角外框；悬停和键盘聚焦只提亮按钮本身。
+            if (focusRing != null) focusRing.alpha = 0;
         }
 
         public void OnPointerEnter(PointerEventData eventData) { _hovered = true; Refresh(); }
